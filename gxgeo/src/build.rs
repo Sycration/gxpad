@@ -308,6 +308,42 @@ impl Doc {
         out
     }
 
+    /// Circle around point c through position p (radius at least 1e-3).
+    pub fn build_circle_to(&mut self, c: usize, p: [f64; 2]) -> usize {
+        let pc = self.pval(c);
+        let r = (p[0] - pc[0]).hypot(p[1] - pc[1]).max(1e-3);
+        self.add_circle(c, r)
+    }
+
+    /// New point at the radius |ca| around c, in the direction of `toward`:
+    /// the end of an arc around c starting at a.
+    pub fn build_arc_end(&mut self, c: usize, a: usize, toward: [f64; 2]) -> usize {
+        let (ca, pa) = (self.pval(c), self.pval(a));
+        let r = (pa[0] - ca[0]).hypot(pa[1] - ca[1]);
+        let ang = (toward[1] - ca[1]).atan2(toward[0] - ca[0]);
+        self.add_point(ca[0] + r * ang.cos(), ca[1] + r * ang.sin())
+    }
+
+    /// Ellipse or hyperbola centered on point c, with its first axis ending
+    /// at `axis` and its second half-axis reaching the line through `side`
+    /// parallel to the first axis.
+    pub fn build_conic_from(&mut self, kind: ConicKind, c: usize, axis: [f64; 2], side: [f64; 2]) -> usize {
+        let cc = self.pval(c);
+        let (dx, dy) = (axis[0] - cc[0], axis[1] - cc[1]);
+        let a = dx.hypot(dy).max(1e-3);
+        let t = dy.atan2(dx);
+        let b = ((-(side[0] - cc[0]) * t.sin() + (side[1] - cc[1]) * t.cos()).abs()).max(a * 0.05);
+        self.add_conic(kind, c, a, b, t)
+    }
+
+    /// Parabola with vertex at point c opening toward `axis`, its focal
+    /// distance |c axis|.
+    pub fn build_parabola_toward(&mut self, c: usize, axis: [f64; 2]) -> usize {
+        let cc = self.pval(c);
+        let (dx, dy) = (axis[0] - cc[0], axis[1] - cc[1]);
+        self.add_conic(ConicKind::Parabola, c, dx.hypot(dy).max(1e-3), 1.0, dy.atan2(dx))
+    }
+
     /// Mirror image of point p in line l.
     pub fn build_reflection(&mut self, p: usize, l: usize) -> usize {
         let pp = self.pval(p);
@@ -394,6 +430,36 @@ pub fn foot(d: &Doc, p: [f64; 2], l: usize) -> [f64; 2] {
     }
     let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2;
     [a[0] + t * dx, a[1] + t * dy]
+}
+
+/// Whether a label at `w` sits in a sector measuring the supplementary angle
+/// of the directed lines.
+pub fn angle_supp(d: &Doc, l1: usize, l2: usize, w: [f64; 2]) -> bool {
+    let x = angle_vertex(d, l1, l2);
+    let dir = |l: usize| {
+        let (a, b) = d.line_pts(l);
+        let (a, b) = (d.pval(a), d.pval(b));
+        [b[0] - a[0], b[1] - a[1]]
+    };
+    let (u, v) = (dir(l1), dir(l2));
+    let q = [w[0] - x[0], w[1] - x[1]];
+    let cr = |a: [f64; 2], b: [f64; 2]| a[0] * b[1] - a[1] * b[0];
+    for s1 in [1.0, -1.0] {
+        for s2 in [1.0, -1.0] {
+            let a = [u[0] * s1, u[1] * s1];
+            let b = [v[0] * s2, v[1] * s2];
+            let den = cr(a, b);
+            if den.abs() < 1e-15 {
+                continue;
+            }
+            let ka = cr(q, b) / den;
+            let kb = cr(a, q) / den;
+            if ka >= 0.0 && kb >= 0.0 {
+                return s1 * s2 < 0.0;
+            }
+        }
+    }
+    false
 }
 
 /// Intersection of two lines, or the midpoint of their midpoints when parallel.

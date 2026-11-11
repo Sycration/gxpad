@@ -2,13 +2,13 @@
 
 use crate::derive;
 use crate::expr::bx::{Bx, latex, plain, to_bx};
-use crate::expr::parse::plain_number;
 use crate::expr::*;
 use crate::model::*;
-use crate::solver::{DragEq, Sys};
-pub use gxgeo::build::{angle_vertex, foot};
+pub use gxgeo::build::{angle_supp, angle_vertex, foot};
+pub use gxgeo::sketch::Sketch;
+use gxgeo::sketch::{contact_guess, sample_polys};
 use eframe::egui::{self, Color32, Pos2, Rect, pos2};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub const BG: Color32 = Color32::from_rgb(0x11, 0x13, 0x17);
@@ -33,8 +33,7 @@ pub const CURVES: [Color32; 6] = [
     Color32::from_rgb(0x8f, 0xa8, 0xff),
 ];
 
-/// Symbols at or above this value name common subexpressions in formulas.
-pub const CSE_BASE: u32 = 0xF000_0000;
+pub use gxgeo::formula::{CSE_BASE, sym_name};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Tool {
@@ -163,16 +162,8 @@ pub struct DimEdit {
 }
 
 pub struct App {
-    pub doc: Doc,
-    pub undo: Vec<Doc>,
-    pub redo: Vec<Doc>,
-    pub sys: Option<Sys>,
-    pub dirty: bool,
-    pub free_params: HashSet<usize>,
-    pub dof: usize,
-    pub rank: usize,
-    pub conflicts: HashSet<Owner>,
-    pub errors: HashMap<Owner, String>,
+    /// The document with its solver state and undo history.
+    pub geo: Sketch,
     pub view: View,
     pub tool: Tool,
     pub sel: Vec<Sel>,
@@ -190,7 +181,6 @@ pub struct App {
     pub formula_job: Option<((Sel, u64, u32), std::sync::mpsc::Receiver<FormulaView>, std::sync::Arc<std::sync::atomic::AtomicBool>)>,
     /// "Search harder" level for a target in a document generation.
     pub search_level: Option<(Sel, u64, u32)>,
-    pub generation: u64,
     pub edit: Option<DimEdit>,
     pub flash: Vec<usize>,
     pub flash_until: f64,
@@ -231,40 +221,19 @@ pub fn fmt_dim(v: f64, angle: bool) -> String {
     if angle { format!("{}°", fmt_val(v.to_degrees())) } else { fmt_val(v) }
 }
 
-/// Renames identifier tokens equal to `old` in an expression string.
-pub fn rename_ident(s: &str, old: &str, new: &str) -> String {
-    let cs: Vec<char> = s.chars().collect();
-    let mut out = String::new();
-    let mut i = 0;
-    while i < cs.len() {
-        if cs[i].is_alphabetic() || cs[i] == '_' {
-            let st = i;
-            while i < cs.len() && (cs[i].is_alphanumeric() || cs[i] == '_') {
-                i += 1;
-            }
-            let w: String = cs[st..i].iter().collect();
-            out.push_str(if w == old { new } else { &w });
-        } else {
-            out.push(cs[i]);
-            i += 1;
-        }
+/// Polylines of entity e in world coordinates: the drawn shape when on
+/// screen, otherwise a sampling of the geometry.
+fn world_polys(shapes: &HashMap<usize, Vec<Vec<Pos2>>>, view: &View, d: &Doc, e: usize) -> Vec<Vec<[f64; 2]>> {
+    if let Some(p) = shapes.get(&e) {
+        return p.iter().map(|pl| pl.iter().map(|q| view.to_w(*q)).collect()).collect();
     }
-    out
+    sample_polys(d, e)
 }
 
 impl App {
     pub fn new() -> App {
-        let mut a = App {
-            doc: Doc::new(),
-            undo: vec![],
-            redo: vec![],
-            sys: None,
-            dirty: true,
-            free_params: HashSet::new(),
-            dof: 0,
-            rank: 0,
-            conflicts: HashSet::new(),
-            errors: HashMap::new(),
+        App {
+            geo: Sketch::new(),
             view: View { c: [0.0, 0.0], s: 60.0, rect: Rect::from_min_size(Pos2::ZERO, egui::vec2(800.0, 600.0)) },
             tool: Tool::Select,
             sel: vec![],
@@ -281,7 +250,6 @@ impl App {
             formula_key: None,
             formula_job: None,
             search_level: None,
-            generation: 0,
             edit: None,
             flash: vec![],
             flash_until: 0.0,
@@ -299,160 +267,33 @@ impl App {
             picks: vec![],
             flyout: None,
             group_last: [Tool::Ellipse, Tool::Midpoint, Tool::Circle, Tool::Arc],
-        };
-        a.solve_full();
-        a
-    }
-
-    // ------------------------------------------------------------ solving
-
-    pub fn rebuild(&mut self) {
-        let (eqns, errs) = self.doc.equations();
-        self.errors = errs.into_iter().collect();
-        self.sys = Some(Sys::build(&eqns, self.doc.unknowns()));
-        self.dirty = false;
-    }
-
-    fn vals(&self) -> Vec<f64> {
-        self.doc.params.iter().map(|p| p.v).collect()
-    }
-
-    fn store(&mut self, vals: &[f64]) {
-        for (p, v) in self.doc.params.iter_mut().zip(vals) {
-            p.v = *v;
         }
     }
 
-    /// Solves without drags and refreshes the constraint-status analysis.
-    pub fn solve_full(&mut self) -> bool {
-        if self.dirty || self.sys.is_none() {
-            self.rebuild();
-        }
-        let sys = self.sys.as_ref().unwrap();
-        let mut vals = self.vals();
-        let ok = sys.solve(&mut vals, &[], [0.0; 2]);
-        let an = sys.analyze(&vals);
-        let free: HashSet<usize> = an.free.iter().enumerate().filter(|(_, f)| **f).map(|(i, _)| sys.unknowns[i]).collect();
-        let rank = sys.unknowns.len() - an.dof;
-        let conflicts: HashSet<Owner> = sys.violated(&vals).into_iter().collect();
-        self.store(&vals);
-        self.free_params = free;
-        self.dof = an.dof;
-        self.rank = rank;
-        self.conflicts = conflicts;
-        ok
-    }
-
-    fn eq_count(&self) -> usize {
-        self.sys.as_ref().map(|s| s.eqs.len()).unwrap_or(0)
-    }
-
-    /// Applies a structural change; rolls back when it cannot be satisfied
-    /// (or, with `strict`, when it adds redundant equations).
-    pub fn try_change(&mut self, strict: bool, f: impl FnOnce(&mut Doc)) -> bool {
-        let before = self.doc.clone();
-        if self.dirty {
-            self.solve_full();
-        }
-        let (rank0, eqs0) = (self.rank, self.eq_count());
-        let had_conflicts = !self.conflicts.is_empty();
-        let unk0 = self.sys.as_ref().map(|s| s.unknowns.len()).unwrap_or(0);
-        f(&mut self.doc);
-        self.dirty = true;
-        let ok = self.solve_full();
-        let new_unk = self.sys.as_ref().map(|s| s.unknowns.len()).unwrap_or(0).saturating_sub(unk0);
-        let added = self.eq_count().saturating_sub(eqs0);
-        let _ = new_unk;
-        let redundant = strict && added > 0 && self.rank < rank0 + added;
-        if (!ok && !had_conflicts) || redundant || (!self.conflicts.is_empty() && !had_conflicts) {
-            self.doc = before;
-            self.dirty = true;
-            self.solve_full();
-            return false;
-        }
-        self.push_undo(before);
-        true
-    }
-
-    pub fn push_undo(&mut self, before: Doc) {
-        self.undo.push(before);
-        if self.undo.len() > 300 {
-            self.undo.remove(0);
-        }
-        self.redo.clear();
-        self.generation += 1;
-    }
-
-    pub fn checkpoint(&mut self) {
-        let d = self.doc.clone();
-        self.push_undo(d);
-    }
+    // ------------------------------------------------------------ history
 
     pub fn undo(&mut self) {
-        if let Some(d) = self.undo.pop() {
-            let cur = std::mem::replace(&mut self.doc, d);
-            self.redo.push(cur);
+        if self.geo.undo() {
             self.after_history();
         }
     }
 
     pub fn redo(&mut self) {
-        if let Some(d) = self.redo.pop() {
-            let cur = std::mem::replace(&mut self.doc, d);
-            self.undo.push(cur);
+        if self.geo.redo() {
             self.after_history();
         }
     }
 
     fn after_history(&mut self) {
-        self.dirty = true;
-        self.generation += 1;
         self.edit = None;
         self.pending.clear();
+        let d = &self.geo.doc;
         self.sel.retain(|s| match *s {
-            Sel::Ent(e) => self.doc.ent(e).is_some(),
-            Sel::Con(c) => self.doc.cons.get(c).is_some_and(|x| x.is_some()),
-            Sel::Dim(d) => self.doc.dims.get(d).is_some_and(|x| x.is_some()),
-            Sel::Var(v) => self.doc.vars.get(v).is_some_and(|x| x.is_some()),
+            Sel::Ent(e) => d.ent(e).is_some(),
+            Sel::Con(c) => d.cons.get(c).is_some_and(|x| x.is_some()),
+            Sel::Dim(i) => d.dims.get(i).is_some_and(|x| x.is_some()),
+            Sel::Var(v) => d.vars.get(v).is_some_and(|x| x.is_some()),
         });
-        self.solve_full();
-    }
-
-    /// Changes parameter values (dimensions, variables), solving with
-    /// continuation when a direct solve fails.
-    pub fn set_values(&mut self, changes: &[(usize, f64)], undoable: bool) -> bool {
-        let before = self.doc.clone();
-        let old: Vec<f64> = changes.iter().map(|(p, _)| self.doc.params[*p].v).collect();
-        for (p, v) in changes {
-            self.doc.params[*p].v = *v;
-        }
-        let mut ok = self.solve_full();
-        if !ok {
-            self.doc = before.clone();
-            let steps = 24;
-            ok = true;
-            for k in 1..=steps {
-                let t = k as f64 / steps as f64;
-                for (j, (p, v)) in changes.iter().enumerate() {
-                    self.doc.params[*p].v = old[j] + (v - old[j]) * t;
-                }
-                if !self.solve_full() {
-                    ok = false;
-                    break;
-                }
-            }
-        }
-        if !ok {
-            self.doc = before;
-            self.solve_full();
-            return false;
-        }
-        if undoable {
-            self.push_undo(before);
-        } else {
-            self.generation += 1;
-        }
-        true
     }
 
     pub fn flash_ents(&mut self, ents: Vec<usize>) {
@@ -463,7 +304,7 @@ impl App {
     // ------------------------------------------------------------ dragging
 
     pub fn drag_exprs(&self, kind: &DragKind, m: [f64; 2]) -> Vec<Expr> {
-        let d = &self.doc;
+        let d = &self.geo.doc;
         let k = |v: f64| float_raw(v);
         match kind {
             DragKind::Point { e, grab } => {
@@ -511,349 +352,47 @@ impl App {
     }
 
     pub fn drag_solve(&mut self, kind: &DragKind, m: [f64; 2]) {
-        if self.dirty {
-            self.rebuild();
-        }
         let exprs = self.drag_exprs(kind, m);
-        let sys = self.sys.as_ref().unwrap();
-        let drags: Vec<DragEq> = exprs.iter().map(|e| sys.drag_eq(e)).collect();
-        let mut vals = self.vals();
-        if sys.solve(&mut vals, &drags, m) {
-            self.store(&vals);
-        }
+        self.geo.drag_solve(&exprs, m);
     }
 
     // ------------------------------------------------------------ creation
 
     pub fn snap_pos(&self, s: &Snap) -> [f64; 2] {
         match s {
-            Snap::Point(e) => self.doc.pval(*e),
+            Snap::Point(e) => self.geo.doc.pval(*e),
             Snap::Curve(_, p) | Snap::Free(p) => *p,
         }
     }
 
-    pub fn tangent_con(&self, a: usize, b: usize) -> Option<Con> {
-        let d = &self.doc;
-        let side = |l: usize, c: usize| {
-            let (p, q) = d.line_pts(l);
-            let (p, q) = (d.pval(p), d.pval(q));
-            let (cc, _) = d.circ_val(c);
-            let cr = (q[0] - p[0]) * (cc[1] - p[1]) - (q[1] - p[1]) * (cc[0] - p[0]);
-            if cr < 0.0 { -1.0 } else { 1.0 }
-        };
-        if d.is_line(a) && d.is_circlelike(b) {
-            return Some(Con::Tangent { a, b, s: side(a, b), aux: None });
-        }
-        if d.is_line(b) && d.is_circlelike(a) {
-            return Some(Con::Tangent { a: b, b: a, s: side(b, a), aux: None });
-        }
-        if d.is_circlelike(a) && d.is_circlelike(b) {
-            let (c1, r1) = d.circ_val(a);
-            let (c2, r2) = d.circ_val(b);
-            let dist = (c1[0] - c2[0]).hypot(c1[1] - c2[1]);
-            let s = if (dist - (r1 + r2)).abs() <= (dist - (r1 - r2).abs()).abs() { 1.0 } else { -1.0 };
-            return Some(Con::Tangent { a, b, s, aux: None });
-        }
-        if d.is_point(a) || d.is_point(b) || a == b {
-            return None;
-        }
-        Some(Con::Tangent { a, b, s: 1.0, aux: None })
-    }
-
-    /// Initial contact point for a generic tangency: the closest pair of samples.
-    /// Polylines of an entity in world coordinates: the drawn shape when on
-    /// screen, otherwise a sampling of the geometry.
-    fn world_polys(&self, e: usize) -> Vec<Vec<[f64; 2]>> {
-        if let Some(p) = self.shapes.get(&e) {
-            return p.iter().map(|pl| pl.iter().map(|q| self.view.to_w(*q)).collect()).collect();
-        }
-        let d = &self.doc;
-        let n = 400;
-        let lin = |lo: f64, hi: f64, k: usize| lo + (hi - lo) * k as f64 / n as f64;
-        match d.kind(e) {
-            Some(Ent::Line { a, b, .. }) => {
-                let (pa, pb) = (d.pval(*a), d.pval(*b));
-                vec![(0..=n).map(|k| {
-                    let t = lin(-3.0, 4.0, k);
-                    [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t]
-                }).collect()]
-            }
-            Some(Ent::Circle { .. }) | Some(Ent::Arc { .. }) => {
-                let (c, r) = d.circ_val(e);
-                vec![(0..=n).map(|k| {
-                    let t = lin(0.0, std::f64::consts::TAU, k);
-                    [c[0] + r * t.cos(), c[1] + r * t.sin()]
-                }).collect()]
-            }
-            Some(Ent::Conic { kind, c, a, b, t }) => {
-                let cc = d.pval(*c);
-                let (a, b, t) = (d.params[*a].v, d.params[*b].v, d.params[*t].v);
-                let (ct, st) = (t.cos(), t.sin());
-                let tr = |u: f64, w: f64| [cc[0] + u * ct - w * st, cc[1] + u * st + w * ct];
-                match kind {
-                    ConicKind::Ellipse => vec![(0..=n).map(|k| {
-                        let th = lin(0.0, std::f64::consts::TAU, k);
-                        tr(a * th.cos(), b * th.sin())
-                    }).collect()],
-                    ConicKind::Hyperbola => [1.0, -1.0]
-                        .iter()
-                        .map(|sg| (0..=n).map(|k| {
-                            let u = lin(-3.0, 3.0, k);
-                            tr(sg * a * u.cosh(), b * u.sinh())
-                        }).collect())
-                        .collect(),
-                    ConicKind::Parabola => vec![(0..=n).map(|k| {
-                        let w = lin(-12.0 * a.abs().max(0.1), 12.0 * a.abs().max(0.1), k);
-                        tr(w * w / (4.0 * a), w)
-                    }).collect()],
-                }
-            }
-            Some(Ent::Curve { src }) => {
-                let Ok(def) = d.curve_def(src) else { return vec![] };
-                let Some(f) = def.explicit else { return vec![] };
-                let vals: Vec<f64> = d.params.iter().map(|p| p.v).collect();
-                let mut out = vec![vec![]];
-                for k in 0..=2000 {
-                    let x = -25.0 + 50.0 * k as f64 / 2000.0;
-                    let y = eval(&f, &|s| if s == X_SYM { x } else { vals.get(s as usize).copied().unwrap_or(f64::NAN) });
-                    if y.is_finite() && y.abs() < 1e6 {
-                        out.last_mut().unwrap().push([x, y]);
-                    } else if !out.last().unwrap().is_empty() {
-                        out.push(vec![]);
-                    }
-                }
-                out
-            }
-            _ => vec![],
-        }
-    }
-
-    /// Initial contact point for a generic tangency: the pair of samples that
-    /// are close together and have parallel tangents.
-    fn contact_guess(&self, a: usize, b: usize) -> [f64; 2] {
-        let (pa, pb) = (self.world_polys(a), self.world_polys(b));
-        let with_dirs = |polys: &[Vec<[f64; 2]>]| -> Vec<([f64; 2], [f64; 2])> {
-            let mut v = Vec::new();
-            for pl in polys {
-                for i in 1..pl.len().saturating_sub(1) {
-                    let d = [pl[i + 1][0] - pl[i - 1][0], pl[i + 1][1] - pl[i - 1][1]];
-                    let l = d[0].hypot(d[1]);
-                    if l > 0.0 {
-                        v.push((pl[i], [d[0] / l, d[1] / l]));
-                    }
-                }
-            }
-            v
-        };
-        let (sa, sb) = (with_dirs(&pa), with_dirs(&pb));
-        if sa.is_empty() || sb.is_empty() {
-            return self.mouse_w;
-        }
-        let step_a = (sa.len() / 500).max(1);
-        let step_b = (sb.len() / 500).max(1);
-        let scale = {
-            let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
-            for (p, _) in sa.iter().chain(&sb) {
-                for k in 0..2 {
-                    lo[k] = lo[k].min(p[k]);
-                    hi[k] = hi[k].max(p[k]);
-                }
-            }
-            (hi[0] - lo[0]).hypot(hi[1] - lo[1]).max(1e-9)
-        };
-        let mut best = (f64::INFINITY, self.mouse_w);
-        for (p, dp) in sa.iter().step_by(step_a) {
-            for (q, dq) in sb.iter().step_by(step_b) {
-                let dist = (p[0] - q[0]).hypot(p[1] - q[1]);
-                let mis = (dp[0] * dq[1] - dp[1] * dq[0]).abs();
-                let score = dist / scale + 0.5 * mis;
-                if score < best.0 {
-                    best = (score, [(p[0] + q[0]) * 0.5, (p[1] + q[1]) * 0.5]);
-                }
-            }
-        }
-        best.1
-    }
-
+    /// Adds a constraint; flashes its entities when it is rejected.
     pub fn add_constraint(&mut self, c: Con) -> bool {
-        let c = if let Con::Tangent { a, b, s, aux: None } = c {
-            let d = &self.doc;
-            let special = (d.is_line(a) && d.is_circlelike(b)) || (d.is_circlelike(a) && d.is_circlelike(b));
-            if special || d.tangent_contact(a, b).is_some() {
-                Con::Tangent { a, b, s, aux: None }
-            } else {
-                let g = self.contact_guess(a, b);
-                let tx = self.doc.add_param(g[0], false);
-                let ty = self.doc.add_param(g[1], false);
-                Con::Tangent { a, b, s, aux: Some((tx, ty)) }
-            }
-        } else {
-            c
-        };
         let ents = Doc::con_ents(&c);
-        let ok = self.try_change(true, |d| d.cons.push(Some(c)));
+        let (shapes, view, mouse) = (&self.shapes, self.view, self.mouse_w);
+        let ok = self.geo.add_constraint_with(c, |d, a, b| contact_guess(&world_polys(shapes, &view, d, a), &world_polys(shapes, &view, d, b), mouse));
         if !ok {
             self.flash_ents(ents);
         }
         ok
     }
 
-    pub fn add_dimension(&mut self, kind: DimKind, label_w: [f64; 2]) -> Option<usize> {
-        let anchor = self.dim_anchor_kind(&kind);
-        let off = [label_w[0] - anchor[0], label_w[1] - anchor[1]];
-        let supp = match kind {
-            DimKind::Angle(l1, l2) => angle_supp(&self.doc, l1, l2, label_w),
-            _ => false,
-        };
-        let make = |d: &mut Doc, driving: bool| -> usize {
-            let i = d.add_dim(kind, off);
-            if supp {
-                d.dims[i].as_mut().unwrap().supp = true;
-                let v = d.measure_value(i);
-                let p = d.dims[i].as_ref().unwrap().param;
-                d.params[p].v = v;
-            }
-            d.dims[i].as_mut().unwrap().driving = driving;
-            i
-        };
-        let mut idx = None;
-        let ok = self.try_change(true, |d| {
-            idx = Some(make(d, true));
-        });
-        if !ok {
-            let mut idx2 = None;
-            self.try_change(false, |d| {
-                idx2 = Some(make(d, false));
-            });
-            return idx2;
-        }
-        idx
-    }
-
-    pub fn dim_anchor_kind(&self, k: &DimKind) -> [f64; 2] {
-        let d = &self.doc;
-        let mid = |a: [f64; 2], b: [f64; 2]| [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5];
-        match *k {
-            DimKind::Distance(a, b) | DimKind::HDist(a, b) | DimKind::VDist(a, b) => mid(d.pval(a), d.pval(b)),
-            DimKind::Length(l) => {
-                let (a, b) = d.line_pts(l);
-                mid(d.pval(a), d.pval(b))
-            }
-            DimKind::PointLine(p, l) => {
-                let pp = d.pval(p);
-                let f = foot(d, pp, l);
-                mid(pp, f)
-            }
-            DimKind::Radius(c) | DimKind::Diameter(c) => d.circ_val(c).0,
-            DimKind::Angle(l1, l2) => angle_vertex(d, l1, l2),
-            DimKind::ConicA(c) | DimKind::ConicB(c) => match d.kind(c) {
-                Some(Ent::Conic { c, .. }) => d.pval(*c),
-                _ => [0.0; 2],
-            },
-            DimKind::CoordX(p) | DimKind::CoordY(p) => mid(d.pval(d.origin), d.pval(p)),
+    fn flash_dim(&mut self, i: usize) {
+        if let Some(d) = self.geo.doc.dims.get(i).and_then(|d| d.as_ref()) {
+            let ents = d.kind.ents();
+            self.flash_ents(ents);
         }
     }
 
     /// Commits text typed for a dimension value.
     pub fn commit_dim_text(&mut self, i: usize, text: &str) {
-        let Some(dim) = self.doc.dims[i].clone() else { return };
-        let t = text.trim();
-        if t.is_empty() {
-            if dim.driving {
-                self.try_change(false, |d| {
-                    let x = d.dims[i].as_mut().unwrap();
-                    x.driving = false;
-                    x.expr.clear();
-                });
-            }
-            return;
-        }
-        let angle = dim.kind.is_angle();
-        if let Some(v) = plain_number(t) {
-            let v = if angle { v.to_radians() } else { v };
-            if !dim.driving || !dim.expr.is_empty() {
-                let mv = self.doc.measure_value(i);
-                let ok = self.try_change(true, |d| {
-                    let s = d.dim_sign(d.dims[i].as_ref().unwrap());
-                    let x = d.dims[i].as_mut().unwrap();
-                    x.driving = true;
-                    x.expr.clear();
-                    x.s = s;
-                    d.params[x.param].v = mv;
-                });
-                if !ok {
-                    self.flash_ents(dim.kind.ents());
-                    return;
-                }
-            }
-            let p = dim.param;
-            if !self.set_values(&[(p, v)], true) {
-                self.flash_ents(dim.kind.ents());
-            }
-        } else {
-            if let Err(_) = self.doc.parse_expr(t, 0) {
-                self.flash_ents(dim.kind.ents());
-                return;
-            }
-            let was_driving = dim.driving;
-            let tt = t.to_string();
-            let ok = self.try_change(!was_driving, |d| {
-                let s = d.dim_sign(d.dims[i].as_ref().unwrap());
-                let x = d.dims[i].as_mut().unwrap();
-                if !x.driving {
-                    x.s = s;
-                }
-                x.driving = true;
-                x.expr = tt;
-            });
-            if !ok {
-                // try reaching the new value gradually
-                let before = self.doc.clone();
-                let cur = self.doc.measure_value(i);
-                self.doc.dims[i].as_mut().unwrap().driving = true;
-                self.doc.dims[i].as_mut().unwrap().expr = t.to_string();
-                let target = self.doc.dim_value_expr(i, 0).map(|e| self.doc.eval_now(&e)).unwrap_or(f64::NAN);
-                self.doc = before;
-                if target.is_finite() {
-                    let p = dim.param;
-                    let ok2 = self.try_change(!was_driving, |d| {
-                        let s = d.dim_sign(d.dims[i].as_ref().unwrap());
-                        let x = d.dims[i].as_mut().unwrap();
-                        x.driving = true;
-                        x.expr.clear();
-                        x.s = s;
-                        d.params[p].v = cur;
-                    });
-                    if ok2 && self.set_values(&[(p, target)], false) {
-                        let tt = t.to_string();
-                        if self.try_change(false, |d| d.dims[i].as_mut().unwrap().expr = tt) {
-                            return;
-                        }
-                    }
-                }
-                self.flash_ents(dim.kind.ents());
-            }
+        if !self.geo.set_dim_text(i, text) {
+            self.flash_dim(i);
         }
     }
 
     pub fn toggle_driving(&mut self, i: usize) {
-        let Some(dim) = self.doc.dims[i].clone() else { return };
-        if dim.driving {
-            self.try_change(false, |d| d.dims[i].as_mut().unwrap().driving = false);
-        } else {
-            let v = self.doc.measure_value(i);
-            let ok = self.try_change(true, |d| {
-                let s = d.dim_sign(d.dims[i].as_ref().unwrap());
-                let x = d.dims[i].as_mut().unwrap();
-                x.driving = true;
-                x.s = s;
-                if x.expr.is_empty() {
-                    d.params[x.param].v = v;
-                }
-            });
-            if !ok {
-                self.flash_ents(dim.kind.ents());
-            }
+        if !self.geo.toggle_driving(i) {
+            self.flash_dim(i);
         }
     }
 
@@ -862,15 +401,9 @@ impl App {
         let cons: Vec<usize> = self.sel.iter().filter_map(|s| if let Sel::Con(e) = s { Some(*e) } else { None }).collect();
         let dims: Vec<usize> = self.sel.iter().filter_map(|s| if let Sel::Dim(e) = s { Some(*e) } else { None }).collect();
         let vars: Vec<usize> = self.sel.iter().filter_map(|s| if let Sel::Var(e) = s { Some(*e) } else { None }).collect();
-        if ents.is_empty() && cons.is_empty() && dims.is_empty() && vars.is_empty() {
+        if !self.geo.delete(&ents, &cons, &dims, &vars) {
             return;
         }
-        self.try_change(false, |d| {
-            d.delete(&ents, &cons, &dims);
-            for v in vars {
-                d.vars[v] = None;
-            }
-        });
         self.sel.clear();
         self.hover = None;
     }
@@ -903,13 +436,13 @@ impl App {
         };
         if self.drag.is_some() && self.formula.as_ref().is_some_and(|f| f.target == target) {
             // a long search for the construction before the drag is of no use
-            if self.formula_job.as_ref().is_some_and(|j| j.0 .1 != self.generation) {
+            if self.formula_job.as_ref().is_some_and(|j| j.0 .1 != self.geo.generation) {
                 self.cancel_formula_job();
             }
             return;
         }
         let level = self.search_level_of(target);
-        let key = (target, self.generation, level);
+        let key = (target, self.geo.generation, level);
         if self.formula_key == Some(key) {
             return;
         }
@@ -918,7 +451,7 @@ impl App {
         if self.formula.as_ref().is_some_and(|f| f.target != target) {
             self.formula = None;
         }
-        let doc = self.doc.clone();
+        let doc = self.geo.doc.clone();
         let (tx, rx) = std::sync::mpsc::channel();
         let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let flag = cancel.clone();
@@ -955,7 +488,7 @@ impl App {
     /// The search level for `target` in the current construction.
     pub fn search_level_of(&self, target: Sel) -> u32 {
         match self.search_level {
-            Some((t, g, n)) if t == target && g == self.generation => n,
+            Some((t, g, n)) if t == target && g == self.geo.generation => n,
             _ => 0,
         }
     }
@@ -970,7 +503,7 @@ impl App {
         let Some(f) = &self.formula else { return };
         let target = f.target;
         let level = self.search_level_of(target);
-        self.search_level = Some((target, self.generation, level + 1));
+        self.search_level = Some((target, self.geo.generation, level + 1));
     }
 
     // ------------------------------------------------------------ files
@@ -982,7 +515,7 @@ impl App {
             self.path.clone()
         };
         if let Some(p) = path {
-            if let Ok(s) = crate::gxp::to_string_pretty(&self.doc) {
+            if let Ok(s) = crate::gxp::to_string_pretty(&self.geo.doc) {
                 if std::fs::write(&p, s).is_ok() {
                     self.path = Some(p);
                 }
@@ -994,39 +527,24 @@ impl App {
         if let Some(p) = rfd::FileDialog::new().add_filter("gxpad", &["gxp"]).pick_file() {
             if let Ok(s) = std::fs::read_to_string(&p) {
                 if let Ok(d) = crate::gxp::from_str(&s) {
-                    let before = std::mem::replace(&mut self.doc, d);
-                    self.push_undo(before);
+                    let before = std::mem::replace(&mut self.geo.doc, d);
+                    self.geo.push_undo(before);
                     self.path = Some(p);
                     self.sel.clear();
-                    self.dirty = true;
+                    self.geo.dirty = true;
                     self.fitted = false;
-                    self.solve_full();
+                    self.geo.solve_full();
                 }
             }
         }
     }
 }
 
-pub fn sym_name(names: &HashMap<usize, String>, s: u32) -> String {
-    if s >= CSE_BASE {
-        return format!("u_{}", s - CSE_BASE + 1);
-    }
-    names.get(&(s as usize)).cloned().unwrap_or_else(|| format!("p{s}"))
-}
-
 /// Expression whose formula is derived for a selected dimension or variable.
 pub fn target_expr(doc: &Doc, t: Sel) -> Result<(String, Expr, bool), String> {
     match t {
-        Sel::Dim(i) => {
-            let d = doc.dims[i].as_ref().ok_or("gone")?;
-            let e = if d.driving { doc.dim_value_expr(i, 0)? } else { doc.measure(i) };
-            Ok((d.name.clone(), e, d.kind.is_angle()))
-        }
-        Sel::Var(i) => {
-            let v = doc.vars[i].as_ref().ok_or("gone")?;
-            let e = if v.expr.trim().is_empty() { sym(v.param as u32) } else { doc.parse_expr(&v.expr, 0)? };
-            Ok((v.name.clone(), e, false))
-        }
+        Sel::Dim(i) => gxgeo::formula::target_expr(doc, gxgeo::formula::Target::Dim(i)),
+        Sel::Var(i) => gxgeo::formula::target_expr(doc, gxgeo::formula::Target::Var(i)),
         _ => Err(String::new()),
     }
 }
@@ -1079,35 +597,6 @@ pub fn compute_formula(doc: &Doc, target: Sel, level: u32) -> FormulaView {
 }
 
 
-/// Whether a label at `w` sits in a sector measuring the supplementary angle
-/// of the directed lines.
-pub fn angle_supp(d: &Doc, l1: usize, l2: usize, w: [f64; 2]) -> bool {
-    let x = angle_vertex(d, l1, l2);
-    let dir = |l: usize| {
-        let (a, b) = d.line_pts(l);
-        let (a, b) = (d.pval(a), d.pval(b));
-        [b[0] - a[0], b[1] - a[1]]
-    };
-    let (u, v) = (dir(l1), dir(l2));
-    let q = [w[0] - x[0], w[1] - x[1]];
-    let cr = |a: [f64; 2], b: [f64; 2]| a[0] * b[1] - a[1] * b[0];
-    for s1 in [1.0, -1.0] {
-        for s2 in [1.0, -1.0] {
-            let a = [u[0] * s1, u[1] * s1];
-            let b = [v[0] * s2, v[1] * s2];
-            let den = cr(a, b);
-            if den.abs() < 1e-15 {
-                continue;
-            }
-            let ka = cr(q, b) / den;
-            let kb = cr(a, q) / den;
-            if ka >= 0.0 && kb >= 0.0 {
-                return s1 * s2 < 0.0;
-            }
-        }
-    }
-    false
-}
 
 
 #[cfg(test)]
@@ -1119,13 +608,13 @@ mod tests {
         let mut app = App::new();
         let (a, b, c);
         {
-            let d = &mut app.doc;
+            let d = &mut app.geo.doc;
             a = d.add_point(-2.67, -2.83);
             b = d.add_point(4.67, -2.83);
             c = d.add_point(-0.33, 2.83);
         }
         let mut ls = vec![];
-        app.try_change(false, |d| {
+        app.geo.try_change(false, |d| {
             ls.push(d.add_ent(Ent::Line { a, b, infinite: false }));
             ls.push(d.add_ent(Ent::Line { a: b, b: c, infinite: false }));
             ls.push(d.add_ent(Ent::Line { a: c, b: a, infinite: false }));
@@ -1133,12 +622,12 @@ mod tests {
         });
         let mut dims = vec![];
         for l in &ls {
-            dims.push(app.add_dimension(DimKind::Length(*l), [0.0, -4.0]).unwrap());
+            dims.push(app.geo.add_dimension(DimKind::Length(*l), [0.0, -4.0]).unwrap());
         }
-        println!("driving: {:?}", dims.iter().map(|i| app.doc.dims[*i].as_ref().unwrap().driving).collect::<Vec<_>>());
+        println!("driving: {:?}", dims.iter().map(|i| app.geo.doc.dims[*i].as_ref().unwrap().driving).collect::<Vec<_>>());
         app.commit_dim_text(dims[0], "5");
-        let v = app.doc.measure_value(dims[0]);
-        println!("after: {v} conflicts={:?} rank={} dof={}", app.conflicts, app.rank, app.dof);
+        let v = app.geo.doc.measure_value(dims[0]);
+        println!("after: {v} conflicts={:?} rank={} dof={}", app.geo.conflicts, app.geo.rank, app.geo.dof);
         assert!((v - 5.0).abs() < 1e-6);
     }
 }
@@ -1149,37 +638,37 @@ mod demo {
 
     fn save(app: &App, name: &str) {
         if let Ok(dir) = std::env::var("GXPAD_DEMO_DIR") {
-            std::fs::write(format!("{dir}/{name}.gxp"), crate::gxp::to_string(&app.doc).unwrap()).unwrap();
+            std::fs::write(format!("{dir}/{name}.gxp"), crate::gxp::to_string(&app.geo.doc).unwrap()).unwrap();
         }
     }
 
     fn line(app: &mut App, a: usize, b: usize) -> usize {
         let mut l = 0;
-        assert!(app.try_change(false, |d| l = d.add_ent(Ent::Line { a, b, infinite: false })));
+        assert!(app.geo.try_change(false, |d| l = d.add_ent(Ent::Line { a, b, infinite: false })));
         l
     }
 
     #[test]
     fn demo_tangent_circle() {
         let mut app = App::new();
-        let c = app.doc.add_point(3.5, 2.0);
+        let c = app.geo.doc.add_point(3.5, 2.0);
         let mut circ = 0;
-        app.try_change(false, |d| circ = d.add_circle(c, 1.2));
-        let q = app.doc.add_point(6.0, 4.5);
-        let o = app.doc.origin;
+        app.geo.try_change(false, |d| circ = d.add_circle(c, 1.2));
+        let q = app.geo.doc.add_point(6.0, 4.5);
+        let o = app.geo.doc.origin;
         let l = line(&mut app, o, q);
-        let xa = app.doc.xaxis;
-        let t1 = app.tangent_con(xa, circ).unwrap();
+        let xa = app.geo.doc.xaxis;
+        let t1 = app.geo.doc.tangent_con(xa, circ).unwrap();
         assert!(app.add_constraint(t1));
-        let t2 = app.tangent_con(l, circ).unwrap();
+        let t2 = app.geo.doc.tangent_con(l, circ).unwrap();
         assert!(app.add_constraint(t2));
-        app.add_dimension(DimKind::Radius(circ), [5.0, 0.5]).unwrap();
-        app.add_dimension(DimKind::Angle(xa, l), [2.0, 0.6]).unwrap();
-        app.add_dimension(DimKind::Length(l), [2.0, 4.0]).unwrap();
-        let dd = app.add_dimension(DimKind::Distance(o, c), [1.5, -0.8]).unwrap();
-        assert!(!app.doc.dims[dd].as_ref().unwrap().driving);
-        assert_eq!(app.dof, 0);
-        let f = compute_formula(&app.doc, Sel::Dim(dd), 0);
+        app.geo.add_dimension(DimKind::Radius(circ), [5.0, 0.5]).unwrap();
+        app.geo.add_dimension(DimKind::Angle(xa, l), [2.0, 0.6]).unwrap();
+        app.geo.add_dimension(DimKind::Length(l), [2.0, 4.0]).unwrap();
+        let dd = app.geo.add_dimension(DimKind::Distance(o, c), [1.5, -0.8]).unwrap();
+        assert!(!app.geo.doc.dims[dd].as_ref().unwrap().driving);
+        assert_eq!(app.geo.dof, 0);
+        let f = compute_formula(&app.geo.doc, Sel::Dim(dd), 0);
         let f = &f;
         println!("{}  exact={} ({} ms)", f.plain, f.exact, f.ms);
         assert!(f.exact);
@@ -1189,71 +678,71 @@ mod demo {
     #[test]
     fn demo_function_fit() {
         let mut app = App::new();
-        app.try_change(false, |d| {
+        app.geo.try_change(false, |d| {
             d.add_var("k".into(), 1.0);
             d.add_var("c".into(), 0.0);
         });
-        for v in app.doc.vars.iter().flatten() {
+        for v in app.geo.doc.vars.iter().flatten() {
             let p = v.param;
-            app.doc.params[p].locked = false;
+            app.geo.doc.params[p].locked = false;
         }
         let mut f = 0;
-        app.try_change(false, |d| f = d.add_ent(Ent::Curve { src: "y = k x^2 + c".into() }));
-        let p1 = app.doc.add_point(1.0, 1.0);
-        let p2 = app.doc.add_point(2.0, 4.0);
-        app.try_change(false, |d| {
+        app.geo.try_change(false, |d| f = d.add_ent(Ent::Curve { src: "y = k x^2 + c".into() }));
+        let p1 = app.geo.doc.add_point(1.0, 1.0);
+        let p2 = app.geo.doc.add_point(2.0, 4.0);
+        app.geo.try_change(false, |d| {
             d.cons.push(Some(Con::OnCurve(p1, f)));
             d.cons.push(Some(Con::OnCurve(p2, f)));
         });
-        let o = app.doc.origin;
-        app.add_dimension(DimKind::HDist(o, p1), [0.5, -1.0]).unwrap();
-        app.add_dimension(DimKind::VDist(o, p1), [-1.0, 0.5]).unwrap();
-        app.add_dimension(DimKind::HDist(o, p2), [1.0, -1.6]).unwrap();
-        app.add_dimension(DimKind::VDist(o, p2), [-1.6, 2.0]).unwrap();
-        println!("dof={}", app.dof);
-        println!("{}", compute_formula(&app.doc, Sel::Var(0), 0).plain);
-        println!("{}", compute_formula(&app.doc, Sel::Var(1), 0).plain);
+        let o = app.geo.doc.origin;
+        app.geo.add_dimension(DimKind::HDist(o, p1), [0.5, -1.0]).unwrap();
+        app.geo.add_dimension(DimKind::VDist(o, p1), [-1.0, 0.5]).unwrap();
+        app.geo.add_dimension(DimKind::HDist(o, p2), [1.0, -1.6]).unwrap();
+        app.geo.add_dimension(DimKind::VDist(o, p2), [-1.6, 2.0]).unwrap();
+        println!("dof={}", app.geo.dof);
+        println!("{}", compute_formula(&app.geo.doc, Sel::Var(0), 0).plain);
+        println!("{}", compute_formula(&app.geo.doc, Sel::Var(1), 0).plain);
         save(&app, "function");
     }
 
     #[test]
     fn demo_conics() {
         let mut app = App::new();
-        let c = app.doc.add_point(0.0, 0.0);
-        let o = app.doc.origin;
+        let c = app.geo.doc.add_point(0.0, 0.0);
+        let o = app.geo.doc.origin;
         let mut e = 0;
-        app.try_change(false, |d| {
+        app.geo.try_change(false, |d| {
             e = d.add_conic(ConicKind::Ellipse, c, 3.0, 1.6, 0.0);
             d.cons.push(Some(Con::Coincident(c, o)));
         });
-        let ka = app.add_dimension(DimKind::ConicA(e), [1.5, 0.4]).unwrap();
-        let kb = app.add_dimension(DimKind::ConicB(e), [-0.5, 1.0]).unwrap();
+        let ka = app.geo.add_dimension(DimKind::ConicA(e), [1.5, 0.4]).unwrap();
+        let kb = app.geo.add_dimension(DimKind::ConicB(e), [-0.5, 1.0]).unwrap();
         let _ = (ka, kb);
         // ellipse axis aligned
-        let t = match app.doc.kind(e) {
+        let t = match app.geo.doc.kind(e) {
             Some(Ent::Conic { t, .. }) => *t,
             _ => unreachable!(),
         };
-        app.doc.params[t].locked = true;
+        app.geo.doc.params[t].locked = true;
         // a line tangent to the ellipse through a fixed point
-        let p = app.doc.add_point(5.0, 3.0);
-        let q = app.doc.add_point(0.0, 3.0);
+        let p = app.geo.doc.add_point(5.0, 3.0);
+        let q = app.geo.doc.add_point(0.0, 3.0);
         let l = line(&mut app, p, q);
-        app.try_change(false, |d| d.lock_point(p, true));
-        let tc = app.tangent_con(l, e).unwrap();
+        app.geo.try_change(false, |d| d.lock_point(p, true));
+        let tc = app.geo.doc.tangent_con(l, e).unwrap();
         assert!(app.add_constraint(tc));
-        let xa = app.doc.xaxis;
-        let ang = app.add_dimension(DimKind::Angle(xa, l), [3.4, 2.4]).unwrap();
-        app.doc.dims[ang].as_mut().unwrap().driving = false;
-        app.dirty = true;
-        app.solve_full();
-        println!("dof={}", app.dof);
-        let f = compute_formula(&app.doc, Sel::Dim(ang), 0);
+        let xa = app.geo.doc.xaxis;
+        let ang = app.geo.add_dimension(DimKind::Angle(xa, l), [3.4, 2.4]).unwrap();
+        app.geo.doc.dims[ang].as_mut().unwrap().driving = false;
+        app.geo.dirty = true;
+        app.geo.solve_full();
+        println!("dof={}", app.geo.dof);
+        let f = compute_formula(&app.geo.doc, Sel::Dim(ang), 0);
         let f = &f;
         println!("{}  exact={} value={} actual={} ({:.2} ms)", f.plain, f.exact, f.value, f.actual, f.ms);
-        let hp = app.doc.add_point(-6.0, -3.0);
-        let pp = app.doc.add_point(5.0, -4.0);
-        app.try_change(false, |d| {
+        let hp = app.geo.doc.add_point(-6.0, -3.0);
+        let pp = app.geo.doc.add_point(5.0, -4.0);
+        app.geo.try_change(false, |d| {
             d.add_conic(ConicKind::Hyperbola, hp, 1.0, 0.8, 0.3);
             d.add_conic(ConicKind::Parabola, pp, 0.5, 1.0, 1.9);
             let ac = d.add_point(-5.0, 3.0);
@@ -1284,10 +773,10 @@ mod construct_tests {
     #[test]
     fn circumcenter_from_coordinates() {
         let mut app = App::new();
-        let o = app.doc.origin;
-        let (b, c) = (app.doc.add_point(4.0, 0.3), app.doc.add_point(1.2, 3.1));
+        let o = app.geo.doc.origin;
+        let (b, c) = (app.geo.doc.add_point(4.0, 0.3), app.geo.doc.add_point(1.2, 3.1));
         let mut ls = (0, 0);
-        assert!(app.try_change(false, |d| {
+        assert!(app.geo.try_change(false, |d| {
             d.add_ent(Ent::Line { a: o, b, infinite: false });
             d.add_ent(Ent::Line { a: b, b: c, infinite: false });
             d.add_ent(Ent::Line { a: c, b: o, infinite: false });
@@ -1295,9 +784,9 @@ mod construct_tests {
         }));
         // intersection of the bisectors
         let x = {
-            let v = angle_vertex(&app.doc, ls.0, ls.1);
+            let v = angle_vertex(&app.geo.doc, ls.0, ls.1);
             let mut x = 0;
-            assert!(app.try_change(true, |d| {
+            assert!(app.geo.try_change(true, |d| {
                 x = d.add_point(v[0], v[1]);
                 d.cons.push(Some(Con::OnCurve(x, ls.0)));
                 d.cons.push(Some(Con::OnCurve(x, ls.1)));
@@ -1305,58 +794,58 @@ mod construct_tests {
             x
         };
         for k in [DimKind::CoordX(b), DimKind::CoordY(b), DimKind::CoordX(c), DimKind::CoordY(c)] {
-            let i = app.add_dimension(k, [0.0, 0.0]).unwrap();
-            assert!(app.doc.dims[i].as_ref().unwrap().driving);
+            let i = app.geo.add_dimension(k, [0.0, 0.0]).unwrap();
+            assert!(app.geo.doc.dims[i].as_ref().unwrap().driving);
         }
-        assert_eq!(app.dof, 0, "fully constrained");
+        assert_eq!(app.geo.dof, 0, "fully constrained");
         // drive a coordinate to a negative value
-        let yb = app.doc.dims.iter().position(|d| d.as_ref().is_some_and(|d| d.name == "y_A")).unwrap();
+        let yb = app.geo.doc.dims.iter().position(|d| d.as_ref().is_some_and(|d| d.name == "y_A")).unwrap();
         app.commit_dim_text(yb, "-0.5");
-        assert!((app.doc.pval(b)[1] + 0.5).abs() < 1e-9);
-        let rx = app.add_dimension(DimKind::CoordX(x), [0.0, 0.0]).unwrap();
-        let ry = app.add_dimension(DimKind::CoordY(x), [0.0, 0.0]).unwrap();
-        assert!(!app.doc.dims[rx].as_ref().unwrap().driving);
+        assert!((app.geo.doc.pval(b)[1] + 0.5).abs() < 1e-9);
+        let rx = app.geo.add_dimension(DimKind::CoordX(x), [0.0, 0.0]).unwrap();
+        let ry = app.geo.add_dimension(DimKind::CoordY(x), [0.0, 0.0]).unwrap();
+        assert!(!app.geo.doc.dims[rx].as_ref().unwrap().driving);
         for i in [rx, ry] {
-            let f = compute_formula(&app.doc, Sel::Dim(i), 0);
+            let f = compute_formula(&app.geo.doc, Sel::Dim(i), 0);
             println!("{}  exact={} value={} actual={}", f.plain, f.exact, f.value, f.actual);
             assert!(f.exact);
             assert!((f.value - f.actual).abs() < 1e-9);
         }
         // circumcenter is equidistant from all three vertices
-        let pc = app.doc.pval(x);
+        let pc = app.geo.doc.pval(x);
         let dist = |p: [f64; 2]| (p[0] - pc[0]).hypot(p[1] - pc[1]);
-        let (d0, d1, d2) = (dist([0.0, 0.0]), dist(app.doc.pval(b)), dist(app.doc.pval(c)));
+        let (d0, d1, d2) = (dist([0.0, 0.0]), dist(app.geo.doc.pval(b)), dist(app.geo.doc.pval(c)));
         assert!((d0 - d1).abs() < 1e-9 && (d0 - d2).abs() < 1e-9);
     }
 
     #[test]
     fn tangent_from_point_and_angle_bisector() {
         let mut app = App::new();
-        let o = app.doc.origin;
-        let c = app.doc.add_point(4.0, 1.0);
-        let p = app.doc.add_point(0.5, 3.0);
+        let o = app.geo.doc.origin;
+        let c = app.geo.doc.add_point(4.0, 1.0);
+        let p = app.geo.doc.add_point(0.5, 3.0);
         let mut circ = 0;
-        assert!(app.try_change(false, |d| circ = d.add_circle(c, 1.5)));
-        let t = app.doc.add_point(3.0, 2.3);
-        assert!(app.try_change(true, |d| {
+        assert!(app.geo.try_change(false, |d| circ = d.add_circle(c, 1.5)));
+        let t = app.geo.doc.add_point(3.0, 2.3);
+        assert!(app.geo.try_change(true, |d| {
             d.add_ent(Ent::Line { a: p, b: t, infinite: false });
             d.cons.push(Some(Con::TangentAt { p, t, c: circ }));
         }));
-        let (pc, pt) = (app.doc.pval(c), app.doc.pval(t));
-        let pp = app.doc.pval(p);
+        let (pc, pt) = (app.geo.doc.pval(c), app.geo.doc.pval(t));
+        let pp = app.geo.doc.pval(p);
         let rad = [pt[0] - pc[0], pt[1] - pc[1]];
         let tan = [pt[0] - pp[0], pt[1] - pp[1]];
         assert!((rad[0] * tan[0] + rad[1] * tan[1]).abs() < 1e-8);
-        assert!((rad[0].hypot(rad[1]) - app.doc.circ_val(circ).1).abs() < 1e-9);
+        assert!((rad[0].hypot(rad[1]) - app.geo.doc.circ_val(circ).1).abs() < 1e-9);
         // angle bisector of the two axes through the origin: the line y = x
-        let (xa, ya) = (app.doc.xaxis, app.doc.yaxis);
-        assert!(app.try_change(false, |d| {
+        let (xa, ya) = (app.geo.doc.xaxis, app.geo.doc.yaxis);
+        assert!(app.geo.try_change(false, |d| {
             let q = d.add_helper(1.0, 1.0);
             d.cons.push(Some(Con::Bisect { q, x: o, l1: xa, l2: ya, s1: 1.0, s2: 1.0 }));
             d.add_ent(Ent::Line { a: o, b: q, infinite: true });
         }));
-        let q = app.doc.ents.iter().rposition(|e| e.as_ref().is_some_and(|e| e.hidden)).unwrap();
-        let qv = app.doc.pval(q);
+        let q = app.geo.doc.ents.iter().rposition(|e| e.as_ref().is_some_and(|e| e.hidden)).unwrap();
+        let qv = app.geo.doc.pval(q);
         assert!((qv[0] - qv[1]).abs() < 1e-9);
     }
 }
@@ -1370,13 +859,13 @@ mod tangent_contact_tests {
     #[test]
     fn tangent_segment_ending_on_circle() {
         let mut app = App::new();
-        let o = app.doc.origin;
-        let e = app.doc.add_point(0.0, 0.0);
-        let f = app.doc.add_point(-1.3, 1.5);
-        let h = app.doc.add_point(0.34, 0.94);
-        let a = app.doc.add_point(0.98, 0.19);
+        let o = app.geo.doc.origin;
+        let e = app.geo.doc.add_point(0.0, 0.0);
+        let f = app.geo.doc.add_point(-1.3, 1.5);
+        let h = app.geo.doc.add_point(0.34, 0.94);
+        let a = app.geo.doc.add_point(0.98, 0.19);
         let (mut ce, mut cf, mut seg, mut rl) = (0, 0, 0, 0);
-        assert!(app.try_change(false, |d| {
+        assert!(app.geo.try_change(false, |d| {
             ce = d.add_circle(e, 1.0);
             cf = d.add_circle(f, 1.0);
             seg = d.add_ent(Ent::Line { a: f, b: h, infinite: false });
@@ -1386,21 +875,21 @@ mod tangent_contact_tests {
             d.cons.push(Some(Con::Equal(cf, ce)));
             d.cons.push(Some(Con::OnCurve(h, ce)));
         }));
-        let t1 = app.tangent_con(cf, ce).unwrap();
+        let t1 = app.geo.doc.tangent_con(cf, ce).unwrap();
         assert!(app.add_constraint(t1));
-        let t2 = app.tangent_con(seg, ce).unwrap();
+        let t2 = app.geo.doc.tangent_con(seg, ce).unwrap();
         assert!(app.add_constraint(t2));
-        let r = app.add_dimension(DimKind::Length(rl), [0.0, 0.0]).unwrap();
+        let r = app.geo.add_dimension(DimKind::Length(rl), [0.0, 0.0]).unwrap();
         app.commit_dim_text(r, "1");
-        let dd = app.add_dimension(DimKind::Length(seg), [0.0, 0.0]).unwrap();
-        assert!(!app.doc.dims[dd].as_ref().unwrap().driving);
-        let v = app.doc.measure_value(dd);
+        let dd = app.geo.add_dimension(DimKind::Length(seg), [0.0, 0.0]).unwrap();
+        assert!(!app.geo.doc.dims[dd].as_ref().unwrap().driving);
+        let v = app.geo.doc.measure_value(dd);
         assert!((v - 3f64.sqrt()).abs() < 1e-10, "measured {v}");
-        let fm = compute_formula(&app.doc, Sel::Dim(dd), 0);
+        let fm = compute_formula(&app.geo.doc, Sel::Dim(dd), 0);
         println!("{} ({:.2} ms)", fm.plain, fm.ms);
         assert!(fm.exact);
         assert!((fm.value - 3f64.sqrt()).abs() < 1e-10);
-        assert_eq!(app.dof, 2);
+        assert_eq!(app.geo.dof, 2);
     }
 }
 
@@ -1413,13 +902,13 @@ mod periodic_tests {
     #[test]
     fn sine_peak_tangent_to_circle() {
         let mut app = App::new();
-        let o = app.doc.origin;
-        let xa = app.doc.xaxis;
+        let o = app.geo.doc.origin;
+        let xa = app.geo.doc.xaxis;
         let (mut f, mut circ, mut seg) = (0, 0, 0);
-        let dpt = app.doc.add_point(-3.1, 0.05);
-        let b = app.doc.add_point(-2.9, 1.0);
-        let c = app.doc.add_point(1.5, 1.0);
-        assert!(app.try_change(false, |d| {
+        let dpt = app.geo.doc.add_point(-3.1, 0.05);
+        let b = app.geo.doc.add_point(-2.9, 1.0);
+        let c = app.geo.doc.add_point(1.5, 1.0);
+        assert!(app.geo.try_change(false, |d| {
             f = d.add_ent(Ent::Curve { src: "y = sin(x)".into() });
             circ = d.add_circle(o, 3.1);
             seg = d.add_ent(Ent::Line { a: b, b: c, infinite: false });
@@ -1430,16 +919,16 @@ mod periodic_tests {
             d.cons.push(Some(Con::OnCurve(b, circ)));
             d.cons.push(Some(Con::Horizontal(b, c)));
         }));
-        let t = app.tangent_con(seg, f).unwrap();
+        let t = app.geo.doc.tangent_con(seg, f).unwrap();
         assert!(app.add_constraint(t));
-        assert_eq!(app.dof, 0);
-        let dd = app.add_dimension(DimKind::Length(seg), [0.0, 0.0]).unwrap();
-        let fm = compute_formula(&app.doc, Sel::Dim(dd), 0);
+        assert_eq!(app.geo.dof, 0);
+        let dd = app.geo.add_dimension(DimKind::Length(seg), [0.0, 0.0]).unwrap();
+        let fm = compute_formula(&app.geo.doc, Sel::Dim(dd), 0);
         println!("{}", fm.plain);
         let want = std::f64::consts::FRAC_PI_2 + (std::f64::consts::PI.powi(2) - 1.0).sqrt();
         assert!(fm.exact, "{}", fm.plain);
         assert!((fm.value - want).abs() < 1e-12);
-        assert!((app.doc.measure_value(dd) - want).abs() < 1e-9);
+        assert!((app.geo.doc.measure_value(dd) - want).abs() < 1e-9);
     }
 }
 

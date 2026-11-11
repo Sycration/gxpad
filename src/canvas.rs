@@ -113,22 +113,22 @@ impl App {
         self.shapes.clear();
         let v = self.view;
         let vr = self.view_radius_w();
-        for i in 0..self.doc.ents.len() {
-            let Some(e) = self.doc.ents[i].clone() else { continue };
+        for i in 0..self.geo.doc.ents.len() {
+            let Some(e) = self.geo.doc.ents[i].clone() else { continue };
             if e.hidden {
                 continue;
             }
             let polys: Vec<Vec<Pos2>> = match &e.kind {
-                Ent::Point { .. } | Ent::Line { .. } | Ent::Circle { .. } | Ent::Arc { .. } | Ent::Conic { .. } => geom_polys(&self.doc, v, vr, i),
+                Ent::Point { .. } | Ent::Line { .. } | Ent::Circle { .. } | Ent::Arc { .. } | Ent::Conic { .. } => geom_polys(&self.geo.doc, v, vr, i),
                 Ent::Curve { src } => {
-                    let used: Vec<f64> = self.doc.params.iter().map(|p| p.v).collect();
+                    let used: Vec<f64> = self.geo.doc.params.iter().map(|p| p.v).collect();
                     let mut h = std::collections::hash_map::DefaultHasher::new();
                     use std::hash::{Hash, Hasher};
                     src.hash(&mut h);
                     for x in [v.c[0], v.c[1], v.s, v.rect.width() as f64, v.rect.height() as f64, v.rect.min.x as f64, v.rect.min.y as f64] {
                         x.to_bits().hash(&mut h);
                     }
-                    if let Ok(def) = self.doc.curve_def(src) {
+                    if let Ok(def) = self.geo.doc.curve_def(src) {
                         for s in sym_set(&def.implicit) {
                             if let Some(x) = used.get(s as usize) {
                                 x.to_bits().hash(&mut h);
@@ -152,10 +152,10 @@ impl App {
     }
 
     fn curve_polys(&self, src: &str) -> Vec<Vec<Pos2>> {
-        let Ok(def) = self.doc.curve_def(src) else { return vec![] };
+        let Ok(def) = self.geo.doc.curve_def(src) else { return vec![] };
         let v = self.view;
         let r = v.rect;
-        let vals: Vec<f64> = self.doc.params.iter().map(|p| p.v).collect();
+        let vals: Vec<f64> = self.geo.doc.params.iter().map(|p| p.v).collect();
         let mut st = Vec::new();
         if let Some(f) = &def.explicit {
             let code = Code::new(f);
@@ -265,7 +265,7 @@ impl App {
         }
         let mut best: Option<(f32, usize)> = None;
         for (e, polys) in &self.shapes {
-            if !self.doc.is_point(*e) {
+            if !self.geo.doc.is_point(*e) {
                 continue;
             }
             let d = polys[0][0].distance(m);
@@ -278,11 +278,11 @@ impl App {
         }
         let mut best: Option<(f32, usize)> = None;
         for (e, polys) in &self.shapes {
-            if self.doc.is_point(*e) {
+            if self.geo.doc.is_point(*e) {
                 continue;
             }
             let (d, _) = nearest_on(polys, m);
-            let thr = if *e == self.doc.xaxis || *e == self.doc.yaxis { HIT_CURVE * 0.7 } else { HIT_CURVE };
+            let thr = if *e == self.geo.doc.xaxis || *e == self.geo.doc.yaxis { HIT_CURVE * 0.7 } else { HIT_CURVE };
             if d < thr && best.is_none_or(|b| d < b.0 || (d - b.0).abs() < 0.5 && *e > b.1) {
                 best = Some((d, *e));
             }
@@ -301,7 +301,7 @@ impl App {
     fn snap_at(&self, m: Pos2, exclude: &[usize]) -> Snap {
         let mut best: Option<(f32, usize)> = None;
         for (e, polys) in &self.shapes {
-            if !self.doc.is_point(*e) || exclude.contains(e) {
+            if !self.geo.doc.is_point(*e) || exclude.contains(e) {
                 continue;
             }
             let d = polys[0][0].distance(m);
@@ -314,7 +314,7 @@ impl App {
         }
         let mut best: Option<(f32, usize, Pos2)> = None;
         for (e, polys) in &self.shapes {
-            if self.doc.is_point(*e) {
+            if self.geo.doc.is_point(*e) {
                 continue;
             }
             let (d, q) = nearest_on(polys, m);
@@ -324,8 +324,8 @@ impl App {
         }
         if let Some((_, e, q)) = best {
             let mut w = self.view.to_w(q);
-            if let Some(Ent::Line { a, b, .. }) = self.doc.kind(e) {
-                let (pa, pb) = (self.doc.pval(*a), self.doc.pval(*b));
+            if let Some(Ent::Line { a, b, .. }) = self.geo.doc.kind(e) {
+                let (pa, pb) = (self.geo.doc.pval(*a), self.geo.doc.pval(*b));
                 let mw = self.view.to_w(m);
                 let d = [pb[0] - pa[0], pb[1] - pa[1]];
                 let l2 = (d[0] * d[0] + d[1] * d[1]).max(1e-18);
@@ -342,20 +342,20 @@ impl App {
     pub fn fit(&mut self) {
         let mut lo = [f64::INFINITY; 2];
         let mut hi = [f64::NEG_INFINITY; 2];
-        for (i, e) in self.doc.ents.iter().enumerate() {
+        for (i, e) in self.geo.doc.ents.iter().enumerate() {
             if let Some(e) = e {
                 if e.hidden {
                     continue;
                 }
                 let pts: Vec<[f64; 2]> = match &e.kind {
-                    Ent::Point { .. } => vec![self.doc.pval(i)],
+                    Ent::Point { .. } => vec![self.geo.doc.pval(i)],
                     Ent::Circle { .. } | Ent::Arc { .. } => {
-                        let (c, r) = self.doc.circ_val(i);
+                        let (c, r) = self.geo.doc.circ_val(i);
                         vec![[c[0] - r, c[1] - r], [c[0] + r, c[1] + r]]
                     }
                     Ent::Conic { c, a, b, .. } => {
-                        let cc = self.doc.pval(*c);
-                        let r = self.doc.params[*a].v.abs().max(self.doc.params[*b].v.abs());
+                        let cc = self.geo.doc.pval(*c);
+                        let r = self.geo.doc.params[*a].v.abs().max(self.geo.doc.params[*b].v.abs());
                         vec![[cc[0] - r, cc[1] - r], [cc[0] + r, cc[1] + r]]
                     }
                     _ => vec![],
@@ -414,7 +414,7 @@ impl App {
         self.view.rect = rect;
         if !self.fitted && rect.width() > 100.0 {
             self.fitted = true;
-            if self.doc.ents.iter().flatten().filter(|e| !e.hidden).count() > 3 {
+            if self.geo.doc.ents.iter().flatten().filter(|e| !e.hidden).count() > 3 {
                 self.fit();
             }
         }
@@ -484,8 +484,8 @@ impl App {
             } else {
                 match self.hit(p) {
                     Some(Sel::Dim(d)) => {
-                        let dim = self.doc.dims[d].as_ref().unwrap();
-                        let a = self.dim_anchor_kind(&dim.kind);
+                        let dim = self.geo.doc.dims[d].as_ref().unwrap();
+                        let a = self.geo.doc.dim_anchor(&dim.kind);
                         let l = [a[0] + dim.off[0], a[1] + dim.off[1]];
                         kind = Some(DragKind::DimLabel { d, grab: [pw[0] - l[0], pw[1] - l[1]] });
                     }
@@ -495,7 +495,7 @@ impl App {
             }
             match kind {
                 Some(k) => {
-                    self.drag_backup = Some(self.doc.clone());
+                    self.drag_backup = Some(self.geo.doc.clone());
                     self.drag = Some(k);
                 }
                 None => {
@@ -516,17 +516,17 @@ impl App {
                         }
                     }
                     DragKind::DimLabel { d, grab } => {
-                        if let Some(dim) = self.doc.dims[*d].clone() {
-                            let a = self.dim_anchor_kind(&dim.kind);
+                        if let Some(dim) = self.geo.doc.dims[*d].clone() {
+                            let a = self.geo.doc.dim_anchor(&dim.kind);
                             let m = self.mouse_w;
                             let lw = [m[0] - grab[0], m[1] - grab[1]];
-                            let x = self.doc.dims[*d].as_mut().unwrap();
+                            let x = self.geo.doc.dims[*d].as_mut().unwrap();
                             x.off = [lw[0] - a[0], lw[1] - a[1]];
                             if let (DimKind::Angle(l1, l2), false) = (dim.kind, dim.driving) {
-                                let supp = angle_supp(&self.doc, l1, l2, lw);
+                                let supp = angle_supp(&self.geo.doc, l1, l2, lw);
                                 if supp != dim.supp {
-                                    self.doc.dims[*d].as_mut().unwrap().supp = supp;
-                                    self.generation += 1;
+                                    self.geo.doc.dims[*d].as_mut().unwrap().supp = supp;
+                                    self.geo.generation += 1;
                                 }
                             }
                         }
@@ -546,7 +546,7 @@ impl App {
                                 self.sel.clear();
                             }
                             for (e, polys) in &self.shapes {
-                                if self.doc.is_fixed_ent(*e) {
+                                if self.geo.doc.is_fixed_ent(*e) {
                                     continue;
                                 }
                                 let all = polys.iter().flatten().all(|p| r.contains(*p));
@@ -564,9 +564,9 @@ impl App {
                     DragKind::Pan => {}
                     _ => {
                         if let Some(b) = self.drag_backup.take() {
-                            self.push_undo(b);
+                            self.geo.push_undo(b);
                         }
-                        self.solve_full();
+                        self.geo.solve_full();
                     }
                 }
                 self.drag = None;
@@ -601,9 +601,9 @@ impl App {
     }
 
     pub fn open_dim_editor(&mut self, d: usize) {
-        if let Some(dim) = &self.doc.dims[d] {
+        if let Some(dim) = &self.geo.doc.dims[d] {
             let text = if dim.expr.is_empty() {
-                let v = if dim.driving { self.doc.params[dim.param].v } else { self.doc.measure_value(d) };
+                let v = if dim.driving { self.geo.doc.params[dim.param].v } else { self.geo.doc.measure_value(d) };
                 fmt_dim(v, dim.kind.is_angle()).trim_end_matches('°').to_string()
             } else {
                 dim.expr.clone()
@@ -613,7 +613,7 @@ impl App {
     }
 
     fn drag_kind_for(&self, e: usize, pw: [f64; 2]) -> Option<DragKind> {
-        let d = &self.doc;
+        let d = &self.geo.doc;
         let unlocked_pts = |pts: Vec<usize>| -> Vec<(usize, [f64; 2])> {
             pts.into_iter().filter(|p| !d.point_locked(*p)).map(|p| (p, d.pval(p))).collect()
         };
@@ -676,9 +676,9 @@ impl App {
     /// parabola-by-focus tool.
     fn directrix_snap(&self, s: Snap) -> Option<Snap> {
         match s {
-            Snap::Curve(l, _) if self.doc.is_line(l) => Some(s),
+            Snap::Curve(l, _) if self.geo.doc.is_line(l) => Some(s),
             _ => match self.hover {
-                Some(Sel::Ent(l)) if self.doc.is_line(l) => Some(Snap::Curve(l, self.mouse_w)),
+                Some(Sel::Ent(l)) if self.geo.doc.is_line(l) => Some(Snap::Curve(l, self.mouse_w)),
                 _ => None,
             },
         }
@@ -689,7 +689,7 @@ impl App {
     fn shape_ghost(&self, last: Snap) -> Vec<Vec<Pos2>> {
         let mut snaps = self.pending.clone();
         snaps.push(last);
-        let mut d = self.doc.clone();
+        let mut d = self.geo.doc.clone();
         match build_shape(&mut d, self.tool, &snaps) {
             Some(e) => geom_polys(&d, self.view, self.view_radius_w(), e),
             None => vec![],
@@ -715,7 +715,7 @@ impl App {
             // only commit clicks that determine a shape
             let mut snaps = self.pending.clone();
             snaps.push(s);
-            let mut trial = self.doc.clone();
+            let mut trial = self.geo.doc.clone();
             if build_shape(&mut trial, self.tool, &snaps).is_none() {
                 let ents: Vec<usize> = snaps.iter().filter_map(|x| if let Snap::Point(e) | Snap::Curve(e, _) = x { Some(*e) } else { None }).collect();
                 self.flash_ents(ents);
@@ -732,7 +732,7 @@ impl App {
         let tool = self.tool;
         let mut chain: Option<usize> = None;
         let mut created: Option<usize> = None;
-        let ok = self.try_change(false, |d| match tool {
+        let ok = self.geo.try_change(false, |d| match tool {
             Tool::Point => {
                 if !matches!(p[0], Snap::Point(_)) {
                     created = Some(realize(d, p[0]));
@@ -756,8 +756,7 @@ impl App {
             }
             Tool::Circle => {
                 let c = realize(d, p[0]);
-                let r = (pos[1][0] - pos[0][0]).hypot(pos[1][1] - pos[0][1]).max(1e-3);
-                let ci = d.add_circle(c, r);
+                let ci = d.build_circle_to(c, pos[1]);
                 created = Some(ci);
                 match p[1] {
                     Snap::Point(e) => d.cons.push(Some(Con::OnCurve(e, ci))),
@@ -771,15 +770,9 @@ impl App {
             Tool::Arc => {
                 let c = realize(d, p[0]);
                 let a = realize(d, p[1]);
-                let ca = d.pval(c);
-                let pa = d.pval(a);
-                let r = (pa[0] - ca[0]).hypot(pa[1] - ca[1]);
                 let b = match p[2] {
                     Snap::Point(e) => e,
-                    _ => {
-                        let ang = (pos[2][1] - ca[1]).atan2(pos[2][0] - ca[0]);
-                        d.add_point(ca[0] + r * ang.cos(), ca[1] + r * ang.sin())
-                    }
+                    _ => d.build_arc_end(c, a, pos[2]),
                 };
                 if a != b {
                     created = Some(d.add_ent(Ent::Arc { c, a, b }));
@@ -787,19 +780,12 @@ impl App {
             }
             Tool::Ellipse | Tool::Hyperbola => {
                 let c = realize(d, p[0]);
-                let cc = d.pval(c);
-                let (dx, dy) = (pos[1][0] - cc[0], pos[1][1] - cc[1]);
-                let a = dx.hypot(dy).max(1e-3);
-                let t = dy.atan2(dx);
-                let b = ((-(pos[2][0] - cc[0]) * t.sin() + (pos[2][1] - cc[1]) * t.cos()).abs()).max(a * 0.05);
                 let kind = if tool == Tool::Ellipse { ConicKind::Ellipse } else { ConicKind::Hyperbola };
-                created = Some(d.add_conic(kind, c, a, b, t));
+                created = Some(d.build_conic_from(kind, c, pos[1], pos[2]));
             }
             Tool::Parabola => {
                 let c = realize(d, p[0]);
-                let cc = d.pval(c);
-                let (dx, dy) = (pos[1][0] - cc[0], pos[1][1] - cc[1]);
-                created = Some(d.add_conic(ConicKind::Parabola, c, dx.hypot(dy).max(1e-3), 1.0, dy.atan2(dx)));
+                created = Some(d.build_parabola_toward(c, pos[1]));
             }
             Tool::Circle3 | Tool::Arc3 | Tool::EllipseFoci | Tool::HyperbolaFoci | Tool::ParabolaFocus => {
                 created = build_shape(d, tool, &p);
@@ -819,7 +805,7 @@ impl App {
     }
 
     fn dim_kind_for(&self, ents: &[usize]) -> Option<DimKind> {
-        let d = &self.doc;
+        let d = &self.geo.doc;
         match ents {
             [p] if d.is_point(*p) => {
                 let q = d.pval(*p);
@@ -843,7 +829,7 @@ impl App {
     }
 
     fn lines_parallel(&self, l1: usize, l2: usize) -> bool {
-        let d = &self.doc;
+        let d = &self.geo.doc;
         let dir = |l: usize| {
             let (a, b) = d.line_pts(l);
             let (a, b) = (d.pval(a), d.pval(b));
@@ -864,7 +850,7 @@ impl App {
             return;
         }
         match self.hover {
-            Some(Sel::Ent(e)) if !self.doc.ent(e).is_some_and(|x| x.hidden) => {
+            Some(Sel::Ent(e)) if !self.geo.doc.ent(e).is_some_and(|x| x.hidden) => {
                 if let Some(i) = self.sel.iter().position(|s| *s == Sel::Ent(e)) {
                     self.sel.remove(i);
                 } else {
@@ -881,9 +867,9 @@ impl App {
             _ => {
                 let ents = self.sel_ents();
                 if let Some(k) = self.dim_kind_for(&ents) {
-                    if let Some(i) = self.add_dimension(k, self.mouse_w) {
+                    if let Some(i) = self.geo.add_dimension(k, self.mouse_w) {
                         self.sel = vec![Sel::Dim(i)];
-                        if self.doc.dims[i].as_ref().is_some_and(|d| d.driving) {
+                        if self.geo.doc.dims[i].as_ref().is_some_and(|d| d.driving) {
                             self.open_dim_editor(i);
                         }
                     }
@@ -898,15 +884,15 @@ impl App {
 
     fn conflict_ents(&self) -> HashSet<usize> {
         let mut s = HashSet::new();
-        for o in &self.conflicts {
+        for o in &self.geo.conflicts {
             match o {
                 Owner::Con(c) => {
-                    if let Some(c) = &self.doc.cons[*c] {
+                    if let Some(c) = &self.geo.doc.cons[*c] {
                         s.extend(Doc::con_ents(c));
                     }
                 }
                 Owner::Dim(d) => {
-                    if let Some(d) = &self.doc.dims[*d] {
+                    if let Some(d) = &self.geo.doc.dims[*d] {
                         s.extend(d.kind.ents());
                     }
                 }
@@ -919,11 +905,11 @@ impl App {
     }
 
     fn fully_constrained(&self, e: usize) -> bool {
-        self.doc.ent_all_params(e).iter().all(|p| !self.free_params.contains(p))
+        self.geo.doc.ent_all_params(e).iter().all(|p| !self.geo.free_params.contains(p))
     }
 
     fn curve_index(&self, e: usize) -> usize {
-        self.doc.ents[..e].iter().flatten().filter(|x| matches!(x.kind, Ent::Curve { .. })).count()
+        self.geo.doc.ents[..e].iter().flatten().filter(|x| matches!(x.kind, Ent::Curve { .. })).count()
     }
 
     fn ent_color(&self, e: usize, conflicts: &HashSet<usize>) -> Color32 {
@@ -936,10 +922,10 @@ impl App {
         if conflicts.contains(&e) {
             return ERR;
         }
-        if e == self.doc.xaxis || e == self.doc.yaxis {
+        if e == self.geo.doc.xaxis || e == self.geo.doc.yaxis {
             return AXIS;
         }
-        if self.doc.is_curve_ent(e) {
+        if self.geo.doc.is_curve_ent(e) {
             return CURVES[self.curve_index(e) % CURVES.len()];
         }
         if self.fully_constrained(e) { FULL } else { ACCENT }
@@ -1017,21 +1003,21 @@ impl App {
         self.paint_grid(p);
         let conflicts = self.conflict_ents();
         let hovered_con_ents: Vec<usize> = match self.hover {
-            Some(Sel::Con(c)) => self.doc.cons[c].as_ref().map(Doc::con_ents).unwrap_or_default(),
-            Some(Sel::Dim(d)) => self.doc.dims[d].as_ref().map(|d| d.kind.ents()).unwrap_or_default(),
+            Some(Sel::Con(c)) => self.geo.doc.cons[c].as_ref().map(Doc::con_ents).unwrap_or_default(),
+            Some(Sel::Dim(d)) => self.geo.doc.dims[d].as_ref().map(|d| d.kind.ents()).unwrap_or_default(),
             _ => vec![],
         };
         let mut ids: Vec<usize> = self.shapes.keys().copied().collect();
         ids.sort();
         // curves first, then points on top
         for &e in &ids {
-            if self.doc.is_point(e) {
+            if self.geo.doc.is_point(e) {
                 continue;
             }
-            let ent = self.doc.ent(e).unwrap();
+            let ent = self.geo.doc.ent(e).unwrap();
             let col = self.ent_color(e, &conflicts);
             let hov = self.hover == Some(Sel::Ent(e)) || hovered_con_ents.contains(&e);
-            let is_axis = e == self.doc.xaxis || e == self.doc.yaxis;
+            let is_axis = e == self.geo.doc.xaxis || e == self.geo.doc.yaxis;
             let w = if is_axis { 1.2 } else if hov { 2.6 } else { 2.0 };
             let col = if hov && !self.sel.contains(&Sel::Ent(e)) && !is_axis { brighten(col) } else { col };
             let dashed = ent.construction && !is_axis;
@@ -1043,10 +1029,10 @@ impl App {
         // conic handles and asymptotes
         self.handles.clear();
         for &e in &ids {
-            if let Some(Ent::Conic { kind, c, a, b, t }) = self.doc.kind(e).cloned() {
+            if let Some(Ent::Conic { kind, c, a, b, t }) = self.geo.doc.kind(e).cloned() {
                 let show = self.sel.contains(&Sel::Ent(e)) || self.hover == Some(Sel::Ent(e)) || matches!(self.drag, Some(DragKind::Handle { e: de, .. }) if de == e);
-                let cc = self.doc.pval(c);
-                let (av, bv, tv) = (self.doc.params[a].v, self.doc.params[b].v, self.doc.params[t].v);
+                let cc = self.geo.doc.pval(c);
+                let (av, bv, tv) = (self.geo.doc.params[a].v, self.geo.doc.params[b].v, self.geo.doc.params[t].v);
                 let (ct, st) = (tv.cos(), tv.sin());
                 let h0 = self.view.to_s([cc[0] + av * ct, cc[1] + av * st]);
                 let h1 = self.view.to_s([cc[0] - bv * st, cc[1] + bv * ct]);
@@ -1100,12 +1086,12 @@ impl App {
         }
         self.paint_extensions(p, &conflicts);
         // tangent contact points
-        for c in self.doc.cons.iter().flatten() {
+        for c in self.geo.doc.cons.iter().flatten() {
             if let Con::Tangent { a, b, aux: Some((x, y)), .. } = c {
-                if self.doc.tangent_contact(*a, *b).is_some() {
+                if self.geo.doc.tangent_contact(*a, *b).is_some() {
                     continue;
                 }
-                let q = self.view.to_s([self.doc.params[*x].v, self.doc.params[*y].v]);
+                let q = self.view.to_s([self.geo.doc.params[*x].v, self.geo.doc.params[*y].v]);
                 p.circle_stroke(q, 2.5, Stroke::new(1.0, MUTED));
             }
         }
@@ -1116,15 +1102,15 @@ impl App {
             self.glyphs.clear();
         }
         for &e in &ids {
-            if !self.doc.is_point(e) {
+            if !self.geo.doc.is_point(e) {
                 continue;
             }
-            let ent = self.doc.ent(e).unwrap();
+            let ent = self.geo.doc.ent(e).unwrap();
             let q = self.shapes[&e][0][0];
             let col = self.ent_color(e, &conflicts);
             let hov = self.hover == Some(Sel::Ent(e)) || hovered_con_ents.contains(&e);
             let sel = self.sel.contains(&Sel::Ent(e));
-            if e == self.doc.origin {
+            if e == self.geo.doc.origin {
                 p.circle_stroke(q, 4.5, Stroke::new(1.4, if sel { SEL } else if hov { FULL } else { AXIS.gamma_multiply(1.8) }));
                 p.circle_filled(q, 1.6, if sel { SEL } else { MUTED });
                 continue;
@@ -1133,7 +1119,7 @@ impl App {
             if hov {
                 p.circle_filled(q, r + 5.0, col.gamma_multiply(0.18));
             }
-            if self.doc.point_locked(e) {
+            if self.geo.doc.point_locked(e) {
                 let rr = Rect::from_center_size(q, vec2(r * 2.0, r * 2.0));
                 p.rect_filled(rr.expand(1.5), 1.5, BG);
                 p.rect_filled(rr, 1.0, col);
@@ -1155,7 +1141,7 @@ impl App {
 
     /// Dashed continuation of a segment up to points constrained onto its line.
     fn paint_extensions(&self, p: &Painter, conflicts: &HashSet<usize>) {
-        let d = &self.doc;
+        let d = &self.geo.doc;
         let ext = |l: usize, q: [f64; 2]| {
             let Some(Ent::Line { a, b, infinite: false }) = d.kind(l) else { return };
             let (pa, pb) = (d.pval(*a), d.pval(*b));
@@ -1207,7 +1193,7 @@ impl App {
         if self.tool == Tool::Dimension {
             let ents = self.sel_ents();
             if let Some(k) = self.dim_kind_for(&ents) {
-                let a = self.dim_anchor_kind(&k);
+                let a = self.geo.doc.dim_anchor(&k);
                 let tmp = Dim { kind: k, name: String::new(), driving: true, expr: String::new(), param: 0, s: 1.0, supp: false, off: [mw[0] - a[0], mw[1] - a[1]] };
                 self.paint_dim_shape(p, &tmp, None, DIMC.gamma_multiply(0.6), "");
             }
@@ -1224,7 +1210,7 @@ impl App {
             if needs_point {
                 match snap {
                     Snap::Point(e) => {
-                        p.circle_stroke(self.view.to_s(self.doc.pval(e)), 8.0, Stroke::new(1.5, SEL));
+                        p.circle_stroke(self.view.to_s(self.geo.doc.pval(e)), 8.0, Stroke::new(1.5, SEL));
                     }
                     Snap::Curve(_, w) => {
                         p.circle_stroke(self.view.to_s(w), 5.0, Stroke::new(1.5, SEL));
@@ -1237,7 +1223,7 @@ impl App {
         }
         let sp = match snap {
             Snap::Point(e) => {
-                let q = v.to_s(self.doc.pval(e));
+                let q = v.to_s(self.geo.doc.pval(e));
                 p.circle_stroke(q, 8.0, Stroke::new(1.5, SEL));
                 q
             }
@@ -1355,14 +1341,14 @@ impl App {
 
     fn paint_dims(&mut self, p: &Painter) {
         self.dim_rects.clear();
-        for i in 0..self.doc.dims.len() {
-            let Some(d) = self.doc.dims[i].clone() else { continue };
+        for i in 0..self.geo.doc.dims.len() {
+            let Some(d) = self.geo.doc.dims[i].clone() else { continue };
             if self.edit.as_ref().is_some_and(|e| e.dim == i) {
                 // label is replaced by the editor, but still draw geometry
             }
             let sel = self.sel.contains(&Sel::Dim(i));
             let hov = self.hover == Some(Sel::Dim(i));
-            let err = self.conflicts.contains(&Owner::Dim(i)) || self.errors.contains_key(&Owner::Dim(i));
+            let err = self.geo.conflicts.contains(&Owner::Dim(i)) || self.geo.errors.contains_key(&Owner::Dim(i));
             let col = if self.now < self.flash_until && d.kind.ents().iter().all(|e| self.flash.contains(e)) {
                 ERR
             } else if sel {
@@ -1375,7 +1361,7 @@ impl App {
                 MUTED
             };
             let col = if hov && !sel { brighten(col) } else { col };
-            let v = self.doc.measure_value(i);
+            let v = self.geo.doc.measure_value(i);
             let mut txt = fmt_dim(v, d.kind.is_angle());
             if d.kind == DimKind::Diameter(match d.kind { DimKind::Diameter(c) => c, _ => 0 }) {
                 txt = format!("⌀{txt}");
@@ -1394,8 +1380,8 @@ impl App {
     /// Draws the dimension geometry and label; returns the label rect.
     fn paint_dim_shape(&self, p: &Painter, d: &Dim, name: Option<&String>, col: Color32, txt: &str) -> Option<Rect> {
         let v = self.view;
-        let doc = &self.doc;
-        let anchor = self.dim_anchor_kind(&d.kind);
+        let doc = &self.geo.doc;
+        let anchor = self.geo.doc.dim_anchor(&d.kind);
         let lw = [anchor[0] + d.off[0], anchor[1] + d.off[1]];
         let lp = v.to_s(lw);
         let st = Stroke::new(1.1, col);
@@ -1568,7 +1554,7 @@ impl App {
         let nw = ng.as_ref().map(|(gb, gs)| gb.size().x + gs.as_ref().map(|g| g.size().x + 1.0).unwrap_or(0.0) + 6.0).unwrap_or(0.0);
         let size = vec2(g.size().x + nw + 14.0, g.size().y + 6.0);
         let r = Rect::from_center_size(lp, size);
-        if self.edit.as_ref().is_some_and(|e| self.doc.dims.get(e.dim).and_then(|x| x.as_ref()).is_some_and(|x| x.name == d.name) && name.is_some()) {
+        if self.edit.as_ref().is_some_and(|e| self.geo.doc.dims.get(e.dim).and_then(|x| x.as_ref()).is_some_and(|x| x.name == d.name) && name.is_some()) {
             return Some(r);
         }
         p.rect_filled(r, CornerRadius::same(7), SURFACE);
@@ -1591,7 +1577,7 @@ impl App {
 
     fn glyph_anchor(&self, c: &Con) -> Vec<(Pos2, Vec2)> {
         let v = self.view;
-        let d = &self.doc;
+        let d = &self.geo.doc;
         let mid_line = |l: usize| {
             let (a, b) = d.line_pts(l);
             let (a, b) = (d.pval(a), d.pval(b));
@@ -1666,10 +1652,10 @@ impl App {
     fn paint_glyphs(&mut self, p: &Painter) {
         self.glyphs.clear();
         let mut used: HashMap<(i32, i32), u32> = HashMap::new();
-        for i in 0..self.doc.cons.len() {
-            let Some(c) = self.doc.cons[i].clone() else { continue };
+        for i in 0..self.geo.doc.cons.len() {
+            let Some(c) = self.geo.doc.cons[i].clone() else { continue };
             let ents = Doc::con_ents(&c);
-            if ents.iter().any(|e| self.doc.ent(*e).is_none_or(|x| x.hidden)) {
+            if ents.iter().any(|e| self.geo.doc.ent(*e).is_none_or(|x| x.hidden)) {
                 continue;
             }
             let icon = match c {
@@ -1696,7 +1682,7 @@ impl App {
             };
             let sel = self.sel.contains(&Sel::Con(i));
             let hov = self.hover == Some(Sel::Con(i)) || self.hover.is_some_and(|h| matches!(h, Sel::Ent(e) if ents.contains(&e)));
-            let err = self.conflicts.contains(&Owner::Con(i));
+            let err = self.geo.conflicts.contains(&Owner::Con(i));
             for (anchor, off) in self.glyph_anchor(&c) {
                 if !finite(anchor) {
                     continue;
@@ -1722,7 +1708,7 @@ impl App {
     // ------------------------------------------------------------ overlays
 
     fn actions(&self) -> Vec<(Icon, &'static str, Act)> {
-        let d = &self.doc;
+        let d = &self.geo.doc;
         let mut out: Vec<(Icon, &'static str, Act)> = Vec::new();
         if let [Sel::Dim(i)] = self.sel.as_slice() {
             if let Some(dim) = &d.dims[*i] {
@@ -1802,7 +1788,7 @@ impl App {
                 }
             }
             [a, b] if is_curve(*a) && is_curve(*b) => {
-                if let Some(t) = self.tangent_con(*a, *b) {
+                if let Some(t) = self.geo.doc.tangent_con(*a, *b) {
                     out.push((Icon::Tangent, "Tangent  T", Act::Con(t)));
                 }
                 let lc = |e: usize| d.is_line(e) || d.is_circlelike(e);
@@ -1857,7 +1843,7 @@ impl App {
                         _ => Con::Vertical(w[0], w[1]),
                     })
                     .collect();
-                if !self.try_change(true, |d| {
+                if !self.geo.try_change(true, |d| {
                     for c in cons {
                         d.cons.push(Some(c));
                     }
@@ -1866,36 +1852,36 @@ impl App {
                 }
             }
             Act::Dim(k) => {
-                let anchor = self.dim_anchor_kind(&k);
+                let anchor = self.geo.doc.dim_anchor(&k);
                 let off = 40.0 / self.view.s;
                 let label = match k {
                     DimKind::HDist(..) => [anchor[0], anchor[1] + off * 1.2],
                     DimKind::CoordX(p) => {
-                        let q = self.doc.pval(p);
+                        let q = self.geo.doc.pval(p);
                         [anchor[0], if q[1] >= 0.0 { -off * 0.6 } else { off * 0.6 }]
                     }
                     DimKind::CoordY(p) => {
-                        let q = self.doc.pval(p);
+                        let q = self.geo.doc.pval(p);
                         [if q[0] >= 0.0 { -off * 0.9 } else { off * 0.9 }, anchor[1]]
                     }
                     DimKind::VDist(..) => [anchor[0] + off * 1.2, anchor[1]],
                     DimKind::Radius(c) | DimKind::Diameter(c) => {
-                        let (cc, r) = self.doc.circ_val(c);
+                        let (cc, r) = self.geo.doc.circ_val(c);
                         [cc[0] + (r + off) * 0.7071, cc[1] + (r + off) * 0.7071]
                     }
                     DimKind::Angle(..) => [anchor[0] + off * 1.5, anchor[1] + off * 0.6],
                     _ => [anchor[0] + off * 0.5, anchor[1] + off],
                 };
-                if let Some(i) = self.add_dimension(k, label) {
+                if let Some(i) = self.geo.add_dimension(k, label) {
                     self.sel = vec![Sel::Dim(i)];
-                    if self.doc.dims[i].as_ref().is_some_and(|d| d.driving) {
+                    if self.geo.doc.dims[i].as_ref().is_some_and(|d| d.driving) {
                         self.open_dim_editor(i);
                     }
                 }
             }
             Act::Lock(on) => {
                 let ents = self.sel_ents();
-                self.try_change(false, |d| {
+                self.geo.try_change(false, |d| {
                     for e in ents {
                         d.lock_point(e, on);
                     }
@@ -1903,8 +1889,8 @@ impl App {
             }
             Act::Construction => {
                 let ents = self.sel_ents();
-                let on = !ents.iter().all(|e| self.doc.ent(*e).is_some_and(|x| x.construction));
-                self.try_change(false, |d| {
+                let on = !ents.iter().all(|e| self.geo.doc.ent(*e).is_some_and(|x| x.construction));
+                self.geo.try_change(false, |d| {
                     for e in ents {
                         if let Some(x) = d.ents[e].as_mut() {
                             if !matches!(x.kind, Ent::Point { .. }) {
@@ -1916,7 +1902,7 @@ impl App {
             }
             Act::Infinite => {
                 let ents = self.sel_ents();
-                self.try_change(false, |d| {
+                self.geo.try_change(false, |d| {
                     for e in ents {
                         if let Some(Entity { kind: Ent::Line { infinite, .. }, .. }) = d.ents[e].as_mut() {
                             *infinite = !*infinite;
@@ -1927,10 +1913,10 @@ impl App {
             Act::Delete => self.delete_selection(),
             Act::Driving(i) => self.toggle_driving(i),
             Act::Supp(i) => {
-                let p = self.doc.dims[i].as_ref().map(|d| d.param).unwrap();
-                let cur = self.doc.params[p].v;
-                let driving = self.doc.dims[i].as_ref().unwrap().driving;
-                self.try_change(false, |d| {
+                let p = self.geo.doc.dims[i].as_ref().map(|d| d.param).unwrap();
+                let cur = self.geo.doc.params[p].v;
+                let driving = self.geo.doc.dims[i].as_ref().unwrap().driving;
+                self.geo.try_change(false, |d| {
                     let x = d.dims[i].as_mut().unwrap();
                     x.supp = !x.supp;
                     if driving && x.expr.is_empty() {
@@ -2052,12 +2038,12 @@ impl App {
         }
 
         // constraint status
-        let (col, txt) = if !self.conflicts.is_empty() {
-            (ERR, format!("{}", self.dof))
-        } else if self.dof == 0 {
+        let (col, txt) = if !self.geo.conflicts.is_empty() {
+            (ERR, format!("{}", self.geo.dof))
+        } else if self.geo.dof == 0 {
             (GOOD, "0".to_string())
         } else {
-            (ACCENT, format!("{}", self.dof))
+            (ACCENT, format!("{}", self.geo.dof))
         };
         let r = Rect::from_min_size(pos2(rect.min.x + 12.0, rect.max.y - 40.0), vec2(56.0, 28.0));
         self.pill(ui, r);
@@ -2088,9 +2074,9 @@ impl App {
             self.curve_input = Some(owned.clone());
             if resp.lost_focus() && enter {
                 let src = owned.trim().to_string();
-                if self.doc.curve_def(&src).is_ok() {
+                if self.geo.doc.curve_def(&src).is_ok() {
                     let mut idx = 0;
-                    self.try_change(false, |d| idx = d.add_ent(Ent::Curve { src }));
+                    self.geo.try_change(false, |d| idx = d.add_ent(Ent::Curve { src }));
                     self.curve_input = None;
                     self.tool = Tool::Select;
                     self.sel = vec![Sel::Ent(idx)];
@@ -2102,7 +2088,7 @@ impl App {
                 self.tool = Tool::Select;
             }
             if let Some(src) = &self.curve_input {
-                if let Err(_) = self.doc.curve_def(src) {
+                if let Err(_) = self.geo.doc.curve_def(src) {
                     ui.painter().circle_filled(pos2(r.max.x - 14.0, r.center().y), 3.0, ERR);
                 }
             }
@@ -2111,10 +2097,10 @@ impl App {
         // inline dimension editor
         if let Some(mut ed_owned) = self.edit.take() {
             let ed = &mut ed_owned;
-            let Some(dim) = self.doc.dims.get(ed.dim).and_then(|d| d.clone()) else {
+            let Some(dim) = self.geo.doc.dims.get(ed.dim).and_then(|d| d.clone()) else {
                 return;
             };
-            let a = self.dim_anchor_kind(&dim.kind);
+            let a = self.geo.doc.dim_anchor(&dim.kind);
             let lp = self.view.to_s([a[0] + dim.off[0], a[1] + dim.off[1]]);
             let w = 130.0;
             let r = Rect::from_center_size(lp, vec2(w, 30.0));
@@ -2372,7 +2358,7 @@ mod shape_tool_tests {
     use super::*;
 
     fn count(app: &App, f: impl Fn(&Ent) -> bool) -> usize {
-        app.doc.ents.iter().flatten().filter(|e| f(&e.kind)).count()
+        app.geo.doc.ents.iter().flatten().filter(|e| f(&e.kind)).count()
     }
 
     fn run(tool: Tool, clicks: &[Snap]) -> App {
@@ -2387,8 +2373,8 @@ mod shape_tool_tests {
     #[test]
     fn circle_through_three_clicks() {
         let app = run(Tool::Circle3, &[Snap::Free([1.0, 0.0]), Snap::Free([0.0, 1.0]), Snap::Free([-1.0, 0.0])]);
-        let circ = (0..app.doc.ents.len()).find(|&i| matches!(app.doc.kind(i), Some(Ent::Circle { .. }))).expect("no circle");
-        let (c, r) = app.doc.circ_val(circ);
+        let circ = (0..app.geo.doc.ents.len()).find(|&i| matches!(app.geo.doc.kind(i), Some(Ent::Circle { .. }))).expect("no circle");
+        let (c, r) = app.geo.doc.circ_val(circ);
         assert!(c[0].abs() < 1e-9 && c[1].abs() < 1e-9 && (r - 1.0).abs() < 1e-9, "{c:?} {r}");
         assert!(app.pending.is_empty());
     }
@@ -2412,19 +2398,19 @@ mod shape_tool_tests {
         for (tool, kind) in [(Tool::EllipseFoci, ConicKind::Ellipse), (Tool::HyperbolaFoci, ConicKind::Hyperbola)] {
             let third = if kind == ConicKind::Ellipse { [0.0, 3.0] } else { [3.5, 1.0] };
             let app = run(tool, &[Snap::Free([-4.0, 0.0]), Snap::Free([4.0, 0.0]), Snap::Free(third)]);
-            let c = (0..app.doc.ents.len()).find(|&i| matches!(app.doc.kind(i), Some(Ent::Conic { kind: k, .. }) if *k == kind)).expect("no conic");
-            assert_eq!(app.doc.foci_of(c).len(), 2, "{kind:?}");
+            let c = (0..app.geo.doc.ents.len()).find(|&i| matches!(app.geo.doc.kind(i), Some(Ent::Conic { kind: k, .. }) if *k == kind)).expect("no conic");
+            assert_eq!(app.geo.doc.foci_of(c).len(), 2, "{kind:?}");
         }
     }
 
     #[test]
     fn parabola_by_focus_then_line() {
         let app = App::new();
-        let xa = app.doc.xaxis;
+        let xa = app.geo.doc.xaxis;
         let app = run(Tool::ParabolaFocus, &[Snap::Free([0.0, 2.0]), Snap::Curve(xa, [0.5, 0.0])]);
-        let par = (0..app.doc.ents.len()).find(|&i| matches!(app.doc.kind(i), Some(Ent::Conic { kind: ConicKind::Parabola, .. }))).expect("no parabola");
-        let Some(Ent::Conic { a, .. }) = app.doc.kind(par) else { unreachable!() };
-        assert!((app.doc.params[*a].v - 1.0).abs() < 1e-9);
+        let par = (0..app.geo.doc.ents.len()).find(|&i| matches!(app.geo.doc.kind(i), Some(Ent::Conic { kind: ConicKind::Parabola, .. }))).expect("no parabola");
+        let Some(Ent::Conic { a, .. }) = app.geo.doc.kind(par) else { unreachable!() };
+        assert!((app.geo.doc.params[*a].v - 1.0).abs() < 1e-9);
         // a second click that is not on a line is ignored
         let app = run(Tool::ParabolaFocus, &[Snap::Free([0.0, 2.0]), Snap::Free([1.0, 1.0])]);
         assert_eq!(app.pending.len(), 1);

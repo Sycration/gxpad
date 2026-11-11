@@ -30,7 +30,7 @@ fn label(k: &Kit, l1: usize, l2: usize) -> [f64; 2] {
 
 fn adrive(k: &mut Kit, l1: usize, l2: usize, val: &str) -> usize {
     let lw = label(k, l1, l2);
-    let i = k.app.add_dimension(DimKind::Angle(l1, l2), lw).expect("dimension rejected");
+    let i = k.app.geo.add_dimension(DimKind::Angle(l1, l2), lw).expect("dimension rejected");
     assert!(k.doc().dims[i].as_ref().unwrap().driving, "angle already determined");
     k.set(i, val);
     i
@@ -38,7 +38,7 @@ fn adrive(k: &mut Kit, l1: usize, l2: usize, val: &str) -> usize {
 
 fn ameas(k: &mut Kit, l1: usize, l2: usize) -> usize {
     let lw = label(k, l1, l2);
-    let i = k.app.add_dimension(DimKind::Angle(l1, l2), lw).expect("dimension rejected");
+    let i = k.app.geo.add_dimension(DimKind::Angle(l1, l2), lw).expect("dimension rejected");
     if k.doc().dims[i].as_ref().unwrap().driving {
         k.app.toggle_driving(i);
     }

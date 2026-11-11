@@ -1951,7 +1951,7 @@ mod tests {
         let f2 = xx.pow(3).sub(&r.mul(&xx)).add(&s);
         let f3 = xx.sub(&r).sub(&s);
         let p = f1.mul(&f2).mul(&f3);
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         let f = factor_main(&p, 0);
         let mut degs: Vec<u32> = f.iter().map(|g| g.deg(0)).collect();
         degs.sort();
@@ -1992,7 +1992,7 @@ mod tests {
             Err(_) => all.clone(),
         };
         for &main in &mains {
-            let t0 = std::time::Instant::now();
+            let t0 = web_time::Instant::now();
             crate::expr::set_deadline(Some(t0 + std::time::Duration::from_secs(10)));
             let f = factor_main(&p, main);
             println!("factored in v{main} in {:?}", t0.elapsed());

@@ -28,11 +28,6 @@ fn text_cell(ui: &mut Ui, bufs: &mut HashMap<String, String>, key: &str, current
     (resp, out)
 }
 
-fn valid_ident(s: &str) -> bool {
-    let mut cs = s.chars();
-    matches!(cs.next(), Some(c) if c.is_alphabetic()) && cs.all(|c| c.is_alphanumeric() || c == '_')
-}
-
 fn section(ui: &mut Ui, icon: Icon) -> egui::Rect {
     let (r, _) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::hover());
     icons::paint(ui.painter(), r, icon, MUTED);
@@ -87,14 +82,14 @@ impl App {
             } else if o {
                 self.open();
             } else if n {
-                let before = std::mem::replace(&mut self.doc, Doc::new());
-                self.push_undo(before);
+                let before = std::mem::replace(&mut self.geo.doc, Doc::new());
+                self.geo.push_undo(before);
                 self.path = None;
                 self.sel.clear();
-                self.dirty = true;
-                self.solve_full();
+                self.geo.dirty = true;
+                self.geo.solve_full();
             } else if a {
-                self.sel = self.doc.ents.iter().enumerate().filter(|(i, e)| e.as_ref().is_some_and(|e| !e.hidden) && !self.doc.is_fixed_ent(*i)).map(|(i, _)| Sel::Ent(i)).collect();
+                self.sel = self.geo.doc.ents.iter().enumerate().filter(|(i, e)| e.as_ref().is_some_and(|e| !e.hidden) && !self.geo.doc.is_fixed_ent(*i)).map(|(i, _)| Sel::Ent(i)).collect();
             }
             return;
         }
@@ -167,34 +162,34 @@ impl App {
                 Key::H | Key::V => {
                     let h = k == Key::H;
                     let mk = |a: usize, b: usize| if h { Con::Horizontal(a, b) } else { Con::Vertical(a, b) };
-                    let cons: Vec<Con> = if ents.len() == 1 && self.doc.is_line(ents[0]) {
-                        let (a, b) = self.doc.line_pts(ents[0]);
+                    let cons: Vec<Con> = if ents.len() == 1 && self.geo.doc.is_line(ents[0]) {
+                        let (a, b) = self.geo.doc.line_pts(ents[0]);
                         vec![mk(a, b)]
-                    } else if ents.len() >= 2 && ents.iter().all(|e| self.doc.is_point(*e)) {
+                    } else if ents.len() >= 2 && ents.iter().all(|e| self.geo.doc.is_point(*e)) {
                         ents.windows(2).map(|w| mk(w[0], w[1])).collect()
-                    } else if !ents.is_empty() && ents.iter().all(|e| self.doc.is_line(*e)) {
+                    } else if !ents.is_empty() && ents.iter().all(|e| self.geo.doc.is_line(*e)) {
                         ents.iter().map(|l| {
-                            let (a, b) = self.doc.line_pts(*l);
+                            let (a, b) = self.geo.doc.line_pts(*l);
                             mk(a, b)
                         }).collect()
                     } else {
                         vec![]
                     };
-                    if !cons.is_empty() && !self.try_change(true, |d| d.cons.extend(cons.into_iter().map(Some))) {
+                    if !cons.is_empty() && !self.geo.try_change(true, |d| d.cons.extend(cons.into_iter().map(Some))) {
                         self.flash_ents(ents);
                     }
                 }
                 Key::T => {
                     if let [a, b] = ents.as_slice() {
-                        if let Some(c) = self.tangent_con(*a, *b) {
+                        if let Some(c) = self.geo.doc.tangent_con(*a, *b) {
                             self.add_constraint(c);
                         }
                     }
                 }
                 Key::X => {
-                    let on = !ents.iter().all(|e| self.doc.ent(*e).is_some_and(|x| x.construction));
+                    let on = !ents.iter().all(|e| self.geo.doc.ent(*e).is_some_and(|x| x.construction));
                     let ents2 = ents.clone();
-                    self.try_change(false, |d| {
+                    self.geo.try_change(false, |d| {
                         for e in ents2 {
                             if let Some(x) = d.ents[e].as_mut() {
                                 if !matches!(x.kind, Ent::Point { .. }) && !x.hidden {
@@ -207,31 +202,6 @@ impl App {
                 _ => {}
             }
         }
-    }
-
-    fn rename(&mut self, old: &str, new: &str, set: impl FnOnce(&mut Doc)) -> bool {
-        let new = new.trim();
-        if new == old {
-            return true;
-        }
-        if !valid_ident(new) || self.doc.name_taken(new) {
-            return false;
-        }
-        let (o, n) = (old.to_string(), new.to_string());
-        self.try_change(false, |d| {
-            set(d);
-            for v in d.vars.iter_mut().flatten() {
-                v.expr = rename_ident(&v.expr, &o, &n);
-            }
-            for x in d.dims.iter_mut().flatten() {
-                x.expr = rename_ident(&x.expr, &o, &n);
-            }
-            for e in d.ents.iter_mut().flatten() {
-                if let Ent::Curve { src } = &mut e.kind {
-                    *src = rename_ident(src, &o, &n);
-                }
-            }
-        })
     }
 
     fn row_bg(&self, ui: &Ui, r: egui::Rect, selected: bool) {
@@ -264,8 +234,8 @@ impl App {
             section(ui, Icon::Variable);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if small_icon_btn(ui, Icon::Latex, false, "Add defined variable").clicked() {
-                    let name = self.doc.unique_name("f");
-                    self.try_change(false, |d| {
+                    let name = self.geo.doc.unique_name("f");
+                    self.geo.try_change(false, |d| {
                         let i = d.add_var(name, 0.0);
                         d.vars[i].as_mut().unwrap().expr = "0".into();
                     });
@@ -273,18 +243,18 @@ impl App {
                 if small_icon_btn(ui, Icon::Plus, false, "Add variable").clicked() {
                     let name = ["a", "b", "c", "k", "m", "n", "s", "t", "u", "w"]
                         .iter()
-                        .find(|n| !self.doc.name_taken(n))
+                        .find(|n| !self.geo.doc.name_taken(n))
                         .map(|s| s.to_string())
-                        .unwrap_or_else(|| self.doc.unique_name("k"));
-                    self.try_change(false, |d| {
+                        .unwrap_or_else(|| self.geo.doc.unique_name("k"));
+                    self.geo.try_change(false, |d| {
                         d.add_var(name, 1.0);
                     });
                 }
             });
         });
         let w = ui.available_width();
-        for i in 0..self.doc.vars.len() {
-            let Some(v) = self.doc.vars[i].clone() else { continue };
+        for i in 0..self.geo.doc.vars.len() {
+            let Some(v) = self.geo.doc.vars[i].clone() else { continue };
             let selected = self.sel.contains(&Sel::Var(i));
             let r = ui.horizontal(|ui| {
                 let (resp, new_name) = text_cell(ui, &mut self.bufs, &format!("vn{i}"), &v.name, 54.0, Some(FULL));
@@ -294,15 +264,15 @@ impl App {
                 if let Some(nn) = new_name {
                     let old = v.name.clone();
                     let nn2 = nn.trim().to_string();
-                    if !self.rename(&old, &nn, move |d| d.vars[i].as_mut().unwrap().name = nn2) {
+                    if !self.geo.rename(&old, &nn, move |d| d.vars[i].as_mut().unwrap().name = nn2) {
                         self.bufs.remove(&format!("vn{i}"));
                     }
                 }
                 let right = 64.0;
                 let fw = (w - 54.0 - right - 24.0).max(60.0);
                 if v.expr.is_empty() {
-                    let locked = self.doc.params[v.param].locked;
-                    let mut val = self.doc.params[v.param].v;
+                    let locked = self.geo.doc.params[v.param].locked;
+                    let mut val = self.geo.doc.params[v.param].v;
                     if locked {
                         let speed = (val.abs() * 0.005).max(0.005);
                         let dv = ui.add_sized(vec2(fw, 22.0), egui::DragValue::new(&mut val).speed(speed).max_decimals(6));
@@ -310,23 +280,23 @@ impl App {
                             self.sel = vec![Sel::Var(i)];
                         }
                         if dv.drag_started() {
-                            self.checkpoint();
+                            self.geo.checkpoint();
                         }
                         if dv.changed() && self.live {
                             if dv.dragged() {
                                 let p = v.param;
-                                let old = self.doc.params[p].v;
-                                self.doc.params[p].v = val;
-                                if !self.solve_full() {
-                                    self.doc.params[p].v = old;
-                                    self.solve_full();
+                                let old = self.geo.doc.params[p].v;
+                                self.geo.doc.params[p].v = val;
+                                if !self.geo.solve_full() {
+                                    self.geo.doc.params[p].v = old;
+                                    self.geo.solve_full();
                                 }
                             } else {
-                                self.set_values(&[(v.param, val)], true);
+                                self.geo.set_values(&[(v.param, val)], true);
                             }
                         }
                         if dv.drag_stopped() {
-                            self.generation += 1;
+                            self.geo.generation += 1;
                         }
                     } else {
                         let (r, _) = ui.allocate_exact_size(vec2(fw, 22.0), Sense::click());
@@ -339,10 +309,10 @@ impl App {
                     let tip = if locked { "Free — click to solve from constraints" } else { "Solved — click to set freely" };
                     if small_icon_btn(ui, if locked { Icon::Lock } else { Icon::Unlock }, !locked, tip).clicked() {
                         let p = v.param;
-                        self.try_change(false, |d| d.params[p].locked = !locked);
+                        self.geo.try_change(false, |d| d.params[p].locked = !locked);
                     }
                 } else {
-                    let err = self.doc.parse_expr(&v.expr, 0).is_err();
+                    let err = self.geo.doc.parse_expr(&v.expr, 0).is_err();
                     let (resp, ne) = text_cell(ui, &mut self.bufs, &format!("ve{i}"), &v.expr, fw, Some(if err { ERR } else { DIMC }));
                     if resp.gained_focus() {
                         self.sel = vec![Sel::Var(i)];
@@ -350,19 +320,19 @@ impl App {
                     if let Some(ne) = ne {
                         if let Some(x) = plain_number(&ne) {
                             let p = v.param;
-                            self.try_change(false, |d| {
+                            self.geo.try_change(false, |d| {
                                 d.vars[i].as_mut().unwrap().expr.clear();
                                 d.params[p].v = x;
                                 d.params[p].locked = true;
                             });
                         } else {
-                            self.try_change(false, |d| d.vars[i].as_mut().unwrap().expr = ne);
+                            self.geo.try_change(false, |d| d.vars[i].as_mut().unwrap().expr = ne);
                         }
                     }
                     ui.add_space(24.0);
                 }
                 if small_icon_btn(ui, Icon::Close, false, "Delete").clicked() {
-                    self.try_change(false, |d| d.vars[i] = None);
+                    self.geo.try_change(false, |d| d.vars[i] = None);
                 }
             });
             self.row_bg(ui, r.response.rect, selected);
@@ -380,28 +350,28 @@ impl App {
         });
         let w = ui.available_width();
         let mut k = 0;
-        for i in 0..self.doc.ents.len() {
-            let Some(Entity { kind: Ent::Curve { src }, .. }) = self.doc.ents[i].clone() else { continue };
+        for i in 0..self.geo.doc.ents.len() {
+            let Some(Entity { kind: Ent::Curve { src }, .. }) = self.geo.doc.ents[i].clone() else { continue };
             let col = CURVES[k % CURVES.len()];
             k += 1;
             let selected = self.sel.contains(&Sel::Ent(i));
             let r = ui.horizontal(|ui| {
                 let (r, _) = ui.allocate_exact_size(vec2(14.0, 22.0), Sense::hover());
                 ui.painter().circle_filled(r.center(), 5.0, col);
-                let err = self.doc.curve_def(&src).is_err();
+                let err = self.geo.doc.curve_def(&src).is_err();
                 let (resp, ns) = text_cell(ui, &mut self.bufs, &format!("cv{i}"), &src, (w - 14.0 - 40.0).max(80.0), Some(if err { ERR } else { FULL }));
                 if resp.gained_focus() {
                     self.sel = vec![Sel::Ent(i)];
                 }
                 if let Some(ns) = ns {
-                    if self.doc.curve_def(&ns).is_ok() {
-                        if !self.try_change(false, |d| d.ents[i].as_mut().unwrap().kind = Ent::Curve { src: ns }) {
+                    if self.geo.doc.curve_def(&ns).is_ok() {
+                        if !self.geo.try_change(false, |d| d.ents[i].as_mut().unwrap().kind = Ent::Curve { src: ns }) {
                             self.flash_ents(vec![i]);
                         }
                     }
                 }
                 if small_icon_btn(ui, Icon::Close, false, "Delete").clicked() {
-                    self.try_change(false, |d| d.delete(&[i], &[], &[]));
+                    self.geo.try_change(false, |d| d.delete(&[i], &[], &[]));
                 }
             });
             self.row_bg(ui, r.response.rect, selected);
@@ -413,8 +383,8 @@ impl App {
             section(ui, Icon::Dimension);
         });
         let w = ui.available_width();
-        for i in 0..self.doc.dims.len() {
-            let Some(d) = self.doc.dims[i].clone() else { continue };
+        for i in 0..self.geo.doc.dims.len() {
+            let Some(d) = self.geo.doc.dims[i].clone() else { continue };
             let selected = self.sel.contains(&Sel::Dim(i));
             let angle = d.kind.is_angle();
             let r = ui.horizontal(|ui| {
@@ -425,7 +395,7 @@ impl App {
                 if let Some(nn) = nn {
                     let old = d.name.clone();
                     let nn2 = nn.trim().to_string();
-                    if !self.rename(&old, &nn, move |doc| doc.dims[i].as_mut().unwrap().name = nn2) {
+                    if !self.geo.rename(&old, &nn, move |doc| doc.dims[i].as_mut().unwrap().name = nn2) {
                         self.bufs.remove(&format!("dn{i}"));
                     }
                 }
@@ -433,10 +403,10 @@ impl App {
                 let shown = if !d.expr.is_empty() {
                     d.expr.clone()
                 } else {
-                    let v = if d.driving { self.doc.params[d.param].v } else { self.doc.measure_value(i) };
+                    let v = if d.driving { self.geo.doc.params[d.param].v } else { self.geo.doc.measure_value(i) };
                     fmt_dim(v, angle)
                 };
-                let err = self.errors.contains_key(&Owner::Dim(i)) || self.conflicts.contains(&Owner::Dim(i));
+                let err = self.geo.errors.contains_key(&Owner::Dim(i)) || self.geo.conflicts.contains(&Owner::Dim(i));
                 let col = if err { ERR } else if d.driving { DIMC } else { MUTED };
                 let (resp, nv) = text_cell(ui, &mut self.bufs, &format!("dv{i}"), &shown, fw, Some(col));
                 if resp.gained_focus() {
@@ -450,7 +420,7 @@ impl App {
                     self.toggle_driving(i);
                 }
                 if small_icon_btn(ui, Icon::Close, false, "Delete").clicked() {
-                    self.try_change(false, |doc| doc.dims[i] = None);
+                    self.geo.try_change(false, |doc| doc.dims[i] = None);
                     self.sel.retain(|s| *s != Sel::Dim(i));
                 }
             });

@@ -412,7 +412,7 @@ thread_local! {
 }
 
 thread_local! {
-    static DEADLINE: std::cell::Cell<Option<std::time::Instant>> = const { std::cell::Cell::new(None) };
+    static DEADLINE: std::cell::Cell<Option<web_time::Instant>> = const { std::cell::Cell::new(None) };
     /// Set from another thread to stop the work on this one as if its deadline had passed.
     static CANCEL: RefCell<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>> = const { RefCell::new(None) };
 }
@@ -425,9 +425,9 @@ pub fn set_cancel(flag: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>) {
 thread_local! {
     /// Work done on this thread, in polls of `past_deadline` and explicit charges.
     static TICKS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
-    static ORIGIN: std::time::Instant = std::time::Instant::now();
+    static ORIGIN: web_time::Instant = web_time::Instant::now();
     /// Real time after which work stops whatever the work clock says.
-    static HARD: std::cell::Cell<Option<std::time::Instant>> = const { std::cell::Cell::new(None) };
+    static HARD: std::cell::Cell<Option<web_time::Instant>> = const { std::cell::Cell::new(None) };
 }
 
 /// Duration of one tick of the work clock: about the real time between two
@@ -438,7 +438,7 @@ const TICK_NS: u64 = 200;
 /// the work done (each poll of `past_deadline`, each `charge`) and not with
 /// real time: the same derivation stops at the same point however busy the
 /// machine is, so its result does not depend on the load.
-pub fn work_now() -> std::time::Instant {
+pub fn work_now() -> web_time::Instant {
     ORIGIN.with(|o| *o) + std::time::Duration::from_nanos(TICKS.with(|t| t.get()).saturating_mul(TICK_NS))
 }
 
@@ -471,13 +471,13 @@ pub fn work_ticks() -> u64 {
 }
 
 /// Sets (or clears) the point on the work clock after which work stops early.
-pub fn set_deadline(d: Option<std::time::Instant>) {
+pub fn set_deadline(d: Option<web_time::Instant>) {
     DEADLINE.with(|c| c.set(d));
 }
 
 /// Sets (or clears) a real-time limit that stops work even when the work
 /// clock runs far slower than real time (a safeguard, not a budget).
-pub fn set_hard_deadline(d: Option<std::time::Instant>) {
+pub fn set_hard_deadline(d: Option<web_time::Instant>) {
     HARD.with(|c| c.set(d));
 }
 
@@ -493,7 +493,7 @@ pub fn past_deadline() -> bool {
     });
     cancelled()
         || DEADLINE.with(|c| c.get()).is_some_and(|d| work_now() > d)
-        || (t % 64 == 0 && HARD.with(|c| c.get()).is_some_and(|h| std::time::Instant::now() > h))
+        || (t % 64 == 0 && HARD.with(|c| c.get()).is_some_and(|h| web_time::Instant::now() > h))
 }
 
 /// Declares symbols known to be non-negative, and symbols known to lie in [0, π].

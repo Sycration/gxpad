@@ -1004,10 +1004,10 @@ fn symmetric_chain_supplementary_angles() {
     k.drive_angle(xa, od, "θL");
     // interior angles at G and E: labels between the rays from the vertex
     let lw = [pg[0] + 0.4, 0.3];
-    let ag = k.app.add_dimension(DimKind::Angle(fg, xa), lw).expect("dimension rejected");
+    let ag = k.app.geo.add_dimension(DimKind::Angle(fg, xa), lw).expect("dimension rejected");
     k.set(ag, "θL");
     let lw = [pe[0], pe[1] - 0.5];
-    let ae = k.app.add_dimension(DimKind::Angle(de, ef), lw).expect("dimension rejected");
+    let ae = k.app.geo.add_dimension(DimKind::Angle(de, ef), lw).expect("dimension rejected");
     k.set(ae, "θU");
     assert!(k.doc().dims[ag].as_ref().unwrap().supp && k.doc().dims[ae].as_ref().unwrap().supp);
     k.drive(DimKind::Length(od), "L");

@@ -67,13 +67,13 @@ fn main() -> eframe::Result {
             if let Some(path) = std::env::args().nth(1) {
                 if let Ok(s) = std::fs::read_to_string(&path) {
                     if let Ok(d) = gxpad::gxp::from_str(&s) {
-                        app.doc = d;
+                        app.geo.doc = d;
                         app.path = Some(path.into());
-                        app.dirty = true;
-                        app.solve_full();
+                        app.geo.dirty = true;
+                        app.geo.solve_full();
                         // an optional second argument: the dimension to select
                         if let Some(name) = std::env::args().nth(2) {
-                            if let Some(i) = app.doc.dims.iter().position(|d| d.as_ref().is_some_and(|d| d.name == name)) {
+                            if let Some(i) = app.geo.doc.dims.iter().position(|d| d.as_ref().is_some_and(|d| d.name == name)) {
                                 app.sel = vec![Sel::Dim(i)];
                             }
                         }

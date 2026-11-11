@@ -415,7 +415,7 @@ struct BlockSolver<'a> {
     tmp: u32,
     budget: u32,
     /// Blocks still unsolved at this point fall back to numeric values.
-    deadline: std::time::Instant,
+    deadline: web_time::Instant,
     /// Polynomial elimination down to this variable only: it is never
     /// eliminated, and the others are not solved for.
     keep: Option<u32>,
@@ -1114,7 +1114,7 @@ impl<'a> BlockSolver<'a> {
         let r = sub.solve_polys(&ctx, polys, vars, true);
         self.tmp = sub.tmp;
         let r = r?;
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         let mut out: HashMap<u32, Expr> = r
             .into_iter()
             .map(|(v, e)| {
@@ -1168,7 +1168,7 @@ impl<'a> BlockSolver<'a> {
             }
             // normalize
             if fresh {
-                let t0 = std::time::Instant::now();
+                let t0 = web_time::Instant::now();
                 let red = interreduce(&polys, &active);
                 let before: usize = polys.iter().map(|p| p.terms()).sum();
                 let after: usize = red.iter().map(|p| p.terms()).sum();
@@ -1232,7 +1232,7 @@ impl<'a> BlockSolver<'a> {
             if let Some((_, i, y)) = lin {
                 let e = polys.remove(i);
                 let cs = e.coeffs(y);
-                let t0 = std::time::Instant::now();
+                let t0 = web_time::Instant::now();
                 let mut next = Vec::new();
                 for p in polys.drain(..) {
                     if !p.uses(y) {
@@ -1290,7 +1290,7 @@ impl<'a> BlockSolver<'a> {
                     next.push(p);
                     continue;
                 }
-                let t0 = std::time::Instant::now();
+                let t0 = web_time::Instant::now();
                 let Some(r) = resultant(&e, &p, y) else { fail!("resultant in v{y}") };
                 partners.push(p);
                 let vp = vanishing_part(&r, &rest, &vals);
@@ -2623,7 +2623,7 @@ fn derive_impl(doc: &Doc, target: &Expr, strategy: u8, budget_ms: u64) -> Result
     let deadline = work_now() + scaled(budget_ms);
     set_deadline(Some(deadline));
     // real-time safeguard for work that the work clock undercounts
-    let real0 = std::time::Instant::now();
+    let real0 = web_time::Instant::now();
     set_hard_deadline(Some(real0 + scaled(budget_ms) * 4 + std::time::Duration::from_secs(4)));
     let ticks0 = work_ticks();
     let r = derive_inner(doc, target, strategy, deadline);
@@ -2635,7 +2635,7 @@ fn derive_impl(doc: &Doc, target: &Expr, strategy: u8, budget_ms: u64) -> Result
     r
 }
 
-fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: std::time::Instant) -> Result<(Derived, bool), String> {
+fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Instant) -> Result<(Derived, bool), String> {
 
     let (pos, ang) = doc.assumptions();
     set_assumptions(pos, ang);
@@ -3038,7 +3038,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: std::time::Ins
     }
     // Solves the needed blocks in order until `until`; blocks not solved by
     // then get numeric values.
-    let run_blocks = |solver: &mut BlockSolver, until: std::time::Instant| -> (HashMap<u32, Expr>, bool) {
+    let run_blocks = |solver: &mut BlockSolver, until: web_time::Instant| -> (HashMap<u32, Expr>, bool) {
         solver.deadline = until;
         set_deadline(Some(until));
         let mut sol: HashMap<u32, Expr> = HashMap::new();
@@ -3056,7 +3056,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: std::time::Ins
                     eprintln!("   eq: {}", crate::expr::bx::plain(&crate::expr::bx::to_bx(e, &|s| format!("s{s}"))));
                 }
             }
-            let tb = std::time::Instant::now();
+            let tb = web_time::Instant::now();
             let solved = if past_deadline() { None } else { solver.solve_block(beqs, vars.clone()) };
             if dbg {
                 eprintln!("   block took {:?}", tb.elapsed());
@@ -3089,7 +3089,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: std::time::Ins
         if unk.is_empty() {
             return None;
         }
-        let tf = std::time::Instant::now();
+        let tf = web_time::Instant::now();
         let s = work_now() + scaled(700 + EXTRA_MS.with(|c| c.get()) / 4);
         set_deadline(Some(s));
         let lengths: HashSet<u32> = doc.dims.iter().flatten().filter(|d| !d.kind.is_angle()).map(|d| d.param as u32).collect();
@@ -3169,12 +3169,12 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: std::time::Ins
     // simplifying the result gets a tenth of any extra search time
     let extra = if strategy == 0 { 500 } else { 300 } + EXTRA_MS.with(|c| c.get()) / 10;
     set_deadline(Some(work_now().max(deadline) + scaled(extra)));
-    let stage_t = std::cell::Cell::new((std::time::Instant::now(), work_ticks()));
+    let stage_t = std::cell::Cell::new((web_time::Instant::now(), work_ticks()));
     let stage = |name: &str| {
         if std::env::var("GXPAD_DEBUG").is_ok() {
             let (t, k) = stage_t.get();
             eprintln!("stage {name}: {:?}, {} ticks", t.elapsed(), work_ticks() - k);
-            stage_t.set((std::time::Instant::now(), work_ticks()));
+            stage_t.set((web_time::Instant::now(), work_ticks()));
         }
     };
     stage("blocks");
@@ -3197,7 +3197,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: std::time::Ins
     // (with an exact formula in hand and no fitted one, elimination rarely
     // finds what the fit could not: that is left to a longer search)
     } else if strategy == 0 && quick && (!exact || (EXTRA_MS.with(|c| c.get()) > 0 && complexity(&result) > 80)) && !target_vars.is_empty() {
-        let td = std::time::Instant::now();
+        let td = web_time::Instant::now();
         let slice = |solver: &mut BlockSolver| {
             let s = work_now() + scaled(250 + EXTRA_MS.with(|c| c.get()) / 5);
             set_deadline(Some(s));

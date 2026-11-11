@@ -78,7 +78,7 @@ fn example_path() -> Option<std::path::PathBuf> {
 impl Drop for Kit {
     fn drop(&mut self) {
         let Some(path) = example_path() else { return };
-        let Ok(text) = crate::gxp::to_string_pretty(&self.app.doc) else { return };
+        let Ok(text) = crate::gxp::to_string_pretty(&self.app.geo.doc) else { return };
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
@@ -116,16 +116,16 @@ impl Kit {
     }
 
     pub fn doc(&self) -> &Doc {
-        &self.app.doc
+        &self.app.geo.doc
     }
     pub fn origin(&self) -> usize {
-        self.app.doc.origin
+        self.app.geo.doc.origin
     }
     pub fn xaxis(&self) -> usize {
-        self.app.doc.xaxis
+        self.app.geo.doc.xaxis
     }
     pub fn yaxis(&self) -> usize {
-        self.app.doc.yaxis
+        self.app.geo.doc.yaxis
     }
 
     fn rand(&mut self) -> f64 {
@@ -137,7 +137,7 @@ impl Kit {
 
     fn change(&mut self, what: &str, strict: bool, f: impl FnOnce(&mut Doc) -> usize) -> usize {
         let mut out = usize::MAX;
-        let ok = self.app.try_change(strict, |d| out = f(d));
+        let ok = self.app.geo.try_change(strict, |d| out = f(d));
         assert!(ok, "rejected (unsatisfiable or redundant): {what}");
         out
     }
@@ -184,7 +184,7 @@ impl Kit {
     }
     /// The rotation-angle parameter of a conic, for locking.
     pub fn lock_conic_angle(&mut self, c: usize) {
-        let t = match self.app.doc.kind(c) {
+        let t = match self.app.geo.doc.kind(c) {
             Some(Ent::Conic { t, .. }) => *t,
             _ => panic!("not a conic"),
         };
@@ -195,7 +195,7 @@ impl Kit {
     }
     /// Explicit `y = f(x)` or implicit `F(x, y) = G(x, y)` curve.
     pub fn curve(&mut self, src: &str) -> usize {
-        assert!(self.app.doc.curve_def(src).is_ok(), "bad curve {src}");
+        assert!(self.app.geo.doc.curve_def(src).is_ok(), "bad curve {src}");
         let s = src.to_string();
         self.change("curve", false, |d| d.add_ent(Ent::Curve { src: s }))
     }
@@ -227,8 +227,8 @@ impl Kit {
         })
     }
     pub fn set_var(&mut self, v: usize, value: f64) {
-        let p = self.app.doc.vars[v].as_ref().unwrap().param;
-        assert!(self.app.set_values(&[(p, value)], true), "could not set variable");
+        let p = self.app.geo.doc.vars[v].as_ref().unwrap().param;
+        assert!(self.app.geo.set_values(&[(p, value)], true), "could not set variable");
     }
 
     // ------------------------------------------------------------ constraints
@@ -252,11 +252,11 @@ impl Kit {
         self.constrain(Con::Midpoint(p, line))
     }
     pub fn horizontal(&mut self, line: usize) {
-        let (a, b) = self.app.doc.line_pts(line);
+        let (a, b) = self.app.geo.doc.line_pts(line);
         self.constrain(Con::Horizontal(a, b))
     }
     pub fn vertical(&mut self, line: usize) {
-        let (a, b) = self.app.doc.line_pts(line);
+        let (a, b) = self.app.geo.doc.line_pts(line);
         self.constrain(Con::Vertical(a, b))
     }
     pub fn parallel(&mut self, a: usize, b: usize) {
@@ -280,7 +280,7 @@ impl Kit {
     }
     /// Tangency between any two curves (side chosen from the current layout).
     pub fn tangent(&mut self, a: usize, b: usize) {
-        let c = self.app.tangent_con(a, b).expect("cannot be tangent");
+        let c = self.app.geo.doc.tangent_con(a, b).expect("cannot be tangent");
         self.constrain(c)
     }
     pub fn lock(&mut self, p: usize) {
@@ -406,7 +406,7 @@ impl Kit {
     // ------------------------------------------------------------ dimensions
 
     fn label_for(&self, kind: &DimKind) -> [f64; 2] {
-        let a = self.app.dim_anchor_kind(kind);
+        let a = self.app.geo.doc.dim_anchor(kind);
         [a[0] + 0.3, a[1] + 0.3]
     }
 
@@ -415,8 +415,8 @@ impl Kit {
     /// dimension is redundant or the value cannot be reached.
     pub fn drive(&mut self, kind: DimKind, value: &str) -> usize {
         let lw = self.label_for(&kind);
-        let i = self.app.add_dimension(kind, lw).expect("dimension rejected");
-        let dim = self.app.doc.dims[i].as_ref().unwrap();
+        let i = self.app.geo.add_dimension(kind, lw).expect("dimension rejected");
+        let dim = self.app.geo.doc.dims[i].as_ref().unwrap();
         assert!(dim.driving, "dimension {kind:?} is already determined (redundant); use measure()");
         self.set(i, value);
         i
@@ -425,11 +425,11 @@ impl Kit {
     /// Adds a reference (measured) dimension.
     pub fn measure(&mut self, kind: DimKind) -> usize {
         let lw = self.label_for(&kind);
-        let i = self.app.add_dimension(kind, lw).expect("dimension rejected");
-        if self.app.doc.dims[i].as_ref().unwrap().driving {
+        let i = self.app.geo.add_dimension(kind, lw).expect("dimension rejected");
+        if self.app.geo.doc.dims[i].as_ref().unwrap().driving {
             self.app.toggle_driving(i);
         }
-        assert!(!self.app.doc.dims[i].as_ref().unwrap().driving);
+        assert!(!self.app.geo.doc.dims[i].as_ref().unwrap().driving);
         i
     }
 
@@ -437,7 +437,7 @@ impl Kit {
     /// (from their first to second points), so the dimension measures the
     /// angle between those directions rather than its supplement.
     fn angle_label(&self, l1: usize, l2: usize) -> [f64; 2] {
-        let d = &self.app.doc;
+        let d = &self.app.geo.doc;
         let x = angle_vertex(d, l1, l2);
         let dir = |l: usize| {
             let (a, b) = d.line_pts(l);
@@ -459,8 +459,8 @@ impl Kit {
     /// or an expression in radians).
     pub fn drive_angle(&mut self, l1: usize, l2: usize, value: &str) -> usize {
         let lw = self.angle_label(l1, l2);
-        let i = self.app.add_dimension(DimKind::Angle(l1, l2), lw).expect("dimension rejected");
-        assert!(self.app.doc.dims[i].as_ref().unwrap().driving, "angle is already determined; use measure_angle()");
+        let i = self.app.geo.add_dimension(DimKind::Angle(l1, l2), lw).expect("dimension rejected");
+        assert!(self.app.geo.doc.dims[i].as_ref().unwrap().driving, "angle is already determined; use measure_angle()");
         self.set(i, value);
         i
     }
@@ -468,8 +468,8 @@ impl Kit {
     /// Measures the angle between the directions of lines l1 and l2.
     pub fn measure_angle(&mut self, l1: usize, l2: usize) -> usize {
         let lw = self.angle_label(l1, l2);
-        let i = self.app.add_dimension(DimKind::Angle(l1, l2), lw).expect("dimension rejected");
-        if self.app.doc.dims[i].as_ref().unwrap().driving {
+        let i = self.app.geo.add_dimension(DimKind::Angle(l1, l2), lw).expect("dimension rejected");
+        if self.app.geo.doc.dims[i].as_ref().unwrap().driving {
             self.app.toggle_driving(i);
         }
         i
@@ -478,11 +478,11 @@ impl Kit {
     /// Sets a driving dimension's value text.
     pub fn set(&mut self, d: usize, value: &str) {
         self.app.commit_dim_text(d, value);
-        let dim = self.app.doc.dims[d].as_ref().unwrap();
+        let dim = self.app.geo.doc.dims[d].as_ref().unwrap();
         assert!(dim.driving, "dimension {} is not driving", dim.name);
         if let Some(v) = crate::expr::parse::plain_number(value) {
             let v = if dim.kind.is_angle() { v.to_radians() } else { v };
-            let m = self.app.doc.measure_value(d);
+            let m = self.app.geo.doc.measure_value(d);
             assert!(close(m, v, 1e-7), "value {value} could not be reached for {} (measures {m})", dim.name);
         } else {
             assert_eq!(dim.expr, value.trim(), "expression {value} rejected for {}", dim.name);
@@ -491,37 +491,37 @@ impl Kit {
 
     /// Measured value of a dimension (radians for angles).
     pub fn value(&self, d: usize) -> f64 {
-        self.app.doc.measure_value(d)
+        self.app.geo.doc.measure_value(d)
     }
 
     /// Remaining degrees of freedom of the whole construction.
     pub fn dof(&self) -> usize {
-        self.app.dof
+        self.app.geo.dof
     }
 
     // ------------------------------------------------------------ checking
 
     fn formula_text(&self, e: &Expr) -> String {
-        let names = self.app.doc.param_names();
+        let names = self.app.geo.doc.param_names();
         plain(&to_bx(e, &|s| sym_name(&names, s)))
     }
 
     fn named_symbols(&self) -> HashSet<u32> {
-        let d = &self.app.doc;
+        let d = &self.app.geo.doc;
         d.vars.iter().flatten().map(|v| v.param as u32).chain(d.dims.iter().flatten().map(|x| x.param as u32)).collect()
     }
 
     /// Derives the formula of dimension `d` and verifies it (see module docs).
     /// Returns the formula as text.
     pub fn check(&mut self, d: usize) -> String {
-        assert!(self.app.conflicts.is_empty(), "construction has violated constraints: {:?}", self.app.conflicts);
-        assert!(self.app.errors.is_empty(), "construction has errors: {:?}", self.app.errors);
-        let (name, target, _) = target_expr(&self.app.doc, Sel::Dim(d)).expect("bad target");
+        assert!(self.app.geo.conflicts.is_empty(), "construction has violated constraints: {:?}", self.app.geo.conflicts);
+        assert!(self.app.geo.errors.is_empty(), "construction has errors: {:?}", self.app.geo.errors);
+        let (name, target, _) = target_expr(&self.app.geo.doc, Sel::Dim(d)).expect("bad target");
         let t0 = std::time::Instant::now();
-        let der = derive::derive(&self.app.doc, &target).unwrap_or_else(|e| panic!("derivation of {name} failed: {e}"));
+        let der = derive::derive(&self.app.geo.doc, &target).unwrap_or_else(|e| panic!("derivation of {name} failed: {e}"));
         let ms = t0.elapsed().as_secs_f64() * 1e3;
         let text = format!("{name} = {}", self.formula_text(&der.expr));
-        println!("[{}] {text}   [{ms:.1} ms, dof {}]", std::thread::current().name().unwrap_or("?"), self.app.dof);
+        println!("[{}] {text}   [{ms:.1} ms, dof {}]", std::thread::current().name().unwrap_or("?"), self.app.geo.dof);
         assert!(ms <= self.max_ms, "derivation took {ms:.0} ms: {text}");
         assert!(der.exact || self.allow_inexact, "formula is not exact: {text}");
         assert!(
@@ -532,7 +532,7 @@ impl Kit {
         );
         if !self.allow_free_symbols {
             let named = self.named_symbols();
-            let names = self.app.doc.param_names();
+            let names = self.app.geo.doc.param_names();
             let free: Vec<String> = sym_set(&der.expr).into_iter().filter(|s| !named.contains(s)).map(|s| sym_name(&names, s)).collect();
             assert!(free.is_empty(), "formula depends on undetermined quantities {free:?}: {text}");
         }
@@ -548,16 +548,16 @@ impl Kit {
     }
 
     fn eval_now(&self, e: &Expr) -> f64 {
-        let p = &self.app.doc.params;
+        let p = &self.app.geo.doc.params;
         eval(e, &|s| p.get(s as usize).map(|x| x.v).unwrap_or(f64::NAN))
     }
 
     fn scale(&self) -> f64 {
         let mut lo = [f64::INFINITY; 2];
         let mut hi = [f64::NEG_INFINITY; 2];
-        for (i, e) in self.app.doc.ents.iter().enumerate() {
+        for (i, e) in self.app.geo.doc.ents.iter().enumerate() {
             if let Some(Entity { kind: Ent::Point { .. }, hidden: false, .. }) = e {
-                let p = self.app.doc.pval(i);
+                let p = self.app.geo.doc.pval(i);
                 for k in 0..2 {
                     lo[k] = lo[k].min(p[k]);
                     hi[k] = hi[k].max(p[k]);
@@ -568,33 +568,33 @@ impl Kit {
     }
 
     fn articulate(&mut self, d: usize, formula: &Expr, text: &str) {
-        let free_pts: Vec<usize> = (0..self.app.doc.ents.len())
-            .filter(|&i| match self.app.doc.ent(i) {
+        let free_pts: Vec<usize> = (0..self.app.geo.doc.ents.len())
+            .filter(|&i| match self.app.geo.doc.ent(i) {
                 Some(Entity { kind: Ent::Point { x, y }, hidden: false, .. }) => {
-                    self.app.free_params.contains(x) || self.app.free_params.contains(y)
+                    self.app.geo.free_params.contains(x) || self.app.geo.free_params.contains(y)
                 }
                 _ => false,
             })
             .collect();
         let mut knobs: Vec<(usize, String)> = Vec::new();
-        for x in self.app.doc.dims.iter().flatten() {
+        for x in self.app.geo.doc.dims.iter().flatten() {
             // zero-valued driving dimensions are structural, not parameters
-            if x.driving && x.expr.is_empty() && self.app.doc.params[x.param].v != 0.0 {
+            if x.driving && x.expr.is_empty() && self.app.geo.doc.params[x.param].v != 0.0 {
                 knobs.push((x.param, x.name.clone()));
             }
         }
-        for v in self.app.doc.vars.iter().flatten() {
-            if v.expr.is_empty() && self.app.doc.params[v.param].locked {
+        for v in self.app.geo.doc.vars.iter().flatten() {
+            if v.expr.is_empty() && self.app.geo.doc.params[v.param].locked {
                 knobs.push((v.param, v.name.clone()));
             }
         }
         let scale = self.scale();
         for _ in 0..self.trials {
-            let before = self.app.doc.clone();
+            let before = self.app.geo.doc.clone();
             let use_drag = !free_pts.is_empty() && (knobs.is_empty() || self.rand() < 0.55);
             let action = if use_drag {
                 let e = free_pts[(self.rand() * free_pts.len() as f64) as usize % free_pts.len()];
-                let p0 = self.app.doc.pval(e);
+                let p0 = self.app.geo.doc.pval(e);
                 let ang = self.rand() * std::f64::consts::TAU;
                 let r = scale * self.drag_scale * (0.3 + self.rand());
                 let kind = DragKind::Point { e, grab: [0.0, 0.0] };
@@ -602,34 +602,34 @@ impl Kit {
                     let f = k as f64 / 5.0;
                     self.app.drag_solve(&kind, [p0[0] + r * ang.cos() * f, p0[1] + r * ang.sin() * f]);
                 }
-                let ok = self.app.solve_full();
-                (ok, format!("dragged {} by {:.3} toward {:.0}°", self.app.doc.ent(e).map(|x| x.name.clone()).unwrap_or_default(), r, ang.to_degrees()))
+                let ok = self.app.geo.solve_full();
+                (ok, format!("dragged {} by {:.3} toward {:.0}°", self.app.geo.doc.ent(e).map(|x| x.name.clone()).unwrap_or_default(), r, ang.to_degrees()))
             } else if !knobs.is_empty() {
                 let (p, name) = knobs[(self.rand() * knobs.len() as f64) as usize % knobs.len()].clone();
-                let v0 = self.app.doc.params[p].v;
+                let v0 = self.app.geo.doc.params[p].v;
                 let f = 1.0 + self.value_scale * (2.0 * self.rand() - 1.0);
                 let nv = if v0.abs() < 1e-9 { self.value_scale * (2.0 * self.rand() - 1.0) } else { v0 * f };
-                let ok = self.app.set_values(&[(p, nv)], false);
+                let ok = self.app.geo.set_values(&[(p, nv)], false);
                 (ok, format!("set {name} from {v0} to {nv}"))
             } else {
                 break;
             };
-            if !action.0 || !self.app.conflicts.is_empty() {
-                self.app.doc = before;
-                self.app.dirty = true;
-                self.app.solve_full();
+            if !action.0 || !self.app.geo.conflicts.is_empty() {
+                self.app.geo.doc = before;
+                self.app.geo.dirty = true;
+                self.app.geo.solve_full();
                 continue;
             }
-            let m = self.app.doc.measure_value(d);
+            let m = self.app.geo.doc.measure_value(d);
             let f = self.eval_now(formula);
             assert!(
                 close(m, f, 1e-7),
                 "after articulation ({}) the formula gives {f} but the measurement is {m}\n  {text}",
                 action.1
             );
-            self.app.doc = before;
-            self.app.dirty = true;
-            self.app.solve_full();
+            self.app.geo.doc = before;
+            self.app.geo.dirty = true;
+            self.app.geo.solve_full();
         }
     }
 }
@@ -653,10 +653,10 @@ mod tests {
                 let text = std::fs::read_to_string(&path).unwrap();
                 let doc: Doc = crate::gxp::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
                 let mut app = App::new();
-                app.doc = doc;
-                app.dirty = true;
-                app.solve_full();
-                assert!(app.errors.is_empty(), "{}: errors {:?}", path.display(), app.errors);
+                app.geo.doc = doc;
+                app.geo.dirty = true;
+                app.geo.solve_full();
+                assert!(app.geo.errors.is_empty(), "{}: errors {:?}", path.display(), app.geo.errors);
             }
         }
     }
@@ -694,22 +694,22 @@ mod formula_sizes {
             };
             let doc: Doc = crate::gxp::from_str(&text).unwrap();
             let mut app = App::new();
-            app.doc = doc;
-            app.dirty = true;
-            app.solve_full();
-            let names = app.doc.param_names();
-            for i in 0..app.doc.dims.len() {
-                let Some(d) = app.doc.dims[i].as_ref() else { continue };
+            app.geo.doc = doc;
+            app.geo.dirty = true;
+            app.geo.solve_full();
+            let names = app.geo.doc.param_names();
+            for i in 0..app.geo.doc.dims.len() {
+                let Some(d) = app.geo.doc.dims[i].as_ref() else { continue };
                 if d.driving {
                     continue;
                 }
-                let (name, target, _) = target_expr(&app.doc, Sel::Dim(i)).expect("bad target");
-                let der = derive::derive(&app.doc, &target).unwrap();
+                let (name, target, _) = target_expr(&app.geo.doc, Sel::Dim(i)).expect("bad target");
+                let der = derive::derive(&app.geo.doc, &target).unwrap();
                 let text = plain(&to_bx(&der.expr, &|s| sym_name(&names, s)));
                 assert!(der.exact, "{file}: {name} is not exact");
                 assert!(text.len() <= *limit, "{file}: {name} has {} characters (limit {limit}): {text}", text.len());
                 // the same derivation again gives the same formula
-                let again = derive::derive(&app.doc, &target).unwrap();
+                let again = derive::derive(&app.geo.doc, &target).unwrap();
                 assert_eq!(text, plain(&to_bx(&again.expr, &|s| sym_name(&names, s))), "{file}: {name} differs between two derivations");
             }
         }
@@ -729,19 +729,19 @@ mod derive_file {
         let Ok(path) = std::env::var("GXPAD_DERIVE_FILE") else { return };
         let doc: Doc = crate::gxp::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         let mut app = App::new();
-        app.doc = doc;
-        app.dirty = true;
-        app.solve_full();
-        println!("dof {}, conflicts {:?}, errors {:?}", app.dof, app.conflicts, app.errors);
-        for i in 0..app.doc.dims.len() {
-            let Some(d) = app.doc.dims[i].as_ref() else { continue };
+        app.geo.doc = doc;
+        app.geo.dirty = true;
+        app.geo.solve_full();
+        println!("dof {}, conflicts {:?}, errors {:?}", app.geo.dof, app.geo.conflicts, app.geo.errors);
+        for i in 0..app.geo.doc.dims.len() {
+            let Some(d) = app.geo.doc.dims[i].as_ref() else { continue };
             if d.driving {
                 continue;
             }
-            let (name, target, _) = target_expr(&app.doc, Sel::Dim(i)).expect("bad target");
+            let (name, target, _) = target_expr(&app.geo.doc, Sel::Dim(i)).expect("bad target");
             let t0 = std::time::Instant::now();
             let level: u64 = std::env::var("GXPAD_DERIVE_LEVEL").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
-            match derive::derive_harder(&app.doc, &target, level * SEARCH_HARDER_MS) {
+            match derive::derive_harder(&app.geo.doc, &target, level * SEARCH_HARDER_MS) {
                 Ok(der) => println!(
                     "{name} = {}   [exact {}, value {}, measured {}, {:?}]",
                     plain(&to_bx(&der.expr, &|s| format!("s{s}"))),
