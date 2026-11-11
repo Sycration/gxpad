@@ -2367,20 +2367,6 @@ fn join_segments(segs: Vec<Vec<Pos2>>) -> Vec<Vec<Pos2>> {
     out
 }
 
-impl Doc {
-    pub fn center_of_val(&self, e: usize) -> [f64; 2] {
-        match self.kind(e) {
-            Some(Ent::Point { .. }) => self.pval(e),
-            Some(Ent::Circle { c, .. }) | Some(Ent::Arc { c, .. }) | Some(Ent::Conic { c, .. }) => self.pval(*c),
-            Some(Ent::Line { a, b, .. }) => {
-                let (pa, pb) = (self.pval(*a), self.pval(*b));
-                [(pa[0] + pb[0]) * 0.5, (pa[1] + pb[1]) * 0.5]
-            }
-            _ => [0.0, 0.0],
-        }
-    }
-}
-
 #[cfg(test)]
 mod shape_tool_tests {
     use super::*;

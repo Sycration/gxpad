@@ -6,6 +6,7 @@ use crate::expr::parse::plain_number;
 use crate::expr::*;
 use crate::model::*;
 use crate::solver::{DragEq, Sys};
+pub use gxgeo::build::{angle_vertex, foot};
 use eframe::egui::{self, Color32, Pos2, Rect, pos2};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -981,7 +982,7 @@ impl App {
             self.path.clone()
         };
         if let Some(p) = path {
-            if let Ok(s) = serde_json::to_string_pretty(&self.doc) {
+            if let Ok(s) = crate::gxp::to_string_pretty(&self.doc) {
                 if std::fs::write(&p, s).is_ok() {
                     self.path = Some(p);
                 }
@@ -992,7 +993,7 @@ impl App {
     pub fn open(&mut self) {
         if let Some(p) = rfd::FileDialog::new().add_filter("gxpad", &["gxp"]).pick_file() {
             if let Ok(s) = std::fs::read_to_string(&p) {
-                if let Ok(d) = serde_json::from_str::<Doc>(&s) {
+                if let Ok(d) = crate::gxp::from_str(&s) {
                     let before = std::mem::replace(&mut self.doc, d);
                     self.push_undo(before);
                     self.path = Some(p);
@@ -1077,17 +1078,6 @@ pub fn compute_formula(doc: &Doc, target: Sel, level: u32) -> FormulaView {
     fv
 }
 
-pub fn foot(d: &Doc, p: [f64; 2], l: usize) -> [f64; 2] {
-    let (a, b) = d.line_pts(l);
-    let (a, b) = (d.pval(a), d.pval(b));
-    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-    let l2 = dx * dx + dy * dy;
-    if l2 < 1e-18 {
-        return a;
-    }
-    let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2;
-    [a[0] + t * dx, a[1] + t * dy]
-}
 
 /// Whether a label at `w` sits in a sector measuring the supplementary angle
 /// of the directed lines.
@@ -1119,20 +1109,6 @@ pub fn angle_supp(d: &Doc, l1: usize, l2: usize, w: [f64; 2]) -> bool {
     false
 }
 
-/// Intersection of two lines, or the midpoint of their midpoints when parallel.
-pub fn angle_vertex(d: &Doc, l1: usize, l2: usize) -> [f64; 2] {
-    let (a, b) = d.line_pts(l1);
-    let (c, e) = d.line_pts(l2);
-    let (a, b, c, e) = (d.pval(a), d.pval(b), d.pval(c), d.pval(e));
-    let r = [b[0] - a[0], b[1] - a[1]];
-    let s = [e[0] - c[0], e[1] - c[1]];
-    let den = r[0] * s[1] - r[1] * s[0];
-    if den.abs() < 1e-12 {
-        return [(a[0] + b[0] + c[0] + e[0]) * 0.25, (a[1] + b[1] + c[1] + e[1]) * 0.25];
-    }
-    let t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den;
-    [a[0] + t * r[0], a[1] + t * r[1]]
-}
 
 #[cfg(test)]
 mod tests {
@@ -1173,7 +1149,7 @@ mod demo {
 
     fn save(app: &App, name: &str) {
         if let Ok(dir) = std::env::var("GXPAD_DEMO_DIR") {
-            std::fs::write(format!("{dir}/{name}.gxp"), serde_json::to_string(&app.doc).unwrap()).unwrap();
+            std::fs::write(format!("{dir}/{name}.gxp"), crate::gxp::to_string(&app.doc).unwrap()).unwrap();
         }
     }
 

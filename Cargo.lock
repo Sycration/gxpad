@@ -1379,17 +1379,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "gxpad"
+name = "gxgeo"
 version = "0.1.0"
 dependencies = [
- "eframe",
  "num-bigint",
  "num-integer",
  "num-rational",
  "num-traits",
- "rfd",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "gxpad"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "gxgeo",
+ "rfd",
 ]
 
 [[package]]

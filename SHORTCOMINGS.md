@@ -15,14 +15,14 @@ closed-form formula for that dimension in terms of the driving dimensions and va
 
 | File | Content |
 |---|---|
-| `src/model.rs` | `Doc`: entities, parameters, constraints, dimensions. `Doc::equations`, `Doc::con_eqs`: constraints as expressions equal to 0. |
-| `src/solver.rs` | Numeric solver (`Sys::build`, `Sys::solve`), used by the app, by the fit and by checks inside the derivation. |
-| `src/derive.rs` | The derivation: structure, block solving, target, checks. |
-| `src/fit.rs` | Formula discovery from samples: a polynomial relation fitted to numeric solutions. |
-| `src/dd.rs` | Double-double arithmetic (about 31 digits) for the fit. |
-| `src/expr/mod.rs` | Expression type `Expr`, canonicalizing constructors, evaluation, the simplifier, the work clock. |
-| `src/expr/poly.rs` | `Expr`-level polynomial helpers (`coeffs`, `split_frac`). |
-| `src/alg.rs` | Sparse multivariate polynomials over Q (`MPoly`), resultants, factorization. |
+| `gxgeo/src/model.rs` | `Doc`: entities, parameters, constraints, dimensions. `Doc::equations`, `Doc::con_eqs`: constraints as expressions equal to 0. |
+| `gxgeo/src/solver.rs` | Numeric solver (`Sys::build`, `Sys::solve`), used by the app, by the fit and by checks inside the derivation. |
+| `gxgeo/src/derive.rs` | The derivation: structure, block solving, target, checks. |
+| `gxgeo/src/fit.rs` | Formula discovery from samples: a polynomial relation fitted to numeric solutions. |
+| `gxgeo/src/dd.rs` | Double-double arithmetic (about 31 digits) for the fit. |
+| `gxgeo/src/expr/mod.rs` | Expression type `Expr`, canonicalizing constructors, evaluation, the simplifier, the work clock. |
+| `gxgeo/src/expr/poly.rs` | `Expr`-level polynomial helpers (`coeffs`, `split_frac`). |
+| `gxgeo/src/alg.rs` | Sparse multivariate polynomials over Q (`MPoly`), resultants, factorization. |
 | `src/app.rs` | `compute_formula`, background search levels, formula display state. |
 | `src/testkit.rs` | `Kit`: builds constructions in tests and checks derived formulas. |
 | `tests/gen_*.rs` | Generated tests (constructions with known answers). |

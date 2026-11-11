@@ -5,15 +5,13 @@ edition = "2024"
 description = "2D constraint-based geometry pad that derives closed-form formulas for measured dimensions"
 license = "GPL-3.0-or-later"
 
+[workspace]
+members = ["gxgeo"]
+
 [dependencies]
+gxgeo = { path = "gxgeo" }
 eframe = "0.37"
-serde = { version = "1", features = ["derive", "rc"] }
-serde_json = "1"
 rfd = "0.17"
-num-bigint = "0.4"
-num-rational = "0.4"
-num-traits = "0.2"
-num-integer = "0.1"
 
 [profile.dev]
 opt-level = 1

@@ -66,7 +66,7 @@ fn main() -> eframe::Result {
             let mut app = App::new();
             if let Some(path) = std::env::args().nth(1) {
                 if let Ok(s) = std::fs::read_to_string(&path) {
-                    if let Ok(d) = serde_json::from_str(&s) {
+                    if let Ok(d) = gxpad::gxp::from_str(&s) {
                         app.doc = d;
                         app.path = Some(path.into());
                         app.dirty = true;

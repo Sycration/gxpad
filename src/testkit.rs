@@ -78,7 +78,7 @@ fn example_path() -> Option<std::path::PathBuf> {
 impl Drop for Kit {
     fn drop(&mut self) {
         let Some(path) = example_path() else { return };
-        let Ok(text) = serde_json::to_string_pretty(&self.app.doc) else { return };
+        let Ok(text) = crate::gxp::to_string_pretty(&self.app.doc) else { return };
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
@@ -651,7 +651,7 @@ mod tests {
                     continue;
                 }
                 let text = std::fs::read_to_string(&path).unwrap();
-                let doc: Doc = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+                let doc: Doc = crate::gxp::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
                 let mut app = App::new();
                 app.doc = doc;
                 app.dirty = true;
@@ -692,7 +692,7 @@ mod formula_sizes {
                 eprintln!("skipped (no example file yet): {file}");
                 continue;
             };
-            let doc: Doc = serde_json::from_str(&text).unwrap();
+            let doc: Doc = crate::gxp::from_str(&text).unwrap();
             let mut app = App::new();
             app.doc = doc;
             app.dirty = true;
@@ -727,7 +727,7 @@ mod derive_file {
     #[ignore]
     fn derive_file() {
         let Ok(path) = std::env::var("GXPAD_DERIVE_FILE") else { return };
-        let doc: Doc = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let doc: Doc = crate::gxp::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         let mut app = App::new();
         app.doc = doc;
         app.dirty = true;
