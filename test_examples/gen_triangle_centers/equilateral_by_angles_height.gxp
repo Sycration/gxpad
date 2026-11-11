@@ -1,0 +1,272 @@
+{
+  "params": [
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 0.015912942421613428,
+      "locked": false
+    },
+    {
+      "v": -0.0485007841650884,
+      "locked": false
+    },
+    {
+      "v": 4.01554189760199,
+      "locked": false
+    },
+    {
+      "v": 0.005980596899742766,
+      "locked": false
+    },
+    {
+      "v": 1.9685451599763981,
+      "locked": false
+    },
+    {
+      "v": 3.4425201872653455,
+      "locked": false
+    },
+    {
+      "v": 4.0,
+      "locked": true
+    },
+    {
+      "v": 1.0471975511965976,
+      "locked": true
+    },
+    {
+      "v": 2.0943951023931953,
+      "locked": true
+    },
+    {
+      "v": 3.464101615137755,
+      "locked": true
+    }
+  ],
+  "ents": [
+    {
+      "kind": {
+        "Point": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "name": "O",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 2,
+          "y": 3
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 4,
+          "y": 5
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 1,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 2,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 6,
+          "y": 7
+        }
+      },
+      "name": "A",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 8,
+          "y": 9
+        }
+      },
+      "name": "B",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 10,
+          "y": 11
+        }
+      },
+      "name": "C",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 5,
+          "b": 6,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 5,
+          "b": 7,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 6,
+          "b": 7,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    }
+  ],
+  "cons": [],
+  "dims": [
+    {
+      "kind": {
+        "Length": 8
+      },
+      "name": "d1",
+      "driving": true,
+      "expr": "",
+      "param": 12,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.2999999999999998,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "Angle": [
+          8,
+          9
+        ]
+      },
+      "name": "θ1",
+      "driving": true,
+      "expr": "",
+      "param": 13,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "Angle": [
+          10,
+          8
+        ]
+      },
+      "name": "θ2",
+      "driving": true,
+      "expr": "",
+      "param": 14,
+      "s": -1.0,
+      "supp": false,
+      "off": [
+        0.2999999999999998,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "PointLine": [
+          7,
+          8
+        ]
+      },
+      "name": "d2",
+      "driving": false,
+      "expr": "",
+      "param": 15,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.30000000000000004,
+        0.2999999999999998
+      ]
+    }
+  ],
+  "vars": [],
+  "origin": 0,
+  "xaxis": 3,
+  "yaxis": 4
+}

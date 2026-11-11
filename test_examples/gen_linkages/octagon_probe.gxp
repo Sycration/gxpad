@@ -1,0 +1,486 @@
+{
+  "params": [
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 2.0,
+      "locked": false
+    },
+    {
+      "v": 2.0,
+      "locked": true
+    },
+    {
+      "v": -3.635031332880928e-7,
+      "locked": false
+    },
+    {
+      "v": 1.999999999999967,
+      "locked": false
+    },
+    {
+      "v": -1.4142138194086022,
+      "locked": false
+    },
+    {
+      "v": 1.4142133053375412,
+      "locked": false
+    },
+    {
+      "v": -1.999999999999967,
+      "locked": false
+    },
+    {
+      "v": -3.6350313340340683e-7,
+      "locked": false
+    },
+    {
+      "v": -1.4142133053375412,
+      "locked": false
+    },
+    {
+      "v": -1.4142138194086022,
+      "locked": false
+    },
+    {
+      "v": 3.635031331445433e-7,
+      "locked": false
+    },
+    {
+      "v": -1.999999999999967,
+      "locked": false
+    },
+    {
+      "v": 1.4142138194086022,
+      "locked": false
+    },
+    {
+      "v": -1.4142133053375412,
+      "locked": false
+    },
+    {
+      "v": 1.999999999999967,
+      "locked": false
+    },
+    {
+      "v": 3.6350313326882086e-7,
+      "locked": false
+    },
+    {
+      "v": 1.4142133053375412,
+      "locked": false
+    },
+    {
+      "v": 1.4142138194086022,
+      "locked": false
+    },
+    {
+      "v": 1.530733729460359,
+      "locked": true
+    }
+  ],
+  "ents": [
+    {
+      "kind": {
+        "Point": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "name": "O",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 2,
+          "y": 3
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 4,
+          "y": 5
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 1,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 2,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Circle": {
+          "c": 0,
+          "r": 6
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 8,
+          "y": 9
+        }
+      },
+      "name": "A",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 10,
+          "y": 11
+        }
+      },
+      "name": "B",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 12,
+          "y": 13
+        }
+      },
+      "name": "C",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 14,
+          "y": 15
+        }
+      },
+      "name": "D",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 16,
+          "y": 17
+        }
+      },
+      "name": "E",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 18,
+          "y": 19
+        }
+      },
+      "name": "F",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 20,
+          "y": 21
+        }
+      },
+      "name": "G",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 22,
+          "y": 23
+        }
+      },
+      "name": "H",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 6,
+          "b": 7,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 7,
+          "b": 8,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 8,
+          "b": 9,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 9,
+          "b": 10,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 10,
+          "b": 11,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 11,
+          "b": 12,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 12,
+          "b": 13,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 13,
+          "b": 6,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    }
+  ],
+  "cons": [
+    {
+      "OnCurve": [
+        6,
+        5
+      ]
+    },
+    {
+      "OnCurve": [
+        7,
+        5
+      ]
+    },
+    {
+      "OnCurve": [
+        8,
+        5
+      ]
+    },
+    {
+      "OnCurve": [
+        9,
+        5
+      ]
+    },
+    {
+      "OnCurve": [
+        10,
+        5
+      ]
+    },
+    {
+      "OnCurve": [
+        11,
+        5
+      ]
+    },
+    {
+      "OnCurve": [
+        12,
+        5
+      ]
+    },
+    {
+      "OnCurve": [
+        13,
+        5
+      ]
+    },
+    {
+      "Equal": [
+        14,
+        15
+      ]
+    },
+    {
+      "Equal": [
+        15,
+        16
+      ]
+    },
+    {
+      "Equal": [
+        16,
+        17
+      ]
+    },
+    {
+      "Equal": [
+        17,
+        18
+      ]
+    },
+    {
+      "Equal": [
+        18,
+        19
+      ]
+    },
+    {
+      "Equal": [
+        19,
+        20
+      ]
+    },
+    {
+      "Equal": [
+        20,
+        21
+      ]
+    }
+  ],
+  "dims": [
+    {
+      "kind": {
+        "Radius": 5
+      },
+      "name": "r1",
+      "driving": true,
+      "expr": "",
+      "param": 7,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "Length": 14
+      },
+      "name": "d1",
+      "driving": false,
+      "expr": "",
+      "param": 24,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.2999999999999998
+      ]
+    }
+  ],
+  "vars": [],
+  "origin": 0,
+  "xaxis": 3,
+  "yaxis": 4
+}

@@ -1,0 +1,288 @@
+{
+  "params": [
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 2.0,
+      "locked": true
+    },
+    {
+      "v": 2.0,
+      "locked": false
+    },
+    {
+      "v": 4.0,
+      "locked": false
+    },
+    {
+      "v": 1.3188370297990883,
+      "locked": false
+    },
+    {
+      "v": 1.2753481191963536,
+      "locked": false
+    },
+    {
+      "v": 0.989393850998518,
+      "locked": true
+    },
+    {
+      "v": 4.724651880803647,
+      "locked": false
+    },
+    {
+      "v": 3.3188370297990883,
+      "locked": false
+    },
+    {
+      "v": 4.015400608039902e-58,
+      "locked": false
+    },
+    {
+      "v": 4.5,
+      "locked": false
+    },
+    {
+      "v": 1.5,
+      "locked": true
+    }
+  ],
+  "ents": [
+    {
+      "kind": {
+        "Point": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "name": "O",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 2,
+          "y": 3
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 4,
+          "y": 5
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 1,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 2,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Curve": {
+          "src": "y = x^2"
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 7,
+          "y": 8
+        }
+      },
+      "name": "A",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 9,
+          "y": 10
+        }
+      },
+      "name": "B",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 6,
+          "b": 7,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 12,
+          "y": 13
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 6,
+          "b": 9,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 14,
+          "y": 15
+        }
+      },
+      "name": "C",
+      "construction": false,
+      "hidden": false
+    }
+  ],
+  "cons": [
+    {
+      "OnCurve": [
+        6,
+        5
+      ]
+    },
+    {
+      "Tangent": {
+        "a": 8,
+        "b": 5,
+        "s": 1.0,
+        "aux": null
+      }
+    },
+    {
+      "Offset": {
+        "q": 9,
+        "p": 6,
+        "a": 6,
+        "b": 7,
+        "rot": true
+      }
+    },
+    {
+      "OnCurve": [
+        11,
+        10
+      ]
+    },
+    {
+      "OnCurve": [
+        11,
+        4
+      ]
+    }
+  ],
+  "dims": [
+    {
+      "kind": {
+        "CoordX": 6
+      },
+      "name": "x_A",
+      "driving": true,
+      "expr": "t",
+      "param": 11,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "CoordY": 11
+      },
+      "name": "y_C",
+      "driving": false,
+      "expr": "",
+      "param": 16,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.30000000000000004
+      ]
+    }
+  ],
+  "vars": [
+    {
+      "name": "t",
+      "expr": "",
+      "param": 6
+    }
+  ],
+  "origin": 0,
+  "xaxis": 3,
+  "yaxis": 4
+}

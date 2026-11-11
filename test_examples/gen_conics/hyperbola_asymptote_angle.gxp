@@ -1,0 +1,257 @@
+{
+  "params": [
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 3.0,
+      "locked": false
+    },
+    {
+      "v": 4.0,
+      "locked": false
+    },
+    {
+      "v": 0.2,
+      "locked": false
+    },
+    {
+      "v": 3.0,
+      "locked": true
+    },
+    {
+      "v": 4.0,
+      "locked": true
+    },
+    {
+      "v": 2.1455224103434802,
+      "locked": false
+    },
+    {
+      "v": 4.5162743037501505,
+      "locked": false
+    },
+    {
+      "v": 3.73487705670397,
+      "locked": false
+    },
+    {
+      "v": -3.324258318979783,
+      "locked": false
+    },
+    {
+      "v": 1.8545904360032246,
+      "locked": true
+    }
+  ],
+  "ents": [
+    {
+      "kind": {
+        "Point": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "name": "O",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 2,
+          "y": 3
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 4,
+          "y": 5
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 1,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 2,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Conic": {
+          "kind": "Hyperbola",
+          "c": 0,
+          "a": 6,
+          "b": 7,
+          "t": 8
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 11,
+          "y": 12
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 6,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 13,
+          "y": 14
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 8,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    }
+  ],
+  "cons": [
+    {
+      "Asymptote": {
+        "q": 6,
+        "c": 5,
+        "s": 1.0
+      }
+    },
+    {
+      "Asymptote": {
+        "q": 8,
+        "c": 5,
+        "s": -1.0
+      }
+    }
+  ],
+  "dims": [
+    {
+      "kind": {
+        "ConicA": 5
+      },
+      "name": "a1",
+      "driving": true,
+      "expr": "",
+      "param": 9,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "ConicB": 5
+      },
+      "name": "b1",
+      "driving": true,
+      "expr": "",
+      "param": 10,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "Angle": [
+          7,
+          9
+        ]
+      },
+      "name": "θ1",
+      "driving": false,
+      "expr": "",
+      "param": 15,
+      "s": -1.0,
+      "supp": false,
+      "off": [
+        0.49003328892062076,
+        0.09933466539753062
+      ]
+    }
+  ],
+  "vars": [],
+  "origin": 0,
+  "xaxis": 3,
+  "yaxis": 4
+}

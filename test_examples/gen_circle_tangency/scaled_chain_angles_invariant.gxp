@@ -1,0 +1,380 @@
+{
+  "params": [
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 0.0,
+      "locked": true
+    },
+    {
+      "v": 1.0,
+      "locked": true
+    },
+    {
+      "v": 2.0,
+      "locked": true
+    },
+    {
+      "v": -1.9889145254937735,
+      "locked": false
+    },
+    {
+      "v": -2.4323178937265526,
+      "locked": false
+    },
+    {
+      "v": 4.0,
+      "locked": false
+    },
+    {
+      "v": 8.010532711734223,
+      "locked": false
+    },
+    {
+      "v": -2.537460415540441,
+      "locked": false
+    },
+    {
+      "v": 6.0,
+      "locked": false
+    },
+    {
+      "v": -0.22161818624045146,
+      "locked": false
+    },
+    {
+      "v": 13.469778309266994,
+      "locked": false
+    },
+    {
+      "v": 12.0,
+      "locked": false
+    },
+    {
+      "v": 2.0417597430085115,
+      "locked": true
+    },
+    {
+      "v": 3.032236272410197,
+      "locked": true
+    },
+    {
+      "v": 6.2060243592347035,
+      "locked": true
+    },
+    {
+      "v": 1.470628905633337,
+      "locked": true
+    },
+    {
+      "v": 2.5559071101326425,
+      "locked": true
+    }
+  ],
+  "ents": [
+    {
+      "kind": {
+        "Point": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "name": "O",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 2,
+          "y": 3
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 4,
+          "y": 5
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 1,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 0,
+          "b": 2,
+          "infinite": true
+        }
+      },
+      "name": "",
+      "construction": true,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 7,
+          "y": 8
+        }
+      },
+      "name": "A",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Circle": {
+          "c": 5,
+          "r": 9
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 10,
+          "y": 11
+        }
+      },
+      "name": "B",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Circle": {
+          "c": 7,
+          "r": 12
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Point": {
+          "x": 13,
+          "y": 14
+        }
+      },
+      "name": "C",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Circle": {
+          "c": 9,
+          "r": 15
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 5,
+          "b": 7,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 5,
+          "b": 9,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 9,
+          "b": 5,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Line": {
+          "a": 9,
+          "b": 7,
+          "infinite": false
+        }
+      },
+      "name": "",
+      "construction": false,
+      "hidden": false
+    }
+  ],
+  "cons": [
+    {
+      "Tangent": {
+        "a": 6,
+        "b": 8,
+        "s": 1.0,
+        "aux": null
+      }
+    },
+    {
+      "Tangent": {
+        "a": 6,
+        "b": 10,
+        "s": 1.0,
+        "aux": null
+      }
+    },
+    {
+      "Tangent": {
+        "a": 8,
+        "b": 10,
+        "s": 1.0,
+        "aux": null
+      }
+    }
+  ],
+  "dims": [
+    {
+      "kind": {
+        "Radius": 6
+      },
+      "name": "r1",
+      "driving": true,
+      "expr": "2s",
+      "param": 16,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "Radius": 8
+      },
+      "name": "r2",
+      "driving": true,
+      "expr": "3s",
+      "param": 17,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.2999999999999998,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "Radius": 10
+      },
+      "name": "r3",
+      "driving": true,
+      "expr": "6s",
+      "param": 18,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.29999999999999993,
+        0.3000000000000007
+      ]
+    },
+    {
+      "kind": {
+        "Angle": [
+          11,
+          12
+        ]
+      },
+      "name": "θ1",
+      "driving": false,
+      "expr": "",
+      "param": 19,
+      "s": 1.0,
+      "supp": false,
+      "off": [
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "kind": {
+        "Angle": [
+          13,
+          14
+        ]
+      },
+      "name": "θ2",
+      "driving": false,
+      "expr": "",
+      "param": 20,
+      "s": 1.0,
+      "supp": true,
+      "off": [
+        0.30000000000000004,
+        0.3000000000000007
+      ]
+    }
+  ],
+  "vars": [
+    {
+      "name": "s",
+      "expr": "",
+      "param": 6
+    }
+  ],
+  "origin": 0,
+  "xaxis": 3,
+  "yaxis": 4
+}
