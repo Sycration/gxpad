@@ -1,6 +1,6 @@
 //! Formula derivation for a dimension or variable of a document, with the
-//! result formatted as plain text and LaTeX. Shared by gxpad and the C and
-//! JS interfaces.
+//! result formatted as plain text and LaTeX. Shared by the Rust, C and JS
+//! interfaces.
 
 use crate::derive;
 use crate::expr::bx::{Bx, latex, plain, to_bx};
@@ -124,7 +124,7 @@ pub struct Formula {
 }
 
 /// Derives the formula of target `t`, searching `extra_ms` longer than the
-/// default budget (gxpad's "search harder" adds 10 000 ms per level).
+/// default budget (steps of 10 000 ms suit retrying a hard target).
 pub fn derive_formula(doc: &Doc, t: Target, extra_ms: u64) -> Result<Formula, String> {
     let doc = numeric_doc(doc, t);
     let (name, e, is_angle) = target_expr(&doc, t)?;

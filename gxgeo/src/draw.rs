@@ -1,5 +1,5 @@
-//! Polylines for drawing entities inside a window of the plane: the same
-//! tessellation gxpad draws, in world coordinates.
+//! Polylines for drawing entities inside a window of the plane, in world
+//! coordinates, with detail matched to the window's pixel size.
 
 use crate::expr::{Code, X_SYM, Y_SYM};
 use crate::model::*;

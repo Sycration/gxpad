@@ -1332,7 +1332,7 @@ pub unsafe extern "C" fn gx_doc_var_numeric(doc: *const GxDoc, i: usize) -> c_in
 
 /// Derives the closed-form formula of a dimension or variable, or NULL.
 /// `extra_ms` extends the search beyond the default budget (0 for the
-/// default; gxpad's "search harder" adds 10000 per press).
+/// default; steps of 10000 suit retrying a hard target).
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
