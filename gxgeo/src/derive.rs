@@ -2737,6 +2737,14 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
             consts.insert(d.param as u32, zero());
         }
     }
+    // numeric variables and dimensions are frozen: their value enters the
+    // formula as a plain number, so their name never appears
+    for v in doc.vars.iter().flatten().filter(|v| v.numeric) {
+        consts.insert(v.param as u32, nice_const(env.get(v.param as u32)));
+    }
+    for d in doc.dims.iter().flatten().filter(|d| d.numeric) {
+        consts.insert(d.param as u32, nice_const(env.get(d.param as u32)));
+    }
     let eqs: Vec<Expr> = eqns.iter().map(|(e, _)| subst_map(e, &consts)).collect();
     let target_c = subst_map(target, &consts);
 

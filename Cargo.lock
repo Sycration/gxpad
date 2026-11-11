@@ -1388,6 +1388,7 @@ dependencies = [
 name = "gxgeo"
 version = "0.1.0"
 dependencies = [
+ "js-sys",
  "num-bigint",
  "num-integer",
  "num-rational",

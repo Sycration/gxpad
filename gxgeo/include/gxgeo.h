@@ -7,8 +7,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// Kind of an entity.
+typedef struct EntKind EntKind;
+
 // A geometry document with its solver state and undo history. Opaque.
 typedef struct GxDoc GxDoc;
+
+// Conic kind passed to `gx_doc_add_conic` and the conic constructions.
+typedef uint32_t GxConic;
 
 // Constraint kind passed to `gx_doc_constrain`, with its arguments a and b.
 typedef uint32_t GxCon;
@@ -37,6 +43,9 @@ typedef struct GxFormula {
 
 // Kind of quantity passed to `gx_derive`.
 typedef uint32_t GxTarget;
+
+// Entity kind returned by `gx_doc_ent_kind`.
+typedef uint32_t GxEnt;
 
 
 
@@ -83,6 +92,30 @@ typedef uint32_t GxTarget;
 // Curves a and b tangent, on the side they are on now.
 #define GX_CON_TANGENT 10
 
+// Points a and b symmetric about line c (read-only).
+#define GX_CON_SYMMETRIC 11
+
+// Point a is the midpoint of points b and c (read-only).
+#define GX_CON_MIDPOINT_OF 12
+
+// Point a offset from point b by the direction c to d (read-only).
+#define GX_CON_OFFSET 13
+
+// Point a on the bisector of lines b and c through point d (read-only).
+#define GX_CON_BISECTOR 14
+
+// The line through a and b touches curve c at b (read-only).
+#define GX_CON_TANGENT_AT 15
+
+// Point a is a focus of conic b (read-only).
+#define GX_CON_FOCUS 16
+
+// Line a is the directrix of conic c (read-only).
+#define GX_CON_DIRECTRIX 17
+
+// Line a is an asymptote of conic b (read-only).
+#define GX_CON_ASYMPTOTE 18
+
 // Distance between points a and b.
 #define GX_DIM_DISTANCE 0
 
@@ -118,6 +151,37 @@ typedef uint32_t GxTarget;
 
 // y coordinate of point a.
 #define GX_DIM_Y 11
+
+// An ellipse.
+#define GX_CONIC_ELLIPSE 0
+
+// A hyperbola.
+#define GX_CONIC_HYPERBOLA 1
+
+// A parabola.
+#define GX_CONIC_PARABOLA 2
+
+// A point.
+#define GX_ENT_POINT 0
+
+// A segment or infinite line.
+#define GX_ENT_LINE 1
+
+// A circle.
+#define GX_ENT_CIRCLE 2
+
+// An arc.
+#define GX_ENT_ARC 3
+
+// A conic (ellipse, hyperbola or parabola).
+#define GX_ENT_CONIC 4
+
+// A curve given as `y = f(x)` or `F(x, y) = G(x, y)`.
+#define GX_ENT_CURVE 5
+
+
+
+
 
 
 
@@ -221,6 +285,207 @@ ptrdiff_t gx_doc_add_circle(struct GxDoc *doc, size_t c, double r);
 // `doc` is NULL or a document from this library.
 ptrdiff_t gx_doc_add_arc(struct GxDoc *doc, size_t c, size_t a, size_t b);
 
+// Adds a curve given as text: `y = f(x)` or `F(x, y) = G(x, y)` in x, y,
+// variables and dimensions. Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `src` is NULL or a NUL-terminated string.
+ptrdiff_t gx_doc_add_curve(struct GxDoc *doc, const char *src);
+
+// Sets the text of curve `i`. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `src` is NULL or a NUL-terminated string.
+int gx_doc_set_curve(struct GxDoc *doc, size_t i, const char *src);
+
+// Adds a conic of kind `kind` (`GX_CONIC_*`) centered on point c (the vertex
+// of a parabola), with half-axes a and b (b is ignored for a parabola,
+// where a is the focal distance) and axis angle t in radians. Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_conic(struct GxDoc *doc, GxConic kind, size_t c, double a, double b, double t);
+
+// Adds a point at (x, y) on curve c, bound to it by a constraint. Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_point_on(struct GxDoc *doc, size_t c, double x, double y);
+
+// Adds the circle around point c through point p, bound to it. Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_circle_to(struct GxDoc *doc, size_t c, size_t p);
+
+// Adds the arc around point c from point a, ending at a new point in the
+// direction of (x, y). Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_arc_toward(struct GxDoc *doc, size_t c, size_t a, double x, double y);
+
+// Adds the midpoint of points a and b, bound to them. Returns the point.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_midpoint(struct GxDoc *doc, size_t a, size_t b);
+
+// Adds the midpoint of line l, bound to it. Returns the point.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_line_midpoint(struct GxDoc *doc, size_t l);
+
+// Adds a point at a crossing of curves a and b, starting from (x, y).
+// Returns the point.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_intersection(struct GxDoc *doc, size_t a, size_t b, double x, double y);
+
+// Adds a point at the crossing of curves a and b nearest to (x, y).
+// Returns the point.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_intersection_near(struct GxDoc *doc, size_t a, size_t b, double x, double y);
+
+// Adds the infinite line through point p perpendicular to line l. Returns the line.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_perp_line(struct GxDoc *doc, size_t l, size_t p);
+
+// Adds the infinite line through point p parallel to line l. Returns the line.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_parallel_line(struct GxDoc *doc, size_t l, size_t p);
+
+// Adds the perpendicular bisector of points a and b. Returns the line;
+// the midpoint is stored in `mid` when it is not NULL.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `mid` is NULL or writable.
+ptrdiff_t gx_doc_add_perp_bisector(struct GxDoc *doc, size_t a, size_t b, size_t *mid);
+
+// Adds the bisector of lines l1 and l2 in the sector containing (x, y).
+// Returns the line; the vertex (a shared endpoint, or a new point at the
+// crossing) is stored in `vertex` when it is not NULL.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `vertex` is NULL or writable.
+ptrdiff_t gx_doc_add_angle_bisector(struct GxDoc *doc,
+                                    size_t l1,
+                                    size_t l2,
+                                    double x,
+                                    double y,
+                                    size_t *vertex);
+
+// Adds the segment from point p touching curve c at a contact point
+// starting from (x, y). Returns the segment; the contact point is stored
+// in `contact` when it is not NULL.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `contact` is NULL or writable.
+ptrdiff_t gx_doc_add_tangent_line(struct GxDoc *doc,
+                                  size_t p,
+                                  size_t c,
+                                  double x,
+                                  double y,
+                                  size_t *contact);
+
+// Like `gx_doc_add_tangent_line`, with the contact point nearest to (x, y).
+//
+// # Safety
+// `doc` is NULL or a document from this library; `contact` is NULL or writable.
+ptrdiff_t gx_doc_add_tangent_line_near(struct GxDoc *doc,
+                                       size_t p,
+                                       size_t c,
+                                       double x,
+                                       double y,
+                                       size_t *contact);
+
+// Adds the mirror image of point p in line l. Returns the point.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_reflection(struct GxDoc *doc, size_t p, size_t l);
+
+// Adds the circle through points a, b and c. Returns the circle; its new
+// center point is stored in `center` when it is not NULL.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `center` is NULL or writable.
+ptrdiff_t gx_doc_add_circle_through(struct GxDoc *doc,
+                                    size_t a,
+                                    size_t b,
+                                    size_t c,
+                                    size_t *center);
+
+// Adds the arc from point a through point m to point b. Returns the arc;
+// its new center point is stored in `center` when it is not NULL.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `center` is NULL or writable.
+ptrdiff_t gx_doc_add_arc_through(struct GxDoc *doc, size_t a, size_t m, size_t b, size_t *center);
+
+// Adds the ellipse or hyperbola (`kind`: `GX_CONIC_ELLIPSE` or
+// `GX_CONIC_HYPERBOLA`) with foci f1 and f2 through point p. Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_conic_by_foci(struct GxDoc *doc, GxConic kind, size_t f1, size_t f2, size_t p);
+
+// Adds the parabola with focus f and directrix line l. Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_parabola_by_focus(struct GxDoc *doc, size_t f, size_t l);
+
+// Adds the ellipse or hyperbola centered on point c, its first axis ending
+// at (ax, ay) and its second half-axis reaching the line through (sx, sy)
+// parallel to the first axis. Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_conic_from(struct GxDoc *doc,
+                                GxConic kind,
+                                size_t c,
+                                double ax,
+                                double ay,
+                                double sx,
+                                double sy);
+
+// Adds the parabola with vertex at point c opening toward (x, y), its focal
+// distance the distance to (x, y). Returns the entity.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_parabola_toward(struct GxDoc *doc, size_t c, double x, double y);
+
+// Adds the foci of conic c (two points, one for a parabola), storing up to
+// `cap` of them in `out`. Returns their number, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `out` is NULL or writable for `cap` entries.
+ptrdiff_t gx_doc_add_foci(struct GxDoc *doc, size_t c, size_t *out, size_t cap);
+
+// Adds the directrix of conic c belonging to the focus nearest (x, y).
+// Returns the line.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_directrix(struct GxDoc *doc, size_t c, double x, double y);
+
+// Adds both asymptotes of hyperbola c, storing up to `cap` of them in
+// `out`. Returns their number, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `out` is NULL or writable for `cap` entries.
+ptrdiff_t gx_doc_add_asymptotes(struct GxDoc *doc, size_t c, size_t *out, size_t cap);
+
 // Adds a constraint of kind `kind` (`GX_CON_*`) on entities a and b.
 // Returns 1, 0 when it is rejected (unsatisfiable or redundant), -1 on error.
 //
@@ -260,6 +525,137 @@ int gx_doc_set_dim(struct GxDoc *doc, size_t i, const char *text);
 // `doc` is NULL or a document from this library.
 int gx_doc_set_dim_driving(struct GxDoc *doc, size_t i, bool driving);
 
+// Marks dimension `i` numeric or not. A numeric dimension is frozen at its
+// current value and substituted as a plain number in derived formulas, so
+// its name never appears there. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_set_dim_numeric(struct GxDoc *doc, size_t i, bool numeric);
+
+// Adds a value variable named `name` (NULL picks the first unused of a, b,
+// c, k, ...). A free variable is set by `value`, otherwise it is solved
+// from the constraints, starting at `value`. Returns the variable.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `name` is NULL or a NUL-terminated string.
+ptrdiff_t gx_doc_add_var(struct GxDoc *doc, const char *name, double value, bool free);
+
+// Adds a variable named `name` (NULL picks f1, f2, ...) defined by the
+// expression `expr` of variables and dimensions. Returns the variable.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `name` is NULL or a NUL-terminated string; `expr` is NULL or a NUL-terminated string.
+ptrdiff_t gx_doc_add_defvar(struct GxDoc *doc,
+                            const char *name,
+                            const char *expr);
+
+// Sets the value of value variable `i`. Returns 1, 0 when the value cannot
+// be reached, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_set_var(struct GxDoc *doc, size_t i, double value);
+
+// Sets variable `i` from text as typed in gxpad: a plain number makes it a
+// free value variable, any other text an expression of variables and
+// dimensions. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `text` is NULL or a NUL-terminated string.
+int gx_doc_set_var_expr(struct GxDoc *doc, size_t i, const char *text);
+
+// Makes value variable `i` free (set by its value) or solved from the
+// constraints. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_set_var_free(struct GxDoc *doc, size_t i, bool free);
+
+// Marks variable `i` numeric or not. A numeric variable is frozen at its
+// current value and substituted as a plain number in derived formulas, so
+// its name never appears there. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_set_var_numeric(struct GxDoc *doc, size_t i, bool numeric);
+
+// Removes variable `i`, leaving an empty slot. Returns 1, 0 when rejected,
+// -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_delete_var(struct GxDoc *doc, size_t i);
+
+// Deletes entity `e` and what depends on it. Returns 1, 0 when nothing
+// changed, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_delete_ent(struct GxDoc *doc, size_t e);
+
+// Deletes constraint `c`. Returns 1, 0 when nothing changed, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_delete_con(struct GxDoc *doc, size_t c);
+
+// Deletes dimension `i` together with its parameter. Returns 1, 0 when
+// nothing changed, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_delete_dim(struct GxDoc *doc, size_t i);
+
+// Locks or unlocks point `e` (fixing or freeing its coordinates). Returns 1,
+// 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_lock_point(struct GxDoc *doc, size_t e, bool on);
+
+// Sets the construction flag of entity `e` (a dashed helper). Returns 1, 0
+// when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_set_construction(struct GxDoc *doc, size_t e, bool on);
+
+// Sets the hidden flag of entity `e`. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_set_hidden(struct GxDoc *doc, size_t e, bool on);
+
+// Makes line `e` infinite or a segment. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_set_infinite(struct GxDoc *doc, size_t e, bool on);
+
+// Pulls point `e` toward (x, y) by solving the constraints with it pinned
+// there (a drag, not an undoable change). Returns 1 when reached, 0 when
+// not, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_drag_point(struct GxDoc *doc, size_t e, double x, double y);
+
+// Pulls the radius of circle `e` so its edge passes through (x, y). Returns
+// 1 when reached, 0 when not, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_drag_circle(struct GxDoc *doc, size_t e, double x, double y);
+
+// Pulls a handle of conic `e` (`which` 0 the first-axis end, 1 the
+// second-axis end) toward (x, y). Returns 1 when reached, 0 when not, -1 on
+// error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_drag_conic_handle(struct GxDoc *doc, size_t e, uint8_t which, double x, double y);
+
 // Gives the point, dimension or variable named `old` the name `new`,
 // rewriting expressions that use it. Returns 1, 0 when `new` is not an
 // identifier or is taken, -1 on error.
@@ -269,6 +665,140 @@ int gx_doc_set_dim_driving(struct GxDoc *doc, size_t i, bool driving);
 int gx_doc_rename(struct GxDoc *doc,
                   const char *old,
                   const char *new_);
+
+// Number of entity slots. Deleted entities leave empty slots.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+size_t gx_doc_ent_count(const struct GxDoc *doc);
+
+// Kind of entity `e` (`GX_ENT_*`), or -1 for an empty slot or a bad index.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_ent_kind(const struct GxDoc *doc, size_t e);
+
+// Name of entity `e`, or NULL for an empty name, an empty slot or a bad
+// index. Free the result with `gx_string_free`.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+char *gx_doc_ent_name(const struct GxDoc *doc, size_t e);
+
+// World coordinates of point `e`, stored in `x` and `y` when they are not
+// NULL. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `x` and `y` are NULL or writable.
+int gx_doc_point_pos(const struct GxDoc *doc, size_t e, double *x, double *y);
+
+// 1 when point `e` is locked (both coordinates fixed), 0 when it is free, -1
+// on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_point_locked(const struct GxDoc *doc, size_t e);
+
+// Endpoints a and b of line `e`, stored in `a`, `b` and `infinite` when they
+// are not NULL. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `a`, `b` and `infinite` are NULL or writable.
+int gx_doc_line_pts(const struct GxDoc *doc, size_t e, size_t *a, size_t *b, bool *infinite);
+
+// 1 when line `e` is infinite, 0 when it is a segment, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_ent_infinite(const struct GxDoc *doc, size_t e);
+
+// Center point and radius of circle or arc `e`, stored in `c` and `r` when
+// they are not NULL. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `c` and `r` are NULL or writable.
+int gx_doc_circle_vals(const struct GxDoc *doc, size_t e, size_t *c, double *r);
+
+// Center and endpoints of arc `e`, stored in `c`, `a` and `b` when they are
+// not NULL. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `c`, `a` and `b` are NULL or writable.
+int gx_doc_arc_pts(const struct GxDoc *doc, size_t e, size_t *c, size_t *a, size_t *b);
+
+// Kind (`GX_CONIC_*`), center point and axis values (a, b, angle in
+// radians) of conic `e`, stored in the non-NULL outputs. Returns 1, or -1
+// on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; the outputs are NULL or writable.
+int gx_doc_conic_vals(const struct GxDoc *doc,
+                      size_t e,
+                      GxConic *kind,
+                      size_t *c,
+                      double *a,
+                      double *b,
+                      double *t);
+
+// Source text of function curve `e`, or NULL for an empty slot or a bad
+// index. Free the result with `gx_string_free`.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+char *gx_doc_curve_src(const struct GxDoc *doc, size_t e);
+
+// 1 when entity `e` is a construction (dashed helper), 0 when it is a
+// normal entity, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_ent_construction(const struct GxDoc *doc, size_t e);
+
+// 1 when entity `e` is hidden, 0 when it is drawn, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_ent_hidden(const struct GxDoc *doc, size_t e);
+
+// Number of constraint slots. Deleted constraints leave empty slots.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+size_t gx_doc_con_count(const struct GxDoc *doc);
+
+// Kind of constraint `c` (`GX_CON_*`), or -1 for an empty slot or a bad
+// index.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_con_kind(const struct GxDoc *doc, size_t c);
+
+// The entities of constraint `c`, stored in `out` (up to `cap`); returns
+// their number, -1 for an empty slot or a bad index.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `out` is NULL or writable for `cap` entries.
+ptrdiff_t gx_doc_con_ents(const struct GxDoc *doc, size_t c, size_t *out, size_t cap);
+
+// Kind of dimension `i` (`GX_DIM_*`), or -1 for an empty slot or a bad index.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_dim_kind(const struct GxDoc *doc, size_t i);
+
+// World-coordinate polylines sampling entity `e`, stored in `out` as flat
+// pairs (x0, y0, x1, y1, ...) broken by `starts`, one index per polyline
+// start, up to `cap` points and `cap_starts` polylines. Returns the total
+// number of points, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `out` and `starts` are NULL or writable.
+ptrdiff_t gx_doc_ent_samples(const struct GxDoc *doc,
+                             size_t e,
+                             double *out,
+                             size_t cap,
+                             size_t *starts,
+                             size_t cap_starts);
 
 // Number of dimension slots. Removed dimensions leave empty slots.
 //
@@ -295,6 +825,13 @@ double gx_doc_dim_value(const struct GxDoc *doc, size_t i);
 // `doc` is NULL or a document from this library.
 int gx_doc_dim_driving(const struct GxDoc *doc, size_t i);
 
+// 1 when dimension `i` is numeric (frozen, substituted as a number), 0 when
+// it is symbolic, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_dim_numeric(const struct GxDoc *doc, size_t i);
+
 // Number of variable slots. Removed variables leave empty slots.
 //
 // # Safety
@@ -306,6 +843,33 @@ size_t gx_doc_var_count(const struct GxDoc *doc);
 // # Safety
 // `doc` is NULL or a document from this library.
 char *gx_doc_var_name(const struct GxDoc *doc, size_t i);
+
+// Value of variable `i`, or NaN for an empty slot or a bad index.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+double gx_doc_var_value(const struct GxDoc *doc, size_t i);
+
+// Expression of variable `i` (empty for a value variable), or NULL for an
+// empty slot or a bad index. Free the result with `gx_string_free`.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+char *gx_doc_var_expr(const struct GxDoc *doc, size_t i);
+
+// 1 when variable `i` is free, 0 when it is solved or defined by an
+// expression, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_var_free(const struct GxDoc *doc, size_t i);
+
+// 1 when variable `i` is numeric (frozen, substituted as a number), 0 when
+// it is symbolic, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_var_numeric(const struct GxDoc *doc, size_t i);
 
 // Derives the closed-form formula of a dimension or variable, or NULL.
 // `extra_ms` extends the search beyond the default budget (0 for the

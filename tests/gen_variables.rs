@@ -2,6 +2,7 @@
 //! expressions, defined variables and solved variables.
 
 use gxpad::model::DimKind;
+use gxpad::ops;
 use gxpad::testkit::Kit;
 use std::f64::consts::PI;
 
@@ -555,4 +556,62 @@ fn law_of_sines_variables() {
     let side = k.measure(DimKind::Length(ac));
     let gamma = (180.0 - 40.0 - 65.0f64).to_radians();
     k.check_value(side, 5.0 * 65f64.to_radians().sin() / gamma.sin());
+}
+
+/// A numeric variable is frozen and substituted as a plain number in the
+/// derived formula, so its name no longer appears there.
+#[test]
+fn numeric_variable_drops_from_formula() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let aa = k.var("aa", 3.0);
+    k.var("bb", 4.0);
+    let p = k.point(3.0, 0.0);
+    let q = k.point(3.0, 4.0);
+    let op = k.line(o, p);
+    let pq = k.line(p, q);
+    k.horizontal(op);
+    k.perpendicular(op, pq);
+    k.drive(DimKind::Length(op), "aa");
+    k.drive(DimKind::Length(pq), "bb");
+    assert_eq!(k.dof(), 0);
+    let d = k.measure(DimKind::Distance(o, q));
+    let text = k.check(d);
+    assert!(text.contains("aa"), "{text}");
+    assert!(text.contains("bb"), "{text}");
+
+    ops::set_var_numeric(&mut k.app.geo, aa, true).unwrap();
+    let text = k.check(d);
+    assert!(!text.contains("aa"), "{text}");
+    assert!(text.contains("bb"), "{text}");
+    k.check_value(d, 5.0);
+}
+
+/// A numeric dimension is substituted as its frozen value in the derived
+/// formula, so its name no longer appears there.
+#[test]
+fn numeric_dimension_drops_from_formula() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let p = k.point(3.0, 0.0);
+    let q = k.point(3.0, 4.0);
+    let op = k.line(o, p);
+    let pq = k.line(p, q);
+    k.horizontal(op);
+    k.perpendicular(op, pq);
+    let d1 = k.drive(DimKind::Length(op), "3");
+    let d2 = k.drive(DimKind::Length(pq), "4");
+    assert_eq!(k.dof(), 0);
+    let dd = k.measure(DimKind::Distance(o, q));
+    let n1 = nm(&k, d1);
+    let n2 = nm(&k, d2);
+    let text = k.check(dd);
+    assert!(text.contains(&n1), "{text}");
+    assert!(text.contains(&n2), "{text}");
+
+    ops::set_dim_numeric(&mut k.app.geo, d1, true).unwrap();
+    let text = k.check(dd);
+    assert!(!text.contains(&n1), "{text}");
+    assert!(text.contains(&n2), "{text}");
+    k.check_value(dd, 5.0);
 }

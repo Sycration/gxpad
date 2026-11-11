@@ -4,6 +4,79 @@
 
 use crate::model::*;
 
+/// A point argument of a construction: an existing point, or one to create.
+#[derive(Clone, Copy, Debug)]
+pub enum Pt {
+    /// The existing point.
+    Ent(usize),
+    /// A new free point at the position.
+    Free([f64; 2]),
+    /// A new point at the position, on the curve.
+    On(usize, [f64; 2]),
+}
+
+impl From<usize> for Pt {
+    fn from(e: usize) -> Pt {
+        Pt::Ent(e)
+    }
+}
+
+/// The conic features the interfaces build.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ConicFeature {
+    /// The foci.
+    Foci,
+    /// The directrix belonging to the focus nearest a position.
+    Directrix,
+    /// Both asymptotes of a hyperbola.
+    Asymptotes,
+}
+
+impl Doc {
+    /// Creates (or reuses) the point `p` refers to.
+    pub fn realize(&mut self, p: Pt) -> usize {
+        match p {
+            Pt::Ent(e) => e,
+            Pt::Free(q) => self.add_point(q[0], q[1]),
+            Pt::On(c, q) => {
+                let e = self.add_point(q[0], q[1]);
+                self.cons.push(Some(Con::OnCurve(e, c)));
+                e
+            }
+        }
+    }
+
+    /// Current position of the point `p` refers to.
+    pub fn pt_pos(&self, p: Pt) -> [f64; 2] {
+        match p {
+            Pt::Ent(e) => self.pval(e),
+            Pt::Free(q) | Pt::On(_, q) => q,
+        }
+    }
+
+    /// The conic feature `f` of conic c (for a directrix, the one of the
+    /// focus nearest `near`); returns the features.
+    pub fn build_conic_feature(&mut self, f: ConicFeature, c: usize, near: [f64; 2]) -> Vec<usize> {
+        match f {
+            ConicFeature::Foci => self.build_foci(c),
+            ConicFeature::Directrix => self.build_directrix(c, near).into_iter().collect(),
+            ConicFeature::Asymptotes => self.build_asymptotes(c),
+        }
+    }
+
+    /// Direction of line l from its first to its second point.
+    pub fn line_dir_val(&self, l: usize) -> [f64; 2] {
+        line_dir_of(self, l)
+    }
+
+    /// The endpoint lines l1 and l2 have in common, when there is one.
+    pub fn shared_point(&self, l1: usize, l2: usize) -> Option<usize> {
+        let (a, b) = self.line_pts(l1);
+        let (c, d) = self.line_pts(l2);
+        [a, b].into_iter().find(|p| *p == c || *p == d)
+    }
+}
+
 /// Builders shared by the interactive tools and the test kit. Each returns the
 /// entity it creates; geometry stays bound to its sources by constraints.
 impl Doc {
@@ -55,11 +128,7 @@ impl Doc {
     /// Bisector of lines l1, l2 in the sector containing `toward`; returns
     /// (line, vertex point). Uses a shared endpoint as vertex when present.
     pub fn build_angle_bisector(&mut self, l1: usize, l2: usize, toward: [f64; 2]) -> Option<(usize, usize)> {
-        let shared = {
-            let (a, b) = self.line_pts(l1);
-            let (c, d) = self.line_pts(l2);
-            [a, b].into_iter().find(|p| *p == c || *p == d)
-        };
+        let shared = self.shared_point(l1, l2);
         let x = shared.map(|p| self.pval(p)).unwrap_or_else(|| angle_vertex(self, l1, l2));
         let s = sector_signs(self, l1, l2, x, toward);
         let dir = bisector_dir(self, l1, l2, s)?;

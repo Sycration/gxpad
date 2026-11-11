@@ -85,6 +85,16 @@ pub enum Snap {
     Free([f64; 2]),
 }
 
+impl From<Snap> for gxgeo::build::Pt {
+    fn from(s: Snap) -> Self {
+        match s {
+            Snap::Point(e) => Self::Ent(e),
+            Snap::Free(p) => Self::Free(p),
+            Snap::Curve(c, p) => Self::On(c, p),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct View {
     pub c: [f64; 2],

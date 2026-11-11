@@ -23,6 +23,7 @@ use crate::derive;
 use crate::expr::bx::{plain, to_bx};
 use crate::expr::{Expr, eval, sym_set};
 use crate::model::*;
+use crate::ops::{self, ConicFeature};
 use std::collections::HashSet;
 
 pub struct Kit {
@@ -157,30 +158,30 @@ impl Kit {
         })
     }
     pub fn line(&mut self, a: usize, b: usize) -> usize {
-        self.change("line", false, |d| d.add_ent(Ent::Line { a, b, infinite: false }))
+        ops::add_line(&mut self.app.geo, a, b, false).expect("line")
     }
     pub fn inf_line(&mut self, a: usize, b: usize) -> usize {
-        self.change("infinite line", false, |d| d.add_ent(Ent::Line { a, b, infinite: true }))
+        ops::add_line(&mut self.app.geo, a, b, true).expect("infinite line")
     }
     /// Circle with center point `c` and initial radius `r` (radius is free).
     pub fn circle(&mut self, c: usize, r: f64) -> usize {
-        self.change("circle", false, |d| d.add_circle(c, r))
+        ops::add_circle(&mut self.app.geo, c, r).expect("circle")
     }
     /// Arc around `c` from point `a` counter-clockwise to point `b`
     /// (|ca| = |cb| is enforced).
     pub fn arc(&mut self, c: usize, a: usize, b: usize) -> usize {
-        self.change("arc", false, |d| d.add_ent(Ent::Arc { c, a, b }))
+        ops::add_arc(&mut self.app.geo, c, a, b).expect("arc")
     }
     /// Ellipse with center point, semi-axes and rotation angle (all free).
     pub fn ellipse(&mut self, c: usize, a: f64, b: f64, angle: f64) -> usize {
-        self.change("ellipse", false, |d| d.add_conic(ConicKind::Ellipse, c, a, b, angle))
+        ops::add_conic(&mut self.app.geo, ConicKind::Ellipse, c, a, b, angle).expect("ellipse")
     }
     pub fn hyperbola(&mut self, c: usize, a: f64, b: f64, angle: f64) -> usize {
-        self.change("hyperbola", false, |d| d.add_conic(ConicKind::Hyperbola, c, a, b, angle))
+        ops::add_conic(&mut self.app.geo, ConicKind::Hyperbola, c, a, b, angle).expect("hyperbola")
     }
     /// Parabola with vertex point, focal length and axis angle.
     pub fn parabola(&mut self, vertex: usize, focal: f64, angle: f64) -> usize {
-        self.change("parabola", false, |d| d.add_conic(ConicKind::Parabola, vertex, focal, 1.0, angle))
+        ops::add_conic(&mut self.app.geo, ConicKind::Parabola, vertex, focal, 1.0, angle).expect("parabola")
     }
     /// The rotation-angle parameter of a conic, for locking.
     pub fn lock_conic_angle(&mut self, c: usize) {
@@ -196,39 +197,25 @@ impl Kit {
     /// Explicit `y = f(x)` or implicit `F(x, y) = G(x, y)` curve.
     pub fn curve(&mut self, src: &str) -> usize {
         assert!(self.app.geo.doc.curve_def(src).is_ok(), "bad curve {src}");
-        let s = src.to_string();
-        self.change("curve", false, |d| d.add_ent(Ent::Curve { src: s }))
+        ops::add_curve(&mut self.app.geo, src).expect("curve")
     }
 
     // ------------------------------------------------------------ variables
 
     /// Free (driving) variable.
     pub fn var(&mut self, name: &str, value: f64) -> usize {
-        let n = name.to_string();
-        self.change("variable", false, |d| d.add_var(n, value))
+        ops::add_var(&mut self.app.geo, Some(name), value, true).expect("variable")
     }
     /// Variable solved from the constraints, starting at `guess`.
     pub fn solved_var(&mut self, name: &str, guess: f64) -> usize {
-        let n = name.to_string();
-        self.change("solved variable", false, |d| {
-            let i = d.add_var(n, guess);
-            let p = d.vars[i].as_ref().unwrap().param;
-            d.params[p].locked = false;
-            i
-        })
+        ops::add_var(&mut self.app.geo, Some(name), guess, false).expect("solved variable")
     }
     /// Variable defined by an expression (may use dimension and variable names).
     pub fn defvar(&mut self, name: &str, expr: &str) -> usize {
-        let (n, e) = (name.to_string(), expr.to_string());
-        self.change("defined variable", false, |d| {
-            let i = d.add_var(n, 0.0);
-            d.vars[i].as_mut().unwrap().expr = e;
-            i
-        })
+        ops::add_defvar(&mut self.app.geo, Some(name), expr).expect("defined variable")
     }
     pub fn set_var(&mut self, v: usize, value: f64) {
-        let p = self.app.geo.doc.vars[v].as_ref().unwrap().param;
-        assert!(self.app.geo.set_values(&[(p, value)], true), "could not set variable");
+        assert!(ops::set_var(&mut self.app.geo, v, value).unwrap(), "could not set variable");
     }
 
     // ------------------------------------------------------------ constraints
@@ -293,114 +280,74 @@ impl Kit {
     // ------------------------------------------------------------ construction tools
 
     pub fn midpoint_of(&mut self, a: usize, b: usize) -> usize {
-        self.change("midpoint", false, |d| d.build_midpoint(a, b))
+        ops::midpoint(&mut self.app.geo, a, b).expect("midpoint")
     }
     pub fn midpoint_of_line(&mut self, l: usize) -> usize {
-        self.change("midpoint of line", false, |d| d.build_midpoint_of_line(l))
+        ops::line_midpoint(&mut self.app.geo, l).expect("midpoint of line")
     }
     /// Intersection point of two curves near `guess`.
     pub fn intersect(&mut self, a: usize, b: usize, guess: [f64; 2]) -> usize {
-        self.change("intersection", true, |d| d.build_intersection(a, b, guess))
+        ops::intersection(&mut self.app.geo, a, b, guess).expect("intersection")
     }
     /// Infinite line through `p` perpendicular to line `l`.
     pub fn perp_line(&mut self, l: usize, p: usize) -> usize {
-        self.change("perpendicular line", false, |d| d.build_dir_line(l, p, true))
+        ops::dir_line(&mut self.app.geo, l, p, true).expect("perpendicular line")
     }
     /// Infinite line through `p` parallel to line `l`.
     pub fn par_line(&mut self, l: usize, p: usize) -> usize {
-        self.change("parallel line", false, |d| d.build_dir_line(l, p, false))
+        ops::dir_line(&mut self.app.geo, l, p, false).expect("parallel line")
     }
     /// Perpendicular bisector of points a, b: (infinite line, midpoint).
     pub fn perp_bisector(&mut self, a: usize, b: usize) -> (usize, usize) {
-        let mut mp = 0;
-        let l = self.change("perpendicular bisector", false, |d| {
-            let (l, m) = d.build_perp_bisector(a, b);
-            mp = m;
-            l
-        });
-        (l, mp)
+        ops::perp_bisector(&mut self.app.geo, a, b).expect("perpendicular bisector")
     }
     /// Angle bisector of lines l1, l2 in the sector containing `toward`:
     /// (infinite line, vertex point).
     pub fn angle_bisector(&mut self, l1: usize, l2: usize, toward: [f64; 2]) -> (usize, usize) {
-        let mut x = 0;
-        let l = self.change("angle bisector", false, |d| {
-            let (l, v) = d.build_angle_bisector(l1, l2, toward).expect("parallel lines");
-            x = v;
-            l
-        });
-        (l, x)
+        ops::angle_bisector(&mut self.app.geo, l1, l2, toward).expect("angle bisector")
     }
     /// Segment from `p` tangent to curve `c`, touching near `guess`:
     /// (segment, contact point).
     pub fn tangent_line(&mut self, p: usize, c: usize, guess: [f64; 2]) -> (usize, usize) {
-        let mut t = 0;
-        let l = self.change("tangent line", true, |d| {
-            let (l, tp) = d.build_tangent_line(p, c, guess);
-            t = tp;
-            l
-        });
-        (l, t)
+        ops::tangent_line(&mut self.app.geo, p, c, guess).expect("tangent line")
     }
     /// Circle through points a, b, c: (circle, center point).
     pub fn circle_through(&mut self, a: usize, b: usize, c: usize) -> (usize, usize) {
-        let mut ctr = 0;
-        let circ = self.change("circle through three points", true, |d| {
-            let (circ, o) = d.build_circle_through(a, b, c).expect("collinear points");
-            ctr = o;
-            circ
-        });
-        (circ, ctr)
+        ops::circle_through(&mut self.app.geo, a, b, c).expect("circle through three points")
     }
     /// Arc from a through m to b: (arc, center point).
     pub fn arc_through(&mut self, a: usize, m: usize, b: usize) -> (usize, usize) {
-        let mut ctr = 0;
-        let arc = self.change("arc through three points", true, |d| {
-            let (arc, o) = d.build_arc_through(a, m, b).expect("collinear points");
-            ctr = o;
-            arc
-        });
-        (arc, ctr)
+        ops::arc_through(&mut self.app.geo, a, m, b).expect("arc through three points")
     }
     /// Ellipse with foci f1, f2 through point p.
     pub fn ellipse_by_foci(&mut self, f1: usize, f2: usize, p: usize) -> usize {
-        self.change("ellipse by foci", true, |d| d.build_conic_by_foci(ConicKind::Ellipse, f1, f2, p).expect("no such ellipse"))
+        ops::conic_by_foci(&mut self.app.geo, ConicKind::Ellipse, f1, f2, p).expect("ellipse by foci")
     }
     /// Hyperbola with foci f1, f2 through point p.
     pub fn hyperbola_by_foci(&mut self, f1: usize, f2: usize, p: usize) -> usize {
-        self.change("hyperbola by foci", true, |d| d.build_conic_by_foci(ConicKind::Hyperbola, f1, f2, p).expect("no such hyperbola"))
+        ops::conic_by_foci(&mut self.app.geo, ConicKind::Hyperbola, f1, f2, p).expect("hyperbola by foci")
     }
     /// Parabola with focus f and directrix line l.
     pub fn parabola_by_focus(&mut self, f: usize, l: usize) -> usize {
-        self.change("parabola by focus and directrix", true, |d| d.build_parabola_by_focus(f, l).expect("focus on the directrix"))
+        ops::parabola_by_focus(&mut self.app.geo, f, l).expect("parabola by focus and directrix")
     }
     /// The foci of conic `c` (two points, or one for a parabola).
     pub fn foci(&mut self, c: usize) -> Vec<usize> {
-        let mut out = vec![];
-        self.change("foci", true, |d| {
-            out = d.build_foci(c);
-            0
-        });
-        assert!(!out.is_empty(), "no foci for entity {c}");
-        out
+        ops::conic_feature(&mut self.app.geo, ConicFeature::Foci, c, [0.0; 2]).expect("foci")
     }
     /// The directrix of conic `c` belonging to the focus nearest `near`.
     pub fn directrix(&mut self, c: usize, near: [f64; 2]) -> usize {
-        self.change("directrix", true, |d| d.build_directrix(c, near).expect("no directrix"))
+        ops::conic_feature(&mut self.app.geo, ConicFeature::Directrix, c, near).expect("directrix")[0]
     }
     /// Both asymptotes of hyperbola `c`.
     pub fn asymptotes(&mut self, c: usize) -> (usize, usize) {
-        let mut out = vec![];
-        self.change("asymptotes", true, |d| {
-            out = d.build_asymptotes(c);
-            0
-        });
-        assert_eq!(out.len(), 2, "entity {c} has no asymptotes");
-        (out[0], out[1])
+        let v = ops::conic_feature(&mut self.app.geo, ConicFeature::Asymptotes, c, [0.0; 2]).expect("asymptotes");
+        assert_eq!(v.len(), 2, "entity {c} has no asymptotes");
+        (v[0], v[1])
     }
     /// Mirror image of `p` in line `l`.
     pub fn reflect(&mut self, p: usize, l: usize) -> usize {
-        self.change("reflection", true, |d| d.build_reflection(p, l))
+        ops::reflection(&mut self.app.geo, p, l).expect("reflection")
     }
 
     // ------------------------------------------------------------ dimensions
@@ -578,13 +525,14 @@ impl Kit {
             .collect();
         let mut knobs: Vec<(usize, String)> = Vec::new();
         for x in self.app.geo.doc.dims.iter().flatten() {
-            // zero-valued driving dimensions are structural, not parameters
-            if x.driving && x.expr.is_empty() && self.app.geo.doc.params[x.param].v != 0.0 {
+            // zero-valued driving dimensions are structural, not parameters;
+            // numeric dimensions are frozen constants
+            if x.driving && !x.numeric && x.expr.is_empty() && self.app.geo.doc.params[x.param].v != 0.0 {
                 knobs.push((x.param, x.name.clone()));
             }
         }
         for v in self.app.geo.doc.vars.iter().flatten() {
-            if v.expr.is_empty() && self.app.geo.doc.params[v.param].locked {
+            if v.expr.is_empty() && !v.numeric && self.app.geo.doc.params[v.param].locked {
                 knobs.push((v.param, v.name.clone()));
             }
         }

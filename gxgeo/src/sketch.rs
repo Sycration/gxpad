@@ -611,6 +611,69 @@ pub fn contact_guess(pa: &[Vec<[f64; 2]>], pb: &[Vec<[f64; 2]>], fallback: [f64;
     best.1
 }
 
+/// Crossing of curves a and b nearest to `hint`, found on their sampled
+/// polylines.
+pub fn crossing_near(d: &Doc, a: usize, b: usize, hint: [f64; 2]) -> Option<[f64; 2]> {
+    let (pa, pb) = (sample_polys(d, a), sample_polys(d, b));
+    let mut best: Option<(f64, [f64; 2])> = None;
+    for la in &pa {
+        for wa in la.windows(2) {
+            for lb in &pb {
+                for wb in lb.windows(2) {
+                    if let Some(q) = seg_cross(wa[0], wa[1], wb[0], wb[1]) {
+                        let dist = (q[0] - hint[0]).hypot(q[1] - hint[1]);
+                        if best.is_none_or(|b| dist < b.0) {
+                            best = Some((dist, q));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    best.map(|b| b.1)
+}
+
+/// Crossing of segments ab and cd.
+fn seg_cross(a: [f64; 2], b: [f64; 2], c: [f64; 2], d: [f64; 2]) -> Option<[f64; 2]> {
+    let (r, s) = ([b[0] - a[0], b[1] - a[1]], [d[0] - c[0], d[1] - c[1]]);
+    let den = r[0] * s[1] - r[1] * s[0];
+    if den.abs() < 1e-12 {
+        return None;
+    }
+    let t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den;
+    let u = ((c[0] - a[0]) * r[1] - (c[1] - a[1]) * r[0]) / den;
+    if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) { Some([a[0] + r[0] * t, a[1] + r[1] * t]) } else { None }
+}
+
+/// Point of curve c, found on its sampled polylines, where a line from `p`
+/// touches it, nearest to `hint`.
+pub fn tangent_contact_near(d: &Doc, p: [f64; 2], c: usize, hint: [f64; 2]) -> Option<[f64; 2]> {
+    let mut best: Option<(f64, [f64; 2])> = None;
+    for pl in sample_polys(d, c) {
+        if pl.len() < 3 {
+            continue;
+        }
+        // side of the tangent at sample i relative to the line from p
+        let f = |i: usize| {
+            let (n, m) = (pl[(i + 1).min(pl.len() - 1)], pl[i.saturating_sub(1)]);
+            let (t, q) = ([n[0] - m[0], n[1] - m[1]], [pl[i][0] - p[0], pl[i][1] - p[1]]);
+            t[0] * q[1] - t[1] * q[0]
+        };
+        let mut prev = f(0);
+        for i in 1..pl.len() {
+            let cur = f(i);
+            if (prev < 0.0) != (cur < 0.0) {
+                let dist = (pl[i][0] - hint[0]).hypot(pl[i][1] - hint[1]);
+                if best.is_none_or(|b| dist < b.0) {
+                    best = Some((dist, pl[i]));
+                }
+            }
+            prev = cur;
+        }
+    }
+    best.map(|b| b.1)
+}
+
 /// True for a name usable in expressions: a letter, then letters, digits or `_`.
 pub fn valid_ident(s: &str) -> bool {
     let mut cs = s.chars();

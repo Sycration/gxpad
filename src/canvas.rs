@@ -4,6 +4,8 @@ use crate::app::*;
 use crate::expr::*;
 use crate::icons::{self, Icon};
 use crate::model::*;
+use crate::ops;
+use gxgeo::build::Pt;
 use eframe::egui::{self, Align2, Color32, CornerRadius, FontId, Painter, PointerButton, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui, Vec2, pos2, vec2};
 use std::collections::{HashMap, HashSet};
 use std::f64::consts::{PI, TAU};
@@ -14,15 +16,7 @@ const AXIS: Color32 = Color32::from_rgb(0x3a, 0x41, 0x4e);
 
 /// Creates (or reuses) the point a snap refers to.
 pub fn realize(d: &mut Doc, s: Snap) -> usize {
-    match s {
-        Snap::Point(e) => e,
-        Snap::Free(p) => d.add_point(p[0], p[1]),
-        Snap::Curve(c, p) => {
-            let e = d.add_point(p[0], p[1]);
-            d.cons.push(Some(Con::OnCurve(e, c)));
-            e
-        }
-    }
+    d.realize(s.into())
 }
 
 fn seg_dist(p: Pos2, a: Pos2, b: Pos2) -> (f32, Pos2) {
@@ -731,75 +725,47 @@ impl App {
         let hv = self.hv_hint;
         let tool = self.tool;
         let mut chain: Option<usize> = None;
-        let mut created: Option<usize> = None;
-        let ok = self.geo.try_change(false, |d| match tool {
-            Tool::Point => {
-                if !matches!(p[0], Snap::Point(_)) {
-                    created = Some(realize(d, p[0]));
-                }
+        let g = &mut self.geo;
+        let at = |i: usize| Pt::from(p[i]);
+        let ok = match tool {
+            Tool::Point => match p[0] {
+                Snap::Point(_) => Ok(0),
+                Snap::Free(q) => ops::add_point(g, q[0], q[1]),
+                Snap::Curve(c, q) => ops::add_point_on(g, c, q[0], q[1]),
             }
-            Tool::Line => {
-                let a = realize(d, p[0]);
-                let b = realize(d, p[1]);
-                if a == b {
-                    return;
-                }
-                created = Some(d.add_ent(Ent::Line { a, b, infinite: false }));
-                match hv {
-                    Some(true) => d.cons.push(Some(Con::Horizontal(a, b))),
-                    Some(false) => d.cons.push(Some(Con::Vertical(a, b))),
-                    None => {}
-                }
+            .map(|_| ()),
+            Tool::Line => ops::line_between(g, at(0), at(1), false, hv).map(|l| {
                 if !matches!(p[1], Snap::Point(_)) {
-                    chain = Some(b);
+                    chain = Some(g.doc.line_pts(l).1);
                 }
+            }),
+            Tool::Circle => ops::circle_to(g, at(0), at(1)).map(|_| ()),
+            Tool::Arc => match p[2] {
+                Snap::Point(e) => ops::add_arc(g, at(0), at(1), e),
+                _ => ops::arc_toward(g, at(0), at(1), pos[2]),
             }
-            Tool::Circle => {
-                let c = realize(d, p[0]);
-                let ci = d.build_circle_to(c, pos[1]);
-                created = Some(ci);
-                match p[1] {
-                    Snap::Point(e) => d.cons.push(Some(Con::OnCurve(e, ci))),
-                    Snap::Curve(..) => {
-                        let e = realize(d, p[1]);
-                        d.cons.push(Some(Con::OnCurve(e, ci)));
-                    }
-                    _ => {}
-                }
-            }
-            Tool::Arc => {
-                let c = realize(d, p[0]);
-                let a = realize(d, p[1]);
-                let b = match p[2] {
-                    Snap::Point(e) => e,
-                    _ => d.build_arc_end(c, a, pos[2]),
-                };
-                if a != b {
-                    created = Some(d.add_ent(Ent::Arc { c, a, b }));
-                }
-            }
+            .map(|_| ()),
             Tool::Ellipse | Tool::Hyperbola => {
-                let c = realize(d, p[0]);
                 let kind = if tool == Tool::Ellipse { ConicKind::Ellipse } else { ConicKind::Hyperbola };
-                created = Some(d.build_conic_from(kind, c, pos[1], pos[2]));
+                ops::conic_from(g, kind, at(0), pos[1], pos[2]).map(|_| ())
             }
-            Tool::Parabola => {
-                let c = realize(d, p[0]);
-                created = Some(d.build_parabola_toward(c, pos[1]));
+            Tool::Parabola => ops::parabola_toward(g, at(0), pos[1]).map(|_| ()),
+            Tool::Circle3 => ops::circle_through(g, at(0), at(1), p[2]).map(|_| ()),
+            Tool::Arc3 => ops::arc_through(g, at(0), at(1), p[2]).map(|_| ()),
+            Tool::EllipseFoci | Tool::HyperbolaFoci => {
+                let kind = if tool == Tool::EllipseFoci { ConicKind::Ellipse } else { ConicKind::Hyperbola };
+                ops::conic_by_foci(g, kind, at(0), at(1), p[2]).map(|_| ())
             }
-            Tool::Circle3 | Tool::Arc3 | Tool::EllipseFoci | Tool::HyperbolaFoci | Tool::ParabolaFocus => {
-                created = build_shape(d, tool, &p);
-            }
-            _ => {}
-        });
+            Tool::ParabolaFocus => match p[1] {
+                Snap::Curve(l, _) => ops::parabola_by_focus(g, at(0), l).map(|_| ()),
+                _ => Err(String::new()),
+            },
+            _ => Ok(()),
+        }
+        .is_ok();
         if ok {
             if let Some(b) = chain {
                 self.pending.push(Snap::Point(b));
-            }
-            if let Some(e) = created {
-                if tool != Tool::Point {
-                    let _ = e;
-                }
             }
         }
     }
@@ -1194,7 +1160,7 @@ impl App {
             let ents = self.sel_ents();
             if let Some(k) = self.dim_kind_for(&ents) {
                 let a = self.geo.doc.dim_anchor(&k);
-                let tmp = Dim { kind: k, name: String::new(), driving: true, expr: String::new(), param: 0, s: 1.0, supp: false, off: [mw[0] - a[0], mw[1] - a[1]] };
+                let tmp = Dim { kind: k, name: String::new(), driving: true, expr: String::new(), param: 0, s: 1.0, supp: false, off: [mw[0] - a[0], mw[1] - a[1]], numeric: false };
                 self.paint_dim_shape(p, &tmp, None, DIMC.gamma_multiply(0.6), "");
             }
             return;
@@ -1843,11 +1809,7 @@ impl App {
                         _ => Con::Vertical(w[0], w[1]),
                     })
                     .collect();
-                if !self.geo.try_change(true, |d| {
-                    for c in cons {
-                        d.cons.push(Some(c));
-                    }
-                }) {
+                if !ops::add_constraints(&mut self.geo, cons).unwrap_or(false) {
                     self.flash_ents(ents);
                 }
             }
@@ -1881,48 +1843,24 @@ impl App {
             }
             Act::Lock(on) => {
                 let ents = self.sel_ents();
-                self.geo.try_change(false, |d| {
-                    for e in ents {
-                        d.lock_point(e, on);
-                    }
-                });
+                ops::lock_points(&mut self.geo, &ents, on).ok();
             }
             Act::Construction => {
-                let ents = self.sel_ents();
+                let ents: Vec<usize> = self.sel_ents().into_iter().filter(|e| !self.geo.doc.is_point(*e)).collect();
                 let on = !ents.iter().all(|e| self.geo.doc.ent(*e).is_some_and(|x| x.construction));
-                self.geo.try_change(false, |d| {
-                    for e in ents {
-                        if let Some(x) = d.ents[e].as_mut() {
-                            if !matches!(x.kind, Ent::Point { .. }) {
-                                x.construction = on;
-                            }
-                        }
-                    }
-                });
+                ops::set_construction_all(&mut self.geo, &ents, on).ok();
             }
             Act::Infinite => {
-                let ents = self.sel_ents();
-                self.geo.try_change(false, |d| {
-                    for e in ents {
-                        if let Some(Entity { kind: Ent::Line { infinite, .. }, .. }) = d.ents[e].as_mut() {
-                            *infinite = !*infinite;
-                        }
+                for e in self.sel_ents() {
+                    if let Ok(inf) = ops::ent_infinite(&self.geo, e) {
+                        ops::set_infinite(&mut self.geo, e, !inf).ok();
                     }
-                });
+                }
             }
             Act::Delete => self.delete_selection(),
             Act::Driving(i) => self.toggle_driving(i),
             Act::Supp(i) => {
-                let p = self.geo.doc.dims[i].as_ref().map(|d| d.param).unwrap();
-                let cur = self.geo.doc.params[p].v;
-                let driving = self.geo.doc.dims[i].as_ref().unwrap().driving;
-                self.geo.try_change(false, |d| {
-                    let x = d.dims[i].as_mut().unwrap();
-                    x.supp = !x.supp;
-                    if driving && x.expr.is_empty() {
-                        d.params[p].v = PI - cur;
-                    }
-                });
+                ops::toggle_supp(&mut self.geo, i).ok();
             }
         }
     }
@@ -2074,9 +2012,7 @@ impl App {
             self.curve_input = Some(owned.clone());
             if resp.lost_focus() && enter {
                 let src = owned.trim().to_string();
-                if self.geo.doc.curve_def(&src).is_ok() {
-                    let mut idx = 0;
-                    self.geo.try_change(false, |d| idx = d.add_ent(Ent::Curve { src }));
+                if let Ok(idx) = ops::add_curve(&mut self.geo, &src) {
                     self.curve_input = None;
                     self.tool = Tool::Select;
                     self.sel = vec![Sel::Ent(idx)];

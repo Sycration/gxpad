@@ -51,6 +51,33 @@ The generated tests (`tests/gen_*.rs`) build constructions with known answers, d
 measured dimension, and check that the formula stays correct while the construction is dragged
 and its values changed.
 
+## C and WebAssembly interfaces
+
+The geometry core is the `gxgeo` crate, which also builds a C shared library and a Wasm module
+with JS bindings.
+
+```sh
+cargo build -p gxgeo --release                          # C library (target/release/libgxgeo.so)
+```
+
+Regenerate the C header (`gxgeo/include/gxgeo.h`) from `gxgeo/src/ffi.rs` with
+[cbindgen](https://github.com/mozilla/cbindgen), run inside the `gxgeo` directory:
+
+```sh
+cd gxgeo && cbindgen --config cbindgen.toml --output include/gxgeo.h
+```
+
+Build the Wasm module and generate its JS glue with
+[wasm-bindgen](https://rustwasm.github.io/wasm-bindgen/) (requires
+`rustup target add wasm32-unknown-unknown` and `cargo install wasm-bindgen-cli`):
+
+```sh
+cargo build -p gxgeo --target wasm32-unknown-unknown --release
+wasm-bindgen --target web --out-dir gxgeo/pkg target/wasm32-unknown-unknown/release/gxgeo.wasm
+```
+
+Example C and JS clients live in `gxgeo/examples/`.
+
 ## How the formulas are derived
 
 [SHORTCOMINGS.md](SHORTCOMINGS.md) describes the derivation and where it falls short.

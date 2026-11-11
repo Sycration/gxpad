@@ -1,7 +1,7 @@
 //! gxpad: interactive 2D geometric constructions with constraints and
 //! symbolic formula derivation.
 
-pub use gxgeo::{alg, build, dd, derive, expr, fit, formula, gxp, model, sketch, solver};
+pub use gxgeo::{alg, build, dd, derive, expr, fit, formula, gxp, model, ops, sketch, solver};
 
 pub mod app;
 pub mod canvas;

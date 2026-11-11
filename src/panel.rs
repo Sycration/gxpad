@@ -3,9 +3,9 @@
 use crate::app::*;
 use crate::canvas::small_icon_btn;
 use crate::expr::bx::Bx;
-use crate::expr::parse::plain_number;
 use crate::icons::{self, Icon};
 use crate::mathview;
+use crate::ops;
 use crate::model::*;
 use eframe::egui::{self, Color32, FontId, Key, Response, Sense, Stroke, TextEdit, Ui, vec2};
 use std::collections::HashMap;
@@ -175,7 +175,7 @@ impl App {
                     } else {
                         vec![]
                     };
-                    if !cons.is_empty() && !self.geo.try_change(true, |d| d.cons.extend(cons.into_iter().map(Some))) {
+                    if !cons.is_empty() && !ops::add_constraints(&mut self.geo, cons).unwrap_or(false) {
                         self.flash_ents(ents);
                     }
                 }
@@ -187,17 +187,9 @@ impl App {
                     }
                 }
                 Key::X => {
+                    let ents: Vec<usize> = ents.into_iter().filter(|e| !self.geo.doc.is_point(*e)).collect();
                     let on = !ents.iter().all(|e| self.geo.doc.ent(*e).is_some_and(|x| x.construction));
-                    let ents2 = ents.clone();
-                    self.geo.try_change(false, |d| {
-                        for e in ents2 {
-                            if let Some(x) = d.ents[e].as_mut() {
-                                if !matches!(x.kind, Ent::Point { .. }) && !x.hidden {
-                                    x.construction = on;
-                                }
-                            }
-                        }
-                    });
+                    ops::set_construction_all(&mut self.geo, &ents, on).ok();
                 }
                 _ => {}
             }
@@ -234,21 +226,10 @@ impl App {
             section(ui, Icon::Variable);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if small_icon_btn(ui, Icon::Latex, false, "Add defined variable").clicked() {
-                    let name = self.geo.doc.unique_name("f");
-                    self.geo.try_change(false, |d| {
-                        let i = d.add_var(name, 0.0);
-                        d.vars[i].as_mut().unwrap().expr = "0".into();
-                    });
+                    ops::add_defvar(&mut self.geo, None, "0").ok();
                 }
                 if small_icon_btn(ui, Icon::Plus, false, "Add variable").clicked() {
-                    let name = ["a", "b", "c", "k", "m", "n", "s", "t", "u", "w"]
-                        .iter()
-                        .find(|n| !self.geo.doc.name_taken(n))
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| self.geo.doc.unique_name("k"));
-                    self.geo.try_change(false, |d| {
-                        d.add_var(name, 1.0);
-                    });
+                    ops::add_var(&mut self.geo, None, 1.0, true).ok();
                 }
             });
         });
@@ -268,7 +249,7 @@ impl App {
                         self.bufs.remove(&format!("vn{i}"));
                     }
                 }
-                let right = 64.0;
+                let right = 94.0;
                 let fw = (w - 54.0 - right - 24.0).max(60.0);
                 if v.expr.is_empty() {
                     let locked = self.geo.doc.params[v.param].locked;
@@ -292,7 +273,7 @@ impl App {
                                     self.geo.solve_full();
                                 }
                             } else {
-                                self.geo.set_values(&[(v.param, val)], true);
+                                ops::set_var(&mut self.geo, i, val).ok();
                             }
                         }
                         if dv.drag_stopped() {
@@ -308,8 +289,10 @@ impl App {
                     }
                     let tip = if locked { "Free — click to solve from constraints" } else { "Solved — click to set freely" };
                     if small_icon_btn(ui, if locked { Icon::Lock } else { Icon::Unlock }, !locked, tip).clicked() {
-                        let p = v.param;
-                        self.geo.try_change(false, |d| d.params[p].locked = !locked);
+                        ops::set_var_free(&mut self.geo, i, !locked).ok();
+                    }
+                    if small_icon_btn(ui, Icon::Numeric, v.numeric, "Numeric — substitute the value as a number in formulas").clicked() {
+                        ops::set_var_numeric(&mut self.geo, i, !v.numeric).ok();
                     }
                 } else {
                     let err = self.geo.doc.parse_expr(&v.expr, 0).is_err();
@@ -318,21 +301,14 @@ impl App {
                         self.sel = vec![Sel::Var(i)];
                     }
                     if let Some(ne) = ne {
-                        if let Some(x) = plain_number(&ne) {
-                            let p = v.param;
-                            self.geo.try_change(false, |d| {
-                                d.vars[i].as_mut().unwrap().expr.clear();
-                                d.params[p].v = x;
-                                d.params[p].locked = true;
-                            });
-                        } else {
-                            self.geo.try_change(false, |d| d.vars[i].as_mut().unwrap().expr = ne);
-                        }
+                        ops::set_var_expr(&mut self.geo, i, &ne).ok();
                     }
-                    ui.add_space(24.0);
+                    if small_icon_btn(ui, Icon::Numeric, v.numeric, "Numeric — substitute the value as a number in formulas").clicked() {
+                        ops::set_var_numeric(&mut self.geo, i, !v.numeric).ok();
+                    }
                 }
                 if small_icon_btn(ui, Icon::Close, false, "Delete").clicked() {
-                    self.geo.try_change(false, |d| d.vars[i] = None);
+                    ops::delete_var(&mut self.geo, i).ok();
                 }
             });
             self.row_bg(ui, r.response.rect, selected);
@@ -365,13 +341,13 @@ impl App {
                 }
                 if let Some(ns) = ns {
                     if self.geo.doc.curve_def(&ns).is_ok() {
-                        if !self.geo.try_change(false, |d| d.ents[i].as_mut().unwrap().kind = Ent::Curve { src: ns }) {
+                        if !ops::set_curve(&mut self.geo, i, &ns).unwrap_or(false) {
                             self.flash_ents(vec![i]);
                         }
                     }
                 }
                 if small_icon_btn(ui, Icon::Close, false, "Delete").clicked() {
-                    self.geo.try_change(false, |d| d.delete(&[i], &[], &[]));
+                    ops::delete_ent(&mut self.geo, i).ok();
                 }
             });
             self.row_bg(ui, r.response.rect, selected);
@@ -399,7 +375,7 @@ impl App {
                         self.bufs.remove(&format!("dn{i}"));
                     }
                 }
-                let fw = (w - 54.0 - 64.0 - 24.0).max(60.0);
+                let fw = (w - 54.0 - 94.0 - 24.0).max(60.0);
                 let shown = if !d.expr.is_empty() {
                     d.expr.clone()
                 } else {
@@ -419,8 +395,11 @@ impl App {
                 if small_icon_btn(ui, icon, d.driving, tip).clicked() {
                     self.toggle_driving(i);
                 }
+                if small_icon_btn(ui, Icon::Numeric, d.numeric, "Numeric — substitute the value as a number in formulas").clicked() {
+                    ops::set_dim_numeric(&mut self.geo, i, !d.numeric).ok();
+                }
                 if small_icon_btn(ui, Icon::Close, false, "Delete").clicked() {
-                    self.geo.try_change(false, |doc| doc.dims[i] = None);
+                    ops::delete_dim(&mut self.geo, i).ok();
                     self.sel.retain(|s| *s != Sel::Dim(i));
                 }
             });

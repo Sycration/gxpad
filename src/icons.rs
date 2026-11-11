@@ -70,6 +70,7 @@ pub enum Icon {
     EllipseFoci,
     HyperbolaFoci,
     ParabolaFocus,
+    Numeric,
 }
 
 fn poly(p: &Painter, pts: Vec<Pos2>, s: Stroke) {
@@ -504,6 +505,13 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, col: Color32) {
             p.line_segment([at(-0.9, 0.5), at(0.9, 0.5)], s);
             p.line_segment([at(0.0, 0.5), at(0.6, -0.7)], s);
             poly(p, arc_pts(at(0.0, 0.5), h * 0.55, 1.1, PI, 12), thin);
+        }
+        Icon::Numeric => {
+            // a hash: the conventional "number" mark
+            p.line_segment([at(-0.4, -0.6), at(-0.4, 0.6)], s);
+            p.line_segment([at(0.4, -0.6), at(0.4, 0.6)], s);
+            p.line_segment([at(-0.7, -0.2), at(0.7, -0.2)], thin);
+            p.line_segment([at(-0.7, 0.2), at(0.7, 0.2)], thin);
         }
     }
 }

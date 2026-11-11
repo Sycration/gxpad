@@ -6,6 +6,11 @@ use crate::expr::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+/// True for `false`: skips serializing a field that is at its default.
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Param {
     pub v: f64,
@@ -145,6 +150,11 @@ pub struct Dim {
     pub supp: bool,
     /// Label offset from the anchor, in world units.
     pub off: [f64; 2],
+    /// When true, the dimension's value is a frozen constant: it is
+    /// substituted as a plain number in formula derivation, so its name never
+    /// appears.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub numeric: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -153,6 +163,10 @@ pub struct Var {
     /// Empty for value variables (stored in `param`), otherwise a defining expression.
     pub expr: String,
     pub param: usize,
+    /// When true, the variable's value is a frozen constant: it is substituted
+    /// as a plain number in formula derivation, so its name never appears.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub numeric: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -312,7 +326,7 @@ impl Doc {
 
     pub fn add_var(&mut self, name: String, v: f64) -> usize {
         let p = self.add_param(v, true);
-        self.vars.push(Some(Var { name, expr: String::new(), param: p }));
+        self.vars.push(Some(Var { name, expr: String::new(), param: p, numeric: false }));
         self.vars.len() - 1
     }
 
@@ -325,7 +339,7 @@ impl Doc {
             _ => self.unique_name(kind.prefix()),
         };
         let p = self.add_param(0.0, true);
-        let mut d = Dim { kind, name, driving: true, expr: String::new(), param: p, s: 1.0, supp: false, off };
+        let mut d = Dim { kind, name, driving: true, expr: String::new(), param: p, s: 1.0, supp: false, off, numeric: false };
         self.dims.push(None);
         let i = self.dims.len() - 1;
         self.dims[i] = Some(d.clone());
@@ -570,9 +584,16 @@ impl Doc {
                 s.insert(v.param);
             }
         }
-        let mut v: Vec<usize> = s.into_iter().filter(|p| !self.params[*p].locked).collect();
+        let mut v: Vec<usize> = s.into_iter().filter(|p| !self.params[*p].locked && !self.is_numeric_param(*p)).collect();
         v.sort();
         v
+    }
+
+    /// True when parameter `p` is the frozen value of a numeric variable or
+    /// dimension.
+    pub fn is_numeric_param(&self, p: usize) -> bool {
+        self.vars.iter().flatten().any(|v| v.numeric && v.param == p)
+            || self.dims.iter().flatten().any(|d| d.numeric && d.param == p)
     }
 
     // ------------------------------------------------------------ names & parsing
@@ -604,10 +625,14 @@ impl Doc {
             }
         }
         for v in self.vars.iter().flatten() {
-            m.insert(v.param, v.name.clone());
+            if !v.numeric {
+                m.insert(v.param, v.name.clone());
+            }
         }
         for d in self.dims.iter().flatten() {
-            m.insert(d.param, d.name.clone());
+            if !d.numeric {
+                m.insert(d.param, d.name.clone());
+            }
         }
         m
     }
