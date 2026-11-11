@@ -129,6 +129,19 @@ pub const GX_ENT_CONIC: GxEnt = 4;
 /// A curve given as `y = f(x)` or `F(x, y) = G(x, y)`.
 pub const GX_ENT_CURVE: GxEnt = 5;
 
+/// A rectangle of the plane, from (x0, y0) to (x1, y1) with x0 < x1 and
+/// y0 < y1, and the size of one pixel in it in world units. At most 20 000
+/// pixels wide and tall.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct GxWindow {
+    pub x0: f64,
+    pub y0: f64,
+    pub x1: f64,
+    pub y1: f64,
+    pub px: f64,
+}
+
 /// A derived formula. Released with `gx_formula_free`.
 #[repr(C)]
 pub struct GxFormula {
@@ -707,9 +720,10 @@ pub unsafe extern "C" fn gx_doc_set_dim_driving(doc: *mut GxDoc, i: usize, drivi
     status("driving dimension", || ops::set_driving(unsafe { sk_mut(doc) }?, i, driving))
 }
 
-/// Marks dimension `i` numeric or not. A numeric dimension is frozen at its
-/// current value and substituted as a plain number in derived formulas, so
-/// its name never appears there. Returns 1, 0 when rejected, -1 on error.
+/// Marks dimension `i` numeric or not. Formulas derived for other targets
+/// use a numeric dimension's current value as a plain number. Solving and
+/// the dimension itself are unaffected. Returns 1, 0 when rejected, -1 on
+/// error.
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
@@ -770,9 +784,10 @@ pub unsafe extern "C" fn gx_doc_set_var_free(doc: *mut GxDoc, i: usize, free: bo
     status("free variable", || ops::set_var_free(unsafe { sk_mut(doc) }?, i, free))
 }
 
-/// Marks variable `i` numeric or not. A numeric variable is frozen at its
-/// current value and substituted as a plain number in derived formulas, so
-/// its name never appears there. Returns 1, 0 when rejected, -1 on error.
+/// Marks variable `i` numeric or not. Formulas derived for other targets
+/// use a numeric variable's current value as a plain number. Solving and
+/// the variable itself (value, expression, free or solved) are unaffected.
+/// Returns 1, 0 when rejected, -1 on error.
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
@@ -781,8 +796,8 @@ pub unsafe extern "C" fn gx_doc_set_var_numeric(doc: *mut GxDoc, i: usize, numer
     status("numeric variable", || ops::set_var_numeric(unsafe { sk_mut(doc) }?, i, numeric))
 }
 
-/// Removes variable `i`, leaving an empty slot. Returns 1, 0 when rejected,
-/// -1 on error.
+/// Removes variable `i`, leaving an empty slot; expressions naming it fail
+/// to parse until edited. Returns 1, 0 when rejected, -1 on error.
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
@@ -791,8 +806,9 @@ pub unsafe extern "C" fn gx_doc_delete_var(doc: *mut GxDoc, i: usize) -> c_int {
     status("variable deletion", || ops::delete_var(unsafe { sk_mut(doc) }?, i))
 }
 
-/// Deletes entity `e` and what depends on it. Returns 1, 0 when nothing
-/// changed, -1 on error.
+/// Deletes entity `e` and what depends on it. Returns 1, 0 when the
+/// constraints would no longer solve (the document is then unchanged), -1
+/// on error.
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
@@ -801,7 +817,8 @@ pub unsafe extern "C" fn gx_doc_delete_ent(doc: *mut GxDoc, e: usize) -> c_int {
     status("entity deletion", || ops::delete_ent(unsafe { sk_mut(doc) }?, e))
 }
 
-/// Deletes constraint `c`. Returns 1, 0 when nothing changed, -1 on error.
+/// Deletes constraint `c`. Returns 1, 0 when the constraints would no
+/// longer solve (the document is then unchanged), -1 on error.
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
@@ -810,8 +827,9 @@ pub unsafe extern "C" fn gx_doc_delete_con(doc: *mut GxDoc, c: usize) -> c_int {
     status("constraint deletion", || ops::delete_con(unsafe { sk_mut(doc) }?, c))
 }
 
-/// Deletes dimension `i` together with its parameter. Returns 1, 0 when
-/// nothing changed, -1 on error.
+/// Deletes dimension `i`; expressions naming it fail to parse until edited.
+/// Returns 1, 0 when the constraints would no longer solve (the document is
+/// then unchanged), -1 on error.
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
@@ -1139,33 +1157,44 @@ pub unsafe extern "C" fn gx_doc_dim_kind(doc: *const GxDoc, i: usize) -> c_int {
     guard(-1, || Ok(ops::dim_kind(unsafe { sk_ref(doc) }?, i)? as c_int))
 }
 
-/// World-coordinate polylines sampling entity `e`, stored in `out` as flat
-/// pairs (x0, y0, x1, y1, ...) broken by `starts`, one index per polyline
-/// start, up to `cap` points and `cap_starts` polylines. Returns the total
-/// number of points, or -1 on error.
+/// World-coordinate polylines drawing entity `e` inside `window`: one
+/// point for a point, the endpoints of a segment, a segment crossing the
+/// window for an infinite line, the outline of a circle, arc or conic (two
+/// polylines for a hyperbola), and the parts of a function curve inside the
+/// window, sampled at the window's pixel size.
+///
+/// The points go to `out` as flat pairs (x0, y0, x1, y1, ...), up to `cap`
+/// points; the index of the first point of each polyline goes to `starts`,
+/// up to `cap_starts` polylines; the number of polylines goes to `n_polys`.
+/// Any of the three may be NULL. Returns the total number of points, which
+/// is more than `cap` when `out` was too small, or -1 on error. Calling
+/// first with NULL buffers gives the sizes to allocate.
 ///
 /// # Safety
-/// `doc` is NULL or a document from this library; `out` and `starts` are NULL or writable.
+/// `doc` is NULL or a document from this library; `out` is NULL or writable
+/// for `2 * cap` values; `starts` is NULL or writable for `cap_starts`
+/// entries; `n_polys` is NULL or writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn gx_doc_ent_samples(doc: *const GxDoc, e: usize, out: *mut f64, cap: usize, starts: *mut usize, cap_starts: usize) -> isize {
+pub unsafe extern "C" fn gx_doc_ent_samples(
+    doc: *const GxDoc,
+    e: usize,
+    window: GxWindow,
+    out: *mut f64,
+    cap: usize,
+    starts: *mut usize,
+    cap_starts: usize,
+    n_polys: *mut usize,
+) -> isize {
     guard(-1, || {
-        let polys = ops::ent_samples(unsafe { sk_ref(doc) }?, e)?;
-        let mut n = 0usize;
+        let polys = ops::ent_samples(unsafe { sk_ref(doc) }?, e, [window.x0, window.y0], [window.x1, window.y1], window.px)?;
+        let total: usize = polys.iter().map(|pl| pl.len()).sum();
         if !out.is_null() {
-            for pl in &polys {
-                for p in pl {
-                    if n >= cap {
-                        return Ok(n as isize);
-                    }
-                    unsafe {
-                        *out.add(n * 2) = p[0];
-                        *out.add(n * 2 + 1) = p[1];
-                    }
-                    n += 1;
+            for (n, p) in polys.iter().flatten().take(cap).enumerate() {
+                unsafe {
+                    *out.add(n * 2) = p[0];
+                    *out.add(n * 2 + 1) = p[1];
                 }
             }
-        } else {
-            n = polys.iter().map(|pl| pl.len()).sum();
         }
         if !starts.is_null() {
             let mut acc = 0;
@@ -1174,7 +1203,10 @@ pub unsafe extern "C" fn gx_doc_ent_samples(doc: *const GxDoc, e: usize, out: *m
                 acc += pl.len();
             }
         }
-        Ok(n as isize)
+        if let Some(o) = unsafe { n_polys.as_mut() } {
+            *o = polys.len();
+        }
+        Ok(total as isize)
     })
 }
 
@@ -1225,7 +1257,7 @@ pub unsafe extern "C" fn gx_doc_dim_driving(doc: *const GxDoc, i: usize) -> c_in
     guard(-1, || Ok(ops::dim_driving(unsafe { sk_ref(doc) }?, i)? as c_int))
 }
 
-/// 1 when dimension `i` is numeric (frozen, substituted as a number), 0 when
+/// 1 when dimension `i` is numeric (substituted as a number in formulas), 0 when
 /// it is symbolic, -1 on error.
 ///
 /// # Safety
@@ -1286,7 +1318,7 @@ pub unsafe extern "C" fn gx_doc_var_free(doc: *const GxDoc, i: usize) -> c_int {
     guard(-1, || Ok(ops::var_free(unsafe { sk_ref(doc) }?, i)? as c_int))
 }
 
-/// 1 when variable `i` is numeric (frozen, substituted as a number), 0 when
+/// 1 when variable `i` is numeric (substituted as a number in formulas), 0 when
 /// it is symbolic, -1 on error.
 ///
 /// # Safety

@@ -5,7 +5,8 @@
 use crate::derive;
 use crate::expr::bx::{Bx, latex, plain, to_bx};
 use crate::expr::{Expr, sym};
-use crate::model::Doc;
+use crate::model::{Doc, Var};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// First symbol number of the subexpression names `u_1`, `u_2`, … that
@@ -46,6 +47,61 @@ pub fn target_expr(doc: &Doc, t: Target) -> Result<(String, Expr, bool), String>
     }
 }
 
+/// The document the formula of target `t` is derived from. Every numeric
+/// variable and dimension other than `t` becomes a plain value fixed at its
+/// current value, so derivation substitutes it as a number: a defined
+/// variable or a dimension given by an expression loses the expression, a
+/// solved variable is fixed, and a reference dimension is replaced, for
+/// name lookups, by a numeric variable of the same name. `doc` itself when
+/// nothing is numeric.
+pub fn numeric_doc(doc: &Doc, t: Target) -> Cow<'_, Doc> {
+    let var_on = |i: usize, v: &Var| v.numeric && t != Target::Var(i);
+    let vars: Vec<(usize, f64)> = doc
+        .vars
+        .iter()
+        .enumerate()
+        .filter_map(|(i, v)| Some((i, v.as_ref().filter(|v| var_on(i, v))?)))
+        .filter_map(|(i, v)| {
+            let val = if v.expr.trim().is_empty() { doc.params[v.param].v } else { doc.eval_now(&doc.parse_expr(&v.expr, 0).ok()?) };
+            Some((i, val))
+        })
+        .collect();
+    let dims: Vec<(usize, f64)> = doc
+        .dims
+        .iter()
+        .enumerate()
+        .filter_map(|(i, d)| Some((i, d.as_ref().filter(|d| d.numeric && t != Target::Dim(i))?)))
+        .filter_map(|(i, d)| {
+            let val = if d.driving { doc.eval_now(&doc.dim_value_expr(i, 0).ok()?) } else { doc.measure_value(i) };
+            Some((i, val))
+        })
+        .collect();
+    if vars.is_empty() && dims.is_empty() {
+        return Cow::Borrowed(doc);
+    }
+    let mut d = doc.clone();
+    for (i, val) in vars {
+        let v = d.vars[i].as_mut().unwrap();
+        v.expr.clear();
+        let p = v.param;
+        d.params[p].v = val;
+        d.params[p].locked = true;
+    }
+    for (i, val) in dims {
+        let x = d.dims[i].as_mut().unwrap();
+        if x.driving {
+            x.expr.clear();
+            let p = x.param;
+            d.params[p].v = val;
+        } else {
+            let name = std::mem::take(&mut x.name);
+            let p = d.add_param(val, true);
+            d.vars.push(Some(Var { name, expr: String::new(), param: p, numeric: true }));
+        }
+    }
+    Cow::Owned(d)
+}
+
 /// A derived formula.
 #[derive(Clone, Debug)]
 pub struct Formula {
@@ -70,8 +126,9 @@ pub struct Formula {
 /// Derives the formula of target `t`, searching `extra_ms` longer than the
 /// default budget (gxpad's "search harder" adds 10 000 ms per level).
 pub fn derive_formula(doc: &Doc, t: Target, extra_ms: u64) -> Result<Formula, String> {
-    let (name, e, is_angle) = target_expr(doc, t)?;
-    let d = derive::derive_harder(doc, &e, extra_ms)?;
+    let doc = numeric_doc(doc, t);
+    let (name, e, is_angle) = target_expr(&doc, t)?;
+    let d = derive::derive_harder(&doc, &e, extra_ms)?;
     let names = doc.param_names();
     let full = to_bx(&d.expr, &|s| sym_name(&names, s));
     Ok(Formula {

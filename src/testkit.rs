@@ -313,23 +313,36 @@ impl Kit {
     }
     /// Circle through points a, b, c: (circle, center point).
     pub fn circle_through(&mut self, a: usize, b: usize, c: usize) -> (usize, usize) {
-        ops::circle_through(&mut self.app.geo, a, b, c).expect("circle through three points")
+        // strict, unlike the tool: a redundant construction is a test error
+        let mut ctr = 0;
+        let circ = self.change("circle through three points", true, |d| {
+            let (circ, o) = d.build_circle_through(a, b, c).expect("collinear points");
+            ctr = o;
+            circ
+        });
+        (circ, ctr)
     }
     /// Arc from a through m to b: (arc, center point).
     pub fn arc_through(&mut self, a: usize, m: usize, b: usize) -> (usize, usize) {
-        ops::arc_through(&mut self.app.geo, a, m, b).expect("arc through three points")
+        let mut ctr = 0;
+        let arc = self.change("arc through three points", true, |d| {
+            let (arc, o) = d.build_arc_through(a, m, b).expect("collinear points");
+            ctr = o;
+            arc
+        });
+        (arc, ctr)
     }
     /// Ellipse with foci f1, f2 through point p.
     pub fn ellipse_by_foci(&mut self, f1: usize, f2: usize, p: usize) -> usize {
-        ops::conic_by_foci(&mut self.app.geo, ConicKind::Ellipse, f1, f2, p).expect("ellipse by foci")
+        self.change("ellipse by foci", true, |d| d.build_conic_by_foci(ConicKind::Ellipse, f1, f2, p).expect("no such ellipse"))
     }
     /// Hyperbola with foci f1, f2 through point p.
     pub fn hyperbola_by_foci(&mut self, f1: usize, f2: usize, p: usize) -> usize {
-        ops::conic_by_foci(&mut self.app.geo, ConicKind::Hyperbola, f1, f2, p).expect("hyperbola by foci")
+        self.change("hyperbola by foci", true, |d| d.build_conic_by_foci(ConicKind::Hyperbola, f1, f2, p).expect("no such hyperbola"))
     }
     /// Parabola with focus f and directrix line l.
     pub fn parabola_by_focus(&mut self, f: usize, l: usize) -> usize {
-        ops::parabola_by_focus(&mut self.app.geo, f, l).expect("parabola by focus and directrix")
+        self.change("parabola by focus and directrix", true, |d| d.build_parabola_by_focus(f, l).expect("focus on the directrix"))
     }
     /// The foci of conic `c` (two points, or one for a parabola).
     pub fn foci(&mut self, c: usize) -> Vec<usize> {
@@ -463,9 +476,10 @@ impl Kit {
     pub fn check(&mut self, d: usize) -> String {
         assert!(self.app.geo.conflicts.is_empty(), "construction has violated constraints: {:?}", self.app.geo.conflicts);
         assert!(self.app.geo.errors.is_empty(), "construction has errors: {:?}", self.app.geo.errors);
-        let (name, target, _) = target_expr(&self.app.geo.doc, Sel::Dim(d)).expect("bad target");
+        let doc = numeric_doc(&self.app.geo.doc, Sel::Dim(d));
+        let (name, target, _) = target_expr(&doc, Sel::Dim(d)).expect("bad target");
         let t0 = std::time::Instant::now();
-        let der = derive::derive(&self.app.geo.doc, &target).unwrap_or_else(|e| panic!("derivation of {name} failed: {e}"));
+        let der = derive::derive(&doc, &target).unwrap_or_else(|e| panic!("derivation of {name} failed: {e}"));
         let ms = t0.elapsed().as_secs_f64() * 1e3;
         let text = format!("{name} = {}", self.formula_text(&der.expr));
         println!("[{}] {text}   [{ms:.1} ms, dof {}]", std::thread::current().name().unwrap_or("?"), self.app.geo.dof);
@@ -526,7 +540,7 @@ impl Kit {
         let mut knobs: Vec<(usize, String)> = Vec::new();
         for x in self.app.geo.doc.dims.iter().flatten() {
             // zero-valued driving dimensions are structural, not parameters;
-            // numeric dimensions are frozen constants
+            // numeric dimensions enter formulas as constants
             if x.driving && !x.numeric && x.expr.is_empty() && self.app.geo.doc.params[x.param].v != 0.0 {
                 knobs.push((x.param, x.name.clone()));
             }

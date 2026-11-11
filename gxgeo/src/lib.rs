@@ -5,6 +5,7 @@ pub mod alg;
 pub mod build;
 pub mod dd;
 pub mod derive;
+pub mod draw;
 pub mod expr;
 pub mod ffi;
 pub mod fit;

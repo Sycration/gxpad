@@ -150,9 +150,9 @@ pub struct Dim {
     pub supp: bool,
     /// Label offset from the anchor, in world units.
     pub off: [f64; 2],
-    /// When true, the dimension's value is a frozen constant: it is
-    /// substituted as a plain number in formula derivation, so its name never
-    /// appears.
+    /// When true, formula derivation substitutes the dimension's current
+    /// value as a plain number, so neither its name nor what it is computed
+    /// from appears in formulas. Solving is unaffected.
     #[serde(default, skip_serializing_if = "is_false")]
     pub numeric: bool,
 }
@@ -163,8 +163,9 @@ pub struct Var {
     /// Empty for value variables (stored in `param`), otherwise a defining expression.
     pub expr: String,
     pub param: usize,
-    /// When true, the variable's value is a frozen constant: it is substituted
-    /// as a plain number in formula derivation, so its name never appears.
+    /// When true, formula derivation substitutes the variable's current value
+    /// as a plain number, so neither its name nor what it is computed from
+    /// appears in formulas. Solving is unaffected.
     #[serde(default, skip_serializing_if = "is_false")]
     pub numeric: bool,
 }
@@ -584,16 +585,9 @@ impl Doc {
                 s.insert(v.param);
             }
         }
-        let mut v: Vec<usize> = s.into_iter().filter(|p| !self.params[*p].locked && !self.is_numeric_param(*p)).collect();
+        let mut v: Vec<usize> = s.into_iter().filter(|p| !self.params[*p].locked).collect();
         v.sort();
         v
-    }
-
-    /// True when parameter `p` is the frozen value of a numeric variable or
-    /// dimension.
-    pub fn is_numeric_param(&self, p: usize) -> bool {
-        self.vars.iter().flatten().any(|v| v.numeric && v.param == p)
-            || self.dims.iter().flatten().any(|d| d.numeric && d.param == p)
     }
 
     // ------------------------------------------------------------ names & parsing
@@ -625,14 +619,10 @@ impl Doc {
             }
         }
         for v in self.vars.iter().flatten() {
-            if !v.numeric {
-                m.insert(v.param, v.name.clone());
-            }
+            m.insert(v.param, v.name.clone());
         }
         for d in self.dims.iter().flatten() {
-            if !d.numeric {
-                m.insert(d.param, d.name.clone());
-            }
+            m.insert(d.param, d.name.clone());
         }
         m
     }

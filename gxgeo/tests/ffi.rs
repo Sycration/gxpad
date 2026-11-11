@@ -332,10 +332,27 @@ fn read_edit_and_delete_through_c_interface() {
         assert_eq!(gx_doc_set_infinite(doc, ab, true), 1);
         assert_eq!(gx_doc_ent_infinite(doc, ab), 1);
 
-        // sample polylines of the circle
-        let mut starts = [0usize; 4];
-        let np = gx_doc_ent_samples(doc, circ, std::ptr::null_mut(), 0, starts.as_mut_ptr(), 4);
+        // polylines of the circle: sizes first, then the points
+        let win = GxWindow { x0: -10.0, y0: -10.0, x1: 10.0, y1: 10.0, px: 0.02 };
+        let mut npl = usize::MAX;
+        let np = gx_doc_ent_samples(doc, circ, win, std::ptr::null_mut(), 0, std::ptr::null_mut(), 0, &mut npl);
         assert!(np > 0);
+        assert_eq!(npl, 1);
+        let mut pts = vec![0.0; 2 * np as usize];
+        let mut starts = [usize::MAX; 1];
+        assert_eq!(gx_doc_ent_samples(doc, circ, win, pts.as_mut_ptr(), np as usize, starts.as_mut_ptr(), 1, &mut npl), np);
+        assert_eq!(starts[0], 0);
+        assert!(pts.chunks(2).all(|p| (p[0].hypot(p[1]) - 2.0).abs() < 1e-9));
+        // a buffer too small takes what fits and the total still comes back
+        let mut few = [0.0; 4];
+        assert_eq!(gx_doc_ent_samples(doc, circ, win, few.as_mut_ptr(), 2, std::ptr::null_mut(), 0, std::ptr::null_mut()), np);
+        // a point is one point, a segment its two endpoints
+        let mut one = [0.0; 2];
+        assert_eq!(gx_doc_ent_samples(doc, b, win, one.as_mut_ptr(), 1, std::ptr::null_mut(), 0, std::ptr::null_mut()), 1);
+        assert!((one[0] - 4.0).abs() < 1e-9);
+        assert_eq!(gx_doc_ent_samples(doc, ab, win, std::ptr::null_mut(), 0, std::ptr::null_mut(), 0, std::ptr::null_mut()), 2);
+        let bad = GxWindow { x0: 1.0, y0: 0.0, x1: 0.0, y1: 1.0, px: 0.1 };
+        assert_eq!(gx_doc_ent_samples(doc, circ, bad, std::ptr::null_mut(), 0, std::ptr::null_mut(), 0, std::ptr::null_mut()), -1);
 
         // deleting a dimension, then an entity (cascades the line and its
         // horizontal constraint), then the constraint is already gone

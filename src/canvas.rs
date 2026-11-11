@@ -106,14 +106,13 @@ impl App {
     fn build_shapes(&mut self, cache: &mut HashMap<usize, (u64, Vec<Vec<Pos2>>)>) {
         self.shapes.clear();
         let v = self.view;
-        let vr = self.view_radius_w();
         for i in 0..self.geo.doc.ents.len() {
             let Some(e) = self.geo.doc.ents[i].clone() else { continue };
             if e.hidden {
                 continue;
             }
             let polys: Vec<Vec<Pos2>> = match &e.kind {
-                Ent::Point { .. } | Ent::Line { .. } | Ent::Circle { .. } | Ent::Arc { .. } | Ent::Conic { .. } => geom_polys(&self.geo.doc, v, vr, i),
+                Ent::Point { .. } | Ent::Line { .. } | Ent::Circle { .. } | Ent::Arc { .. } | Ent::Conic { .. } => geom_polys(&self.geo.doc, v, i),
                 Ent::Curve { src } => {
                     let used: Vec<f64> = self.geo.doc.params.iter().map(|p| p.v).collect();
                     let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -136,110 +135,13 @@ impl App {
                             continue;
                         }
                     }
-                    let p = self.curve_polys(src);
+                    let p = geom_polys(&self.geo.doc, v, i);
                     cache.insert(i, (key, p.clone()));
                     p
                 }
             };
             self.shapes.insert(i, polys);
         }
-    }
-
-    fn curve_polys(&self, src: &str) -> Vec<Vec<Pos2>> {
-        let Ok(def) = self.geo.doc.curve_def(src) else { return vec![] };
-        let v = self.view;
-        let r = v.rect;
-        let vals: Vec<f64> = self.geo.doc.params.iter().map(|p| p.v).collect();
-        let mut st = Vec::new();
-        if let Some(f) = &def.explicit {
-            let code = Code::new(f);
-            let mut out: Vec<Vec<Pos2>> = vec![];
-            let mut cur: Vec<Pos2> = vec![];
-            let n = (r.width() / 1.5) as usize + 2;
-            let mut prev: Option<Pos2> = None;
-            for k in 0..=n {
-                let sx = r.min.x - 2.0 + (r.width() + 4.0) * k as f32 / n as f32;
-                let x = v.to_w(pos2(sx, 0.0))[0];
-                let y = code.eval(&|s: u32| if s == X_SYM { x } else { vals.get(s as usize).copied().unwrap_or(f64::NAN) }, &mut st);
-                if !y.is_finite() {
-                    if cur.len() > 1 {
-                        out.push(std::mem::take(&mut cur));
-                    }
-                    cur.clear();
-                    prev = None;
-                    continue;
-                }
-                let p = v.to_s([x, y]);
-                let p = pos2(p.x, p.y.clamp(r.min.y - 4000.0, r.max.y + 4000.0));
-                if let Some(q) = prev {
-                    if (p.y - q.y).abs() > r.height() * 1.5 && (p.y < r.min.y || p.y > r.max.y || q.y < r.min.y || q.y > r.max.y) {
-                        if cur.len() > 1 {
-                            out.push(std::mem::take(&mut cur));
-                        }
-                        cur.clear();
-                    }
-                }
-                cur.push(p);
-                prev = Some(p);
-            }
-            if cur.len() > 1 {
-                out.push(cur);
-            }
-            return out;
-        }
-        // marching squares on the implicit form
-        let code = Code::new(&def.implicit);
-        let cell = 7.0f32;
-        let nx = (r.width() / cell) as usize + 2;
-        let ny = (r.height() / cell) as usize + 2;
-        let mut g = vec![0.0f64; (nx + 1) * (ny + 1)];
-        for j in 0..=ny {
-            for i in 0..=nx {
-                let w = v.to_w(pos2(r.min.x + i as f32 * cell, r.min.y + j as f32 * cell));
-                g[j * (nx + 1) + i] = code.eval(
-                    &|s: u32| {
-                        if s == X_SYM {
-                            w[0]
-                        } else if s == Y_SYM {
-                            w[1]
-                        } else {
-                            vals.get(s as usize).copied().unwrap_or(f64::NAN)
-                        }
-                    },
-                    &mut st,
-                );
-            }
-        }
-        let mut segs = Vec::new();
-        let at = |i: usize, j: usize| pos2(r.min.x + i as f32 * cell, r.min.y + j as f32 * cell);
-        for j in 0..ny {
-            for i in 0..nx {
-                let c = [g[j * (nx + 1) + i], g[j * (nx + 1) + i + 1], g[(j + 1) * (nx + 1) + i + 1], g[(j + 1) * (nx + 1) + i]];
-                if c.iter().any(|x| !x.is_finite()) {
-                    continue;
-                }
-                let corners = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
-                let mut pts = Vec::new();
-                for k in 0..4 {
-                    let (a, b) = (c[k], c[(k + 1) % 4]);
-                    if (a < 0.0) != (b < 0.0) {
-                        let t = (a / (a - b)) as f32;
-                        // reject sign changes caused by poles
-                        if (a - b).abs() > 1e6 * (a.abs().min(b.abs()) + 1.0) && a.abs().max(b.abs()) > 1e3 {
-                            continue;
-                        }
-                        pts.push(corners[k] + (corners[(k + 1) % 4] - corners[k]) * t);
-                    }
-                }
-                if pts.len() == 2 {
-                    segs.push(vec![pts[0], pts[1]]);
-                } else if pts.len() == 4 {
-                    segs.push(vec![pts[0], pts[1]]);
-                    segs.push(vec![pts[2], pts[3]]);
-                }
-            }
-        }
-        join_segments(segs)
     }
 
     // ------------------------------------------------------------ hit testing
@@ -685,7 +587,7 @@ impl App {
         snaps.push(last);
         let mut d = self.geo.doc.clone();
         match build_shape(&mut d, self.tool, &snaps) {
-            Some(e) => geom_polys(&d, self.view, self.view_radius_w(), e),
+            Some(e) => geom_polys(&d, self.view, e),
             None => vec![],
         }
     }
@@ -1851,11 +1753,8 @@ impl App {
                 ops::set_construction_all(&mut self.geo, &ents, on).ok();
             }
             Act::Infinite => {
-                for e in self.sel_ents() {
-                    if let Ok(inf) = ops::ent_infinite(&self.geo, e) {
-                        ops::set_infinite(&mut self.geo, e, !inf).ok();
-                    }
-                }
+                let lines: Vec<usize> = self.sel_ents().into_iter().filter(|e| self.geo.doc.is_line(*e)).collect();
+                ops::toggle_infinite(&mut self.geo, &lines).ok();
             }
             Act::Delete => self.delete_selection(),
             Act::Driving(i) => self.toggle_driving(i),
@@ -2102,89 +2001,10 @@ impl App {
     }
 }
 
-/// Screen polylines of a point, line, circle, arc or conic of `doc` (curves
-/// given by functions need the tessellation cache and are not covered).
-pub fn geom_polys(doc: &Doc, v: View, vr: f64, i: usize) -> Vec<Vec<Pos2>> {
-    let Some(e) = doc.ent(i) else { return vec![] };
-    match &e.kind {
-        Ent::Point { .. } => vec![vec![v.to_s(doc.pval(i))]],
-        Ent::Line { a, b, infinite } => {
-            let (pa, pb) = (doc.pval(*a), doc.pval(*b));
-            if *infinite {
-                let d = [pb[0] - pa[0], pb[1] - pa[1]];
-                let l = d[0].hypot(d[1]).max(1e-12);
-                let u = [d[0] / l, d[1] / l];
-                let t = (v.c[0] - pa[0]) * u[0] + (v.c[1] - pa[1]) * u[1];
-                let f = [pa[0] + u[0] * t, pa[1] + u[1] * t];
-                let ext = vr * 1.5;
-                vec![vec![v.to_s([f[0] - u[0] * ext, f[1] - u[1] * ext]), v.to_s([f[0] + u[0] * ext, f[1] + u[1] * ext])]]
-            } else {
-                vec![vec![v.to_s(pa), v.to_s(pb)]]
-            }
-        }
-        Ent::Circle { .. } => {
-            let (c, r) = doc.circ_val(i);
-            let n = ((r * v.s * 0.6) as usize).clamp(48, 720);
-            vec![(0..=n).map(|k| {
-                let t = TAU * k as f64 / n as f64;
-                v.to_s([c[0] + r * t.cos(), c[1] + r * t.sin()])
-            }).collect()]
-        }
-        Ent::Arc { c, a, b } => {
-            let (cc, pa, pb) = (doc.pval(*c), doc.pval(*a), doc.pval(*b));
-            let r = (pa[0] - cc[0]).hypot(pa[1] - cc[1]);
-            let a0 = (pa[1] - cc[1]).atan2(pa[0] - cc[0]);
-            let mut a1 = (pb[1] - cc[1]).atan2(pb[0] - cc[0]);
-            while a1 <= a0 {
-                a1 += TAU;
-            }
-            let n = (((a1 - a0) * r * v.s * 0.6) as usize).clamp(16, 720);
-            vec![(0..=n).map(|k| {
-                let t = a0 + (a1 - a0) * k as f64 / n as f64;
-                v.to_s([cc[0] + r * t.cos(), cc[1] + r * t.sin()])
-            }).collect()]
-        }
-        Ent::Conic { kind, c, a, b, t } => {
-            let cc = doc.pval(*c);
-            let (a, b, t) = (doc.params[*a].v, doc.params[*b].v, doc.params[*t].v);
-            let (ct, st) = (t.cos(), t.sin());
-            let tr = |u: f64, w: f64| v.to_s([cc[0] + u * ct - w * st, cc[1] + u * st + w * ct]);
-            let far = vr + (cc[0] - v.c[0]).hypot(cc[1] - v.c[1]);
-            match kind {
-                ConicKind::Ellipse => {
-                    let n = (((a.abs() + b.abs()) * v.s) as usize).clamp(64, 720);
-                    vec![(0..=n).map(|k| {
-                        let th = TAU * k as f64 / n as f64;
-                        tr(a * th.cos(), b * th.sin())
-                    }).collect()]
-                }
-                ConicKind::Hyperbola => {
-                    let umax = (far / b.abs().max(1e-9)).asinh().clamp(0.5, 12.0) + 0.2;
-                    let n = 240;
-                    [1.0, -1.0]
-                        .iter()
-                        .map(|sg| {
-                            (0..=n).map(|k| {
-                                let s = -1.0 + 2.0 * k as f64 / n as f64;
-                                let u = umax * s * s.abs();
-                                tr(sg * a * u.cosh(), b * u.sinh())
-                            }).collect()
-                        })
-                        .collect()
-                }
-                ConicKind::Parabola => {
-                    let vmax = 2.0 * far + 4.0 * a.abs().sqrt() * far.sqrt() + 1.0;
-                    let n = 300;
-                    vec![(0..=n).map(|k| {
-                        let s = -1.0 + 2.0 * k as f64 / n as f64;
-                        let w = vmax * s * s * s.signum();
-                        tr(w * w / (4.0 * a), w)
-                    }).collect()]
-                }
-            }
-        }
-        Ent::Curve { .. } => vec![],
-    }
+/// Screen polylines of entity `i` of `doc` in view `v` (function curves are
+/// costly; `build_shapes` caches them).
+pub fn geom_polys(doc: &Doc, v: View, i: usize) -> Vec<Vec<Pos2>> {
+    gxgeo::draw::draw_polys(doc, i, &v.window()).into_iter().map(|pl| pl.into_iter().map(|p| v.to_s(p)).collect()).collect()
 }
 
 pub const TOOL_GROUPS: [&[(Tool, Icon, &str)]; 4] = [
@@ -2251,42 +2071,6 @@ pub fn build_shape(d: &mut Doc, tool: Tool, snaps: &[Snap]) -> Option<usize> {
 fn brighten(c: Color32) -> Color32 {
     let f = |x: u8| (x as f32 + (255.0 - x as f32) * 0.35) as u8;
     Color32::from_rgb(f(c.r()), f(c.g()), f(c.b()))
-}
-
-/// Joins short segments sharing endpoints into longer polylines.
-fn join_segments(segs: Vec<Vec<Pos2>>) -> Vec<Vec<Pos2>> {
-    let key = |p: Pos2| ((p.x * 8.0).round() as i64, (p.y * 8.0).round() as i64);
-    let mut ends: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
-    for (i, s) in segs.iter().enumerate() {
-        ends.entry(key(s[0])).or_default().push(i);
-        ends.entry(key(s[1])).or_default().push(i);
-    }
-    let mut used = vec![false; segs.len()];
-    let mut out = Vec::new();
-    for i in 0..segs.len() {
-        if used[i] {
-            continue;
-        }
-        used[i] = true;
-        let mut line: std::collections::VecDeque<Pos2> = segs[i].iter().copied().collect();
-        for forward in [true, false] {
-            loop {
-                let end = if forward { *line.back().unwrap() } else { *line.front().unwrap() };
-                let next = ends.get(&key(end)).and_then(|v| v.iter().copied().find(|j| !used[*j]));
-                let Some(j) = next else { break };
-                used[j] = true;
-                let s = &segs[j];
-                let other = if key(s[0]) == key(end) { s[1] } else { s[0] };
-                if forward {
-                    line.push_back(other);
-                } else {
-                    line.push_front(other);
-                }
-            }
-        }
-        out.push(line.into_iter().collect());
-    }
-    out
 }
 
 #[cfg(test)]

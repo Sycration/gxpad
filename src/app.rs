@@ -111,6 +111,11 @@ impl View {
         let m = self.rect.center();
         [self.c[0] + (p.x - m.x) as f64 / self.s, self.c[1] - (p.y - m.y) as f64 / self.s]
     }
+    /// The part of the plane the view shows.
+    pub fn window(&self) -> gxgeo::draw::Window {
+        let (hw, hh) = (self.rect.width() as f64 * 0.5 / self.s, self.rect.height() as f64 * 0.5 / self.s);
+        gxgeo::draw::Window { min: [self.c[0] - hw, self.c[1] - hh], max: [self.c[0] + hw, self.c[1] + hh], px: 1.0 / self.s }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -559,8 +564,19 @@ pub fn target_expr(doc: &Doc, t: Sel) -> Result<(String, Expr, bool), String> {
     }
 }
 
+/// The document the formula of a selected dimension or variable is derived
+/// from (see `gxgeo::formula::numeric_doc`).
+pub fn numeric_doc(doc: &Doc, t: Sel) -> std::borrow::Cow<'_, Doc> {
+    match t {
+        Sel::Dim(i) => gxgeo::formula::numeric_doc(doc, gxgeo::formula::Target::Dim(i)),
+        Sel::Var(i) => gxgeo::formula::numeric_doc(doc, gxgeo::formula::Target::Var(i)),
+        _ => std::borrow::Cow::Borrowed(doc),
+    }
+}
+
 pub fn compute_formula(doc: &Doc, target: Sel, level: u32) -> FormulaView {
     let t0 = std::time::Instant::now();
+    let doc = &*numeric_doc(doc, target);
     let names = doc.param_names();
     let nm = |s: u32| sym_name(&names, s);
     let mut fv = FormulaView {

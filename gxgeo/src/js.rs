@@ -350,9 +350,9 @@ impl JsDoc {
         ops::set_driving(&mut self.sk, i, driving).map_err(js)
     }
 
-    /// Marks dimension `i` numeric or not. A numeric dimension is frozen at
-    /// its current value and substituted as a plain number in derived
-    /// formulas, so its name never appears there.
+    /// Marks dimension `i` numeric or not. Formulas derived for other targets
+    /// use a numeric dimension's current value as a plain number. Solving and
+    /// the dimension itself are unaffected.
     #[wasm_bindgen(js_name = setDimNumeric)]
     pub fn set_dim_numeric(&mut self, i: usize, numeric: bool) -> Result<bool, JsError> {
         ops::set_dim_numeric(&mut self.sk, i, numeric).map_err(js)
@@ -395,34 +395,39 @@ impl JsDoc {
         ops::set_var_free(&mut self.sk, i, free).map_err(js)
     }
 
-    /// Marks variable `i` numeric or not. A numeric variable is frozen at its
-    /// current value and substituted as a plain number in derived formulas,
-    /// so its name never appears there.
+    /// Marks variable `i` numeric or not. Formulas derived for other targets
+    /// use a numeric variable's current value as a plain number. Solving and
+    /// the variable itself (value, expression, free or solved) are
+    /// unaffected.
     #[wasm_bindgen(js_name = setVarNumeric)]
     pub fn set_var_numeric(&mut self, i: usize, numeric: bool) -> Result<bool, JsError> {
         ops::set_var_numeric(&mut self.sk, i, numeric).map_err(js)
     }
 
-    /// Removes variable `i`, leaving an empty slot. False when rejected.
+    /// Removes variable `i`, leaving an empty slot; expressions naming it
+    /// fail to parse until edited. False when rejected.
     #[wasm_bindgen(js_name = deleteVar)]
     pub fn delete_var(&mut self, i: usize) -> Result<bool, JsError> {
         ops::delete_var(&mut self.sk, i).map_err(js)
     }
 
     /// Deletes entity `e` and what depends on it (constraints and dimensions
-    /// that reference it, and features built from it).
+    /// that reference it, and features built from it). False when the
+    /// constraints would no longer solve.
     #[wasm_bindgen(js_name = deleteEnt)]
     pub fn delete_ent(&mut self, e: usize) -> Result<bool, JsError> {
         ops::delete_ent(&mut self.sk, e).map_err(js)
     }
 
-    /// Deletes constraint `c`.
+    /// Deletes constraint `c`. False when the constraints would no longer
+    /// solve.
     #[wasm_bindgen(js_name = deleteCon)]
     pub fn delete_con(&mut self, c: usize) -> Result<bool, JsError> {
         ops::delete_con(&mut self.sk, c).map_err(js)
     }
 
-    /// Deletes dimension `i` together with its parameter.
+    /// Deletes dimension `i`; expressions naming it fail to parse until
+    /// edited. False when the constraints would no longer solve.
     #[wasm_bindgen(js_name = deleteDim)]
     pub fn delete_dim(&mut self, i: usize) -> Result<bool, JsError> {
         ops::delete_dim(&mut self.sk, i).map_err(js)
@@ -516,7 +521,7 @@ impl JsDoc {
         ops::dim_driving(&self.sk, i).map_err(js)
     }
 
-    /// True when dimension `i` is numeric (frozen, substituted as a number).
+    /// True when dimension `i` is numeric (substituted as a number in formulas).
     #[wasm_bindgen(js_name = dimNumeric)]
     pub fn dim_numeric(&self, i: usize) -> Result<bool, JsError> {
         ops::dim_numeric(&self.sk, i).map_err(js)
@@ -553,7 +558,7 @@ impl JsDoc {
         ops::var_free(&self.sk, i).map_err(js)
     }
 
-    /// True when variable `i` is numeric (frozen, substituted as a number).
+    /// True when variable `i` is numeric (substituted as a number in formulas).
     #[wasm_bindgen(js_name = varNumeric)]
     pub fn var_numeric(&self, i: usize) -> Result<bool, JsError> {
         ops::var_numeric(&self.sk, i).map_err(js)
@@ -672,11 +677,16 @@ impl JsDoc {
         ops::dim_kind(&self.sk, i).ok().map(|k| k.name().to_string())
     }
 
-    /// World-coordinate polylines sampling entity `e`, as an array of
-    /// polylines, each an array of [x, y] pairs.
+    /// World-coordinate polylines drawing entity `e` inside the window from
+    /// (x0, y0) to (x1, y1) with pixels of size `px`, as an array of
+    /// polylines, each an array of [x, y] pairs: one point for a point, the
+    /// endpoints of a segment, a segment crossing the window for an infinite
+    /// line, the outline of a circle, arc or conic (two polylines for a
+    /// hyperbola), and the parts of a function curve inside the window.
     #[wasm_bindgen(js_name = entSamples)]
-    pub fn ent_samples(&self, e: usize) -> Result<js_sys::Array, JsError> {
-        let polys = ops::ent_samples(&self.sk, e).map_err(js)?;
+    #[allow(clippy::too_many_arguments)]
+    pub fn ent_samples(&self, e: usize, x0: f64, y0: f64, x1: f64, y1: f64, px: f64) -> Result<js_sys::Array, JsError> {
+        let polys = ops::ent_samples(&self.sk, e, [x0, y0], [x1, y1], px).map_err(js)?;
         let outer = js_sys::Array::new();
         for pl in polys {
             let line = js_sys::Array::new();

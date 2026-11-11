@@ -3,9 +3,10 @@
 //! gives an error instead of a panic.
 
 use crate::build::Pt;
+use crate::draw::{Window, draw_polys};
 use crate::model::*;
 use crate::expr::parse::plain_number;
-use crate::sketch::{crossing_near, sample_polys, tangent_contact_near, valid_ident, Sketch};
+use crate::sketch::{crossing_near, tangent_contact_near, valid_ident, Sketch};
 
 pub use crate::build::ConicFeature;
 
@@ -441,25 +442,18 @@ pub fn dim_driving(sk: &Sketch, i: usize) -> Result<bool, String> {
     Ok(dim(sk, i)?.driving)
 }
 
-/// Marks dimension `i` numeric or not. A numeric dimension is frozen at its
-/// current measured value and substituted as a plain number in derived
-/// formulas, so its name never appears there.
+/// Marks dimension `i` numeric or not. Formulas derived for other targets
+/// use a numeric dimension's current value as a plain number, so neither its
+/// name nor what it is computed from appears in them. The dimension itself
+/// is unchanged, so turning the flag off restores the formulas.
 pub fn set_dim_numeric(sk: &mut Sketch, i: usize, on: bool) -> Result<bool, String> {
     if dim(sk, i)?.numeric == on {
         return Ok(true);
     }
-    let value = sk.doc.measure_value(i);
-    Ok(sk.try_change(false, |d| {
-        let x = d.dims[i].as_mut().unwrap();
-        x.numeric = on;
-        if on {
-            d.params[x.param].v = value;
-            d.params[x.param].locked = true;
-        }
-    }))
+    Ok(sk.try_change(false, |d| d.dims[i].as_mut().unwrap().numeric = on))
 }
 
-/// True when dimension `i` is numeric (frozen, substituted as a number).
+/// True when dimension `i` is numeric (substituted as a number in formulas).
 pub fn dim_numeric(sk: &Sketch, i: usize) -> Result<bool, String> {
     Ok(dim(sk, i)?.numeric)
 }
@@ -592,10 +586,12 @@ pub fn set_var_free(sk: &mut Sketch, i: usize, free: bool) -> Result<bool, Strin
     Ok(sk.try_change(false, |d| d.params[p].locked = free))
 }
 
-/// Removes variable `i`, leaving an empty slot.
+/// Removes variable `i`, leaving an empty slot. Expressions naming it are
+/// left as they are and fail to parse until edited. Ok(false) when the
+/// constraints would no longer solve; the document is then unchanged.
 pub fn delete_var(sk: &mut Sketch, i: usize) -> Result<bool, String> {
     var(sk, i)?;
-    Ok(sk.try_change(false, |d| d.vars[i] = None))
+    Ok(sk.delete(&[], &[], &[], &[i]))
 }
 
 pub fn var_value(sk: &Sketch, i: usize) -> Result<f64, String> {
@@ -613,32 +609,19 @@ pub fn var_free(sk: &Sketch, i: usize) -> Result<bool, String> {
     Ok(v.expr.is_empty() && sk.doc.params[v.param].locked)
 }
 
-/// Marks variable `i` numeric or not. A numeric variable is frozen at its
-/// current value (a defined variable is evaluated and turned into a plain
-/// value) and substituted as a plain number in derived formulas, so its name
-/// never appears there.
+/// Marks variable `i` numeric or not. Formulas derived for other targets
+/// use a numeric variable's current value as a plain number, so neither its
+/// name nor its defining expression appears in them. The variable itself is
+/// unchanged (a free variable stays free, a solved one solved, a defined one
+/// keeps its expression), so turning the flag off restores the formulas.
 pub fn set_var_numeric(sk: &mut Sketch, i: usize, on: bool) -> Result<bool, String> {
-    let v = var(sk, i)?.clone();
-    if v.numeric == on {
+    if var(sk, i)?.numeric == on {
         return Ok(true);
     }
-    let value = if v.expr.is_empty() {
-        sk.doc.params[v.param].v
-    } else {
-        sk.doc.eval_now(&sk.doc.parse_expr(&v.expr, 0)?)
-    };
-    Ok(sk.try_change(false, |d| {
-        let x = d.vars[i].as_mut().unwrap();
-        x.numeric = on;
-        if on {
-            x.expr.clear();
-            d.params[x.param].v = value;
-            d.params[x.param].locked = true;
-        }
-    }))
+    Ok(sk.try_change(false, |d| d.vars[i].as_mut().unwrap().numeric = on))
 }
 
-/// True when variable `i` is numeric (frozen, substituted as a number).
+/// True when variable `i` is numeric (substituted as a number in formulas).
 pub fn var_numeric(sk: &Sketch, i: usize) -> Result<bool, String> {
     Ok(var(sk, i)?.numeric)
 }
@@ -815,6 +798,7 @@ pub fn arc_through(sk: &mut Sketch, a: impl Into<Pt>, m: impl Into<Pt>, b: impl 
 /// when it is an existing point or a point on a curve.
 pub fn circle_to(sk: &mut Sketch, c: impl Into<Pt>, through: impl Into<Pt>) -> Result<usize, String> {
     let (c, t) = (pt(&sk.doc, c.into())?, pt(&sk.doc, through.into())?);
+    distinct(&[c, t])?;
     make(sk, false, "circle", |d| {
         let pos = d.pt_pos(t);
         let c = d.realize(c);
@@ -926,8 +910,8 @@ pub fn conic_feature_kind(i: u32) -> Result<ConicFeature, String> {
 // ------------------------------------------------------------ deleting
 
 /// Deletes entity `e` and what depends on it (constraints and dimensions that
-/// reference it, owned points, and features built from it). Returns Ok(false)
-/// when the change cannot be kept, but deleting is not otherwise rejected.
+/// reference it, owned points, and features built from it). Ok(false) when
+/// the constraints would no longer solve; the document is then unchanged.
 pub fn delete_ent(sk: &mut Sketch, e: usize) -> Result<bool, String> {
     if sk.doc.ent(e).is_none() {
         return Err(format!("no entity {e}"));
@@ -935,7 +919,8 @@ pub fn delete_ent(sk: &mut Sketch, e: usize) -> Result<bool, String> {
     Ok(sk.delete(&[e], &[], &[], &[]))
 }
 
-/// Deletes constraint `c`. Returns Ok(false) when nothing changed.
+/// Deletes constraint `c`. Ok(false) when the constraints would no longer
+/// solve; the document is then unchanged.
 pub fn delete_con(sk: &mut Sketch, c: usize) -> Result<bool, String> {
     if sk.doc.cons.get(c).is_none_or(|x| x.is_none()) {
         return Err(format!("no constraint {c}"));
@@ -943,8 +928,9 @@ pub fn delete_con(sk: &mut Sketch, c: usize) -> Result<bool, String> {
     Ok(sk.delete(&[], &[c], &[], &[]))
 }
 
-/// Deletes dimension `i` together with its parameter and anything depending
-/// on it. Returns Ok(false) when nothing changed.
+/// Deletes dimension `i`. Expressions naming it are left as they are and
+/// fail to parse until edited. Ok(false) when the constraints would no
+/// longer solve; the document is then unchanged.
 pub fn delete_dim(sk: &mut Sketch, i: usize) -> Result<bool, String> {
     dim(sk, i)?;
     Ok(sk.delete(&[], &[], &[i], &[]))
@@ -1034,6 +1020,23 @@ pub fn set_infinite(sk: &mut Sketch, e: usize, on: bool) -> Result<bool, String>
     }))
 }
 
+/// Switches each of the given lines between infinite and segment, as one
+/// undoable change.
+pub fn toggle_infinite(sk: &mut Sketch, lines: &[usize]) -> Result<bool, String> {
+    for &e in lines {
+        if !sk.doc.is_line(e) {
+            return Err(format!("entity {e} is not a line"));
+        }
+    }
+    Ok(sk.try_change(false, |d| {
+        for &e in lines {
+            if let Some(Entity { kind: Ent::Line { infinite, .. }, .. }) = d.ents[e].as_mut() {
+                *infinite = !*infinite;
+            }
+        }
+    }))
+}
+
 /// True when line `e` is infinite.
 pub fn ent_infinite(sk: &Sketch, e: usize) -> Result<bool, String> {
     match sk.doc.kind(e) {
@@ -1083,8 +1086,8 @@ pub fn drag_conic_handle(sk: &mut Sketch, e: usize, which: u8, x: f64, y: f64) -
         Some(Ent::Conic { c, a, b, t, .. }) => (*c, *a, *b, *t),
         _ => return Err(format!("entity {e} is not a conic")),
     };
-    if which > 1 {
-        return Err(format!("unknown conic handle {which}"));
+    if which > 1 || (which == 1 && matches!(sk.doc.kind(e), Some(Ent::Conic { kind: ConicKind::Parabola, .. }))) {
+        return Err(format!("conic {e} has no handle {which}"));
     }
     let cc = sk.doc.pval(c);
     let (dx, dy) = (x - cc[0], y - cc[1]);
@@ -1297,10 +1300,13 @@ pub fn dim_kind(sk: &Sketch, i: usize) -> Result<DimType, String> {
     })
 }
 
-/// World-coordinate polylines sampling entity `e`: a single point for a
-/// point, one polyline for a segment, circle, arc, ellipse or parabola, two
-/// for a hyperbola, and the sampled graph for a function curve.
-pub fn ent_samples(sk: &Sketch, e: usize) -> Result<Vec<Vec<[f64; 2]>>, String> {
+/// World-coordinate polylines drawing entity `e` in the window from `min`
+/// to `max` with pixels of size `px` (see [`draw_polys`]): one point for a
+/// point, the endpoints of a segment, a segment crossing the window for an
+/// infinite line, the outline of a circle, arc or conic (two polylines for a
+/// hyperbola), and the parts of a function curve inside the window.
+pub fn ent_samples(sk: &Sketch, e: usize, min: [f64; 2], max: [f64; 2], px: f64) -> Result<Vec<Vec<[f64; 2]>>, String> {
     ent_of(&sk.doc, e)?;
-    Ok(sample_polys(&sk.doc, e))
+    let w = Window::new(min, max, px)?;
+    Ok(draw_polys(&sk.doc, e, &w))
 }

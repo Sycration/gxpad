@@ -2737,8 +2737,8 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
             consts.insert(d.param as u32, zero());
         }
     }
-    // numeric variables and dimensions are frozen: their value enters the
-    // formula as a plain number, so their name never appears
+    // numeric variables and dimensions enter the formula as their current
+    // value (formula::numeric_doc turns the computed ones into plain values)
     for v in doc.vars.iter().flatten().filter(|v| v.numeric) {
         consts.insert(v.param as u32, nice_const(env.get(v.param as u32)));
     }

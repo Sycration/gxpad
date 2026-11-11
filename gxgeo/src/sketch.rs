@@ -428,8 +428,12 @@ impl Sketch {
         })
     }
 
-    /// Deletes entities, constraints, dimensions and variables (and what
-    /// depends on them). Returns false when nothing was given.
+    /// Deletes entities, constraints, dimensions and variables, with the
+    /// geometry, constraints and dimensions that depend on the entities (see
+    /// [`Doc::delete`]). Expressions naming a deleted dimension or variable
+    /// are left as they are and fail to parse until edited. Returns false
+    /// when nothing was given or the constraints would no longer solve; the
+    /// document is then unchanged.
     pub fn delete(&mut self, ents: &[usize], cons: &[usize], dims: &[usize], vars: &[usize]) -> bool {
         if ents.is_empty() && cons.is_empty() && dims.is_empty() && vars.is_empty() {
             return false;
@@ -439,8 +443,7 @@ impl Sketch {
             for v in vars {
                 d.vars[*v] = None;
             }
-        });
-        true
+        })
     }
 }
 

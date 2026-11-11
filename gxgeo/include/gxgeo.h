@@ -7,6 +7,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// Largest window side, in pixels, that [`Window::new`] accepts.
+#define MAX_PIXELS 20000.0
+
 // Kind of an entity.
 typedef struct EntKind EntKind;
 
@@ -22,6 +25,17 @@ typedef uint32_t GxCon;
 // Dimension kind passed to `gx_doc_add_dim`, with its arguments a and b
 // (b unused for kinds with one argument).
 typedef uint32_t GxDim;
+
+// A rectangle of the plane, from (x0, y0) to (x1, y1) with x0 < x1 and
+// y0 < y1, and the size of one pixel in it in world units. At most 20 000
+// pixels wide and tall.
+typedef struct GxWindow {
+  double x0;
+  double y0;
+  double x1;
+  double y1;
+  double px;
+} GxWindow;
 
 // A derived formula. Released with `gx_formula_free`.
 typedef struct GxFormula {
@@ -525,9 +539,10 @@ int gx_doc_set_dim(struct GxDoc *doc, size_t i, const char *text);
 // `doc` is NULL or a document from this library.
 int gx_doc_set_dim_driving(struct GxDoc *doc, size_t i, bool driving);
 
-// Marks dimension `i` numeric or not. A numeric dimension is frozen at its
-// current value and substituted as a plain number in derived formulas, so
-// its name never appears there. Returns 1, 0 when rejected, -1 on error.
+// Marks dimension `i` numeric or not. Formulas derived for other targets
+// use a numeric dimension's current value as a plain number. Solving and
+// the dimension itself are unaffected. Returns 1, 0 when rejected, -1 on
+// error.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
@@ -572,36 +587,40 @@ int gx_doc_set_var_expr(struct GxDoc *doc, size_t i, const char *text);
 // `doc` is NULL or a document from this library.
 int gx_doc_set_var_free(struct GxDoc *doc, size_t i, bool free);
 
-// Marks variable `i` numeric or not. A numeric variable is frozen at its
-// current value and substituted as a plain number in derived formulas, so
-// its name never appears there. Returns 1, 0 when rejected, -1 on error.
+// Marks variable `i` numeric or not. Formulas derived for other targets
+// use a numeric variable's current value as a plain number. Solving and
+// the variable itself (value, expression, free or solved) are unaffected.
+// Returns 1, 0 when rejected, -1 on error.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
 int gx_doc_set_var_numeric(struct GxDoc *doc, size_t i, bool numeric);
 
-// Removes variable `i`, leaving an empty slot. Returns 1, 0 when rejected,
-// -1 on error.
+// Removes variable `i`, leaving an empty slot; expressions naming it fail
+// to parse until edited. Returns 1, 0 when rejected, -1 on error.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
 int gx_doc_delete_var(struct GxDoc *doc, size_t i);
 
-// Deletes entity `e` and what depends on it. Returns 1, 0 when nothing
-// changed, -1 on error.
+// Deletes entity `e` and what depends on it. Returns 1, 0 when the
+// constraints would no longer solve (the document is then unchanged), -1
+// on error.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
 int gx_doc_delete_ent(struct GxDoc *doc, size_t e);
 
-// Deletes constraint `c`. Returns 1, 0 when nothing changed, -1 on error.
+// Deletes constraint `c`. Returns 1, 0 when the constraints would no
+// longer solve (the document is then unchanged), -1 on error.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
 int gx_doc_delete_con(struct GxDoc *doc, size_t c);
 
-// Deletes dimension `i` together with its parameter. Returns 1, 0 when
-// nothing changed, -1 on error.
+// Deletes dimension `i`; expressions naming it fail to parse until edited.
+// Returns 1, 0 when the constraints would no longer solve (the document is
+// then unchanged), -1 on error.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
@@ -786,19 +805,31 @@ ptrdiff_t gx_doc_con_ents(const struct GxDoc *doc, size_t c, size_t *out, size_t
 // `doc` is NULL or a document from this library.
 int gx_doc_dim_kind(const struct GxDoc *doc, size_t i);
 
-// World-coordinate polylines sampling entity `e`, stored in `out` as flat
-// pairs (x0, y0, x1, y1, ...) broken by `starts`, one index per polyline
-// start, up to `cap` points and `cap_starts` polylines. Returns the total
-// number of points, or -1 on error.
+// World-coordinate polylines drawing entity `e` inside `window`: one
+// point for a point, the endpoints of a segment, a segment crossing the
+// window for an infinite line, the outline of a circle, arc or conic (two
+// polylines for a hyperbola), and the parts of a function curve inside the
+// window, sampled at the window's pixel size.
+//
+// The points go to `out` as flat pairs (x0, y0, x1, y1, ...), up to `cap`
+// points; the index of the first point of each polyline goes to `starts`,
+// up to `cap_starts` polylines; the number of polylines goes to `n_polys`.
+// Any of the three may be NULL. Returns the total number of points, which
+// is more than `cap` when `out` was too small, or -1 on error. Calling
+// first with NULL buffers gives the sizes to allocate.
 //
 // # Safety
-// `doc` is NULL or a document from this library; `out` and `starts` are NULL or writable.
+// `doc` is NULL or a document from this library; `out` is NULL or writable
+// for `2 * cap` values; `starts` is NULL or writable for `cap_starts`
+// entries; `n_polys` is NULL or writable.
 ptrdiff_t gx_doc_ent_samples(const struct GxDoc *doc,
                              size_t e,
+                             struct GxWindow window,
                              double *out,
                              size_t cap,
                              size_t *starts,
-                             size_t cap_starts);
+                             size_t cap_starts,
+                             size_t *n_polys);
 
 // Number of dimension slots. Removed dimensions leave empty slots.
 //
@@ -825,7 +856,7 @@ double gx_doc_dim_value(const struct GxDoc *doc, size_t i);
 // `doc` is NULL or a document from this library.
 int gx_doc_dim_driving(const struct GxDoc *doc, size_t i);
 
-// 1 when dimension `i` is numeric (frozen, substituted as a number), 0 when
+// 1 when dimension `i` is numeric (substituted as a number in formulas), 0 when
 // it is symbolic, -1 on error.
 //
 // # Safety
@@ -864,7 +895,7 @@ char *gx_doc_var_expr(const struct GxDoc *doc, size_t i);
 // `doc` is NULL or a document from this library.
 int gx_doc_var_free(const struct GxDoc *doc, size_t i);
 
-// 1 when variable `i` is numeric (frozen, substituted as a number), 0 when
+// 1 when variable `i` is numeric (substituted as a number in formulas), 0 when
 // it is symbolic, -1 on error.
 //
 // # Safety
