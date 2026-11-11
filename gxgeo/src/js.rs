@@ -334,7 +334,7 @@ impl JsDoc {
         ops::add_dim(&mut self.sk, DimType::from_name(kind).map_err(js)?, a, b.unwrap_or(usize::MAX), off).map_err(js)
     }
 
-    /// Sets dimension `i` from text as typed in gxpad: a number (degrees
+    /// Sets dimension `i` from text as typed: a number (degrees
     /// for angles) or an expression of variables and dimensions drives it;
     /// empty text makes it a reference dimension. False when the value
     /// cannot be reached.
@@ -380,7 +380,7 @@ impl JsDoc {
         ops::set_var(&mut self.sk, i, value).map_err(js)
     }
 
-    /// Sets variable `i` from text as typed in gxpad: a plain number makes it
+    /// Sets variable `i` from text as typed: a plain number makes it
     /// a free value variable, any other text an expression of variables and
     /// dimensions. False when rejected.
     #[wasm_bindgen(js_name = setVarExpr)]

@@ -421,7 +421,7 @@ fn dim(sk: &Sketch, i: usize) -> Result<&Dim, String> {
     sk.doc.dims.get(i).and_then(|d| d.as_ref()).ok_or_else(|| format!("no dimension {i}"))
 }
 
-/// Sets dimension `i` from text as typed in gxpad: a number (degrees for
+/// Sets dimension `i` from text as typed: a number (degrees for
 /// angles) or an expression drives it, empty text makes it a reference
 /// dimension. Ok(false) when the value cannot be reached.
 pub fn set_dim(sk: &mut Sketch, i: usize, text: &str) -> Result<bool, String> {
@@ -562,7 +562,7 @@ pub fn set_var(sk: &mut Sketch, i: usize, value: f64) -> Result<bool, String> {
     Ok(sk.set_values(&[(p, value)], true))
 }
 
-/// Sets variable `i` from text as typed in gxpad: a plain number makes it a
+/// Sets variable `i` from text as typed: a plain number makes it a
 /// free value variable, any other text an expression. Ok(false) when the
 /// change is rejected.
 pub fn set_var_expr(sk: &mut Sketch, i: usize, text: &str) -> Result<bool, String> {

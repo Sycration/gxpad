@@ -698,7 +698,7 @@ pub unsafe extern "C" fn gx_doc_add_dim(doc: *mut GxDoc, kind: GxDim, a: usize, 
     index(|| ops::add_dim(unsafe { sk_mut(doc) }?, DimType::from_index(kind)?, a, b, [off_x, off_y]))
 }
 
-/// Sets dimension `i` from text as typed in gxpad: a number (degrees for
+/// Sets dimension `i` from text as typed: a number (degrees for
 /// angles) or an expression of variables and dimensions drives it; empty
 /// text makes it a reference dimension. Returns 1, 0 when the value cannot
 /// be reached, -1 on error.
@@ -763,7 +763,7 @@ pub unsafe extern "C" fn gx_doc_set_var(doc: *mut GxDoc, i: usize, value: f64) -
     status("variable value", || ops::set_var(unsafe { sk_mut(doc) }?, i, value))
 }
 
-/// Sets variable `i` from text as typed in gxpad: a plain number makes it a
+/// Sets variable `i` from text as typed: a plain number makes it a
 /// free value variable, any other text an expression of variables and
 /// dimensions. Returns 1, 0 when rejected, -1 on error.
 ///

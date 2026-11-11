@@ -523,7 +523,7 @@ ptrdiff_t gx_doc_add_dim(struct GxDoc *doc,
                          double off_x,
                          double off_y);
 
-// Sets dimension `i` from text as typed in gxpad: a number (degrees for
+// Sets dimension `i` from text as typed: a number (degrees for
 // angles) or an expression of variables and dimensions drives it; empty
 // text makes it a reference dimension. Returns 1, 0 when the value cannot
 // be reached, -1 on error.
@@ -572,7 +572,7 @@ ptrdiff_t gx_doc_add_defvar(struct GxDoc *doc,
 // `doc` is NULL or a document from this library.
 int gx_doc_set_var(struct GxDoc *doc, size_t i, double value);
 
-// Sets variable `i` from text as typed in gxpad: a plain number makes it a
+// Sets variable `i` from text as typed: a plain number makes it a
 // free value variable, any other text an expression of variables and
 // dimensions. Returns 1, 0 when rejected, -1 on error.
 //
