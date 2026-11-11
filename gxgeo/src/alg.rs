@@ -1959,13 +1959,13 @@ mod tests {
         assert_eq!(degs, vec![1, 2, 3]);
     }
 
-    /// Reads a polynomial dumped by the derivation (GXPAD_DUMP) from the file
-    /// named by GXPAD_FACTOR_FILE and factors it in each variable (or in
-    /// GXPAD_MAIN only), for profiling.
+    /// Reads a polynomial dumped by the derivation (GXGEO_DUMP) from the file
+    /// named by GXGEO_FACTOR_FILE and factors it in each variable (or in
+    /// GXGEO_MAIN only), for profiling.
     #[test]
     #[ignore]
     fn factor_dump() {
-        let Ok(path) = std::env::var("GXPAD_FACTOR_FILE") else { return };
+        let Ok(path) = std::env::var("GXGEO_FACTOR_FILE") else { return };
         let text = std::fs::read_to_string(path).unwrap();
         let mut lines = text.lines();
         let head: Vec<usize> = lines.next().unwrap().split(' ').map(|t| t.parse().unwrap()).collect();
@@ -1986,7 +1986,7 @@ mod tests {
         let all: Vec<usize> = (0..n).filter(|&v| p.uses(v)).collect();
         let degs: Vec<u32> = all.iter().map(|&v| p.deg(v)).collect();
         println!("{} terms, vars {all:?} degrees {degs:?}, solved variable v{xv}", p.terms());
-        let mains: Vec<usize> = match std::env::var("GXPAD_MAIN").as_deref() {
+        let mains: Vec<usize> = match std::env::var("GXGEO_MAIN").as_deref() {
             Ok("cheapest") => vec![cheapest_main(&p, &all).unwrap()],
             Ok(v) => vec![v.parse().unwrap()],
             Err(_) => all.clone(),

@@ -917,7 +917,7 @@ impl<'a> BlockSolver<'a> {
         if !(d < 1e-6) {
             return None;
         }
-        if std::env::var("GXPAD_DEBUG").is_ok() {
+        if std::env::var("GXGEO_DEBUG").is_ok() {
             eprintln!("  point on a ray at a distance");
         }
         Some(vec![(vars[0], x), (vars[1], y)])
@@ -1035,7 +1035,7 @@ impl<'a> BlockSolver<'a> {
         if angles.is_empty() {
             return self.solve_block_poly(&eqs, vars);
         }
-        if std::env::var("GXPAD_DEBUG").is_ok() {
+        if std::env::var("GXGEO_DEBUG").is_ok() {
             eprintln!("  angles as cos/sin unknowns: {:?}", angles.iter().map(|a| a.0).collect::<Vec<_>>());
         }
         let env2 = Env { vals };
@@ -1070,7 +1070,7 @@ impl<'a> BlockSolver<'a> {
     /// The last variable comes from its lowest-degree vanishing factor and
     /// the others by back-substitution.
     fn solve_block_poly(&mut self, eqs: &[Expr], vars: &[u32]) -> Option<Vec<(u32, Expr)>> {
-        let dbg = std::env::var("GXPAD_DEBUG").is_ok();
+        let dbg = std::env::var("GXGEO_DEBUG").is_ok();
         macro_rules! fail {
             ($($t:tt)*) => {{
                 if dbg {
@@ -1144,7 +1144,7 @@ impl<'a> BlockSolver<'a> {
 
     /// The elimination part of `solve_block_poly`, on polynomials in `ctx`.
     fn solve_polys(&mut self, ctx: &PolyCtx, mut polys: Vec<MPoly>, vars: &[u32], trig_atoms: bool) -> Option<Vec<(u32, Expr)>> {
-        let dbg = std::env::var("GXPAD_DEBUG").is_ok();
+        let dbg = std::env::var("GXGEO_DEBUG").is_ok();
         macro_rules! fail {
             ($($t:tt)*) => {{
                 if dbg {
@@ -1318,7 +1318,7 @@ impl<'a> BlockSolver<'a> {
                 eprintln!("  remaining poly: {} terms, deg in v{x} {}", p.terms(), p.deg(x));
             }
         }
-        if let Ok(path) = std::env::var("GXPAD_DUMP") {
+        if let Ok(path) = std::env::var("GXGEO_DUMP") {
             if let Some(p) = polys.iter().find(|p| p.uses(x)) {
                 let mut s = format!("{} {}\n", p.n, x);
                 for (m, c) in &p.t {
@@ -1536,7 +1536,7 @@ impl<'a> BlockSolver<'a> {
                     let mut new = std::collections::BTreeSet::new();
                     radicands(&sol, &mut new);
                     if 2 * complexity(&sol) <= cur && new.is_subset(&known) && self.close(&sol, ys) < 1e-6 {
-                        if std::env::var("GXPAD_DEBUG").is_ok() {
+                        if std::env::var("GXGEO_DEBUG").is_ok() {
                             let f = |e: &Expr| crate::expr::bx::plain(&crate::expr::bx::to_bx(e, &|s| format!("s{s}")));
                             eprintln!("  re-solved s{ys}: {} -> {}", f(&solved[&ys]), f(&sol));
                         }
@@ -1584,7 +1584,7 @@ impl<'a> BlockSolver<'a> {
         if eqs.is_empty() {
             return None;
         }
-        let dbg = std::env::var("GXPAD_DEBUG").is_ok();
+        let dbg = std::env::var("GXGEO_DEBUG").is_ok();
         let mut moves: Vec<(usize, u32, Expr)> = Vec::new();
         moves.extend(self.find_linear(&eqs, &vars).into_iter().take(3));
         if eqs.len() >= 2 && combos < 4 {
@@ -2431,7 +2431,7 @@ fn fix_free(
         }
         // reject values where the system becomes nearly singular (double roots)
         let mp = min_pivot(rows, unknowns, &e2, env) / base_pivot.max(1e-300);
-        if std::env::var("GXPAD_DEBUG").is_ok() {
+        if std::env::var("GXGEO_DEBUG").is_ok() {
             eprintln!("  fix_free s{f} = {c}: relative min pivot {mp:.3e}");
         }
         if mp < 1e-2 {
@@ -2534,7 +2534,7 @@ fn creates_coincidence(before: &[f64], after: &[f64], pts: &[(usize, usize)]) ->
             let d0 = (a0[0] - b0[0]).hypot(a0[1] - b0[1]);
             let d1 = (a1[0] - b1[0]).hypot(a1[1] - b1[1]);
             if d0 > tol && d1 <= tol {
-                if std::env::var("GXPAD_DEBUG").is_ok() {
+                if std::env::var("GXGEO_DEBUG").is_ok() {
                     eprintln!("  coincidence {:?} {:?}: {a0:?}/{b0:?} -> {a1:?}/{b1:?}", pts[i], pts[j]);
                 }
                 return true;
@@ -2629,7 +2629,7 @@ fn derive_impl(doc: &Doc, target: &Expr, strategy: u8, budget_ms: u64) -> Result
     let r = derive_inner(doc, target, strategy, deadline);
     set_deadline(None);
     set_hard_deadline(None);
-    if std::env::var("GXPAD_DEBUG").is_ok() {
+    if std::env::var("GXGEO_DEBUG").is_ok() {
         eprintln!("work: {} ticks in {:?}", work_ticks() - ticks0, real0.elapsed());
     }
     r
@@ -2876,7 +2876,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
                 let q = p1.unwrap();
                 rot = -(env.get(q.1 as u32) - o[1]).atan2(env.get(q.0 as u32) - o[0]);
             }
-            if std::env::var("GXPAD_DEBUG").is_ok() {
+            if std::env::var("GXGEO_DEBUG").is_ok() {
                 eprintln!("ground p0={p0:?} p1={p1:?} rot={rot_ok}");
             }
             transform(&mut env.vals, &pts, &angs, o, rot, &comp_u);
@@ -2980,7 +2980,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
     for &f in &free {
         if let Some((nv, vals)) = fix_free(&rows_e, &unk, f, &target_c, &env, actual, piv_cols.len(), &check_pts, &line_pts) {
             env.vals = vals;
-            if std::env::var("GXPAD_DEBUG").is_ok() {
+            if std::env::var("GXGEO_DEBUG").is_ok() {
                 eprintln!("fix free s{f} = {}", nv.to_f64());
             }
             fixed.insert(f, num(Num::R(nv)));
@@ -3025,7 +3025,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
         }
     }
 
-    if std::env::var("GXPAD_DEBUG").is_ok() {
+    if std::env::var("GXGEO_DEBUG").is_ok() {
         let names = doc.param_names();
         let mut ks: Vec<_> = names.iter().collect();
         ks.sort();
@@ -3057,7 +3057,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
             }
             let vars: Vec<u32> = b.iter().map(|&n| unk[em[matched[n]].unwrap()]).collect();
             let beqs: Vec<Expr> = b.iter().map(|&n| subst_map(&eqs[ce[matched[n]]], &sol)).collect();
-            let dbg = std::env::var("GXPAD_DEBUG").is_ok();
+            let dbg = std::env::var("GXGEO_DEBUG").is_ok();
             if dbg {
                 eprintln!("block vars={:?}", vars);
                 for e in &beqs {
@@ -3103,7 +3103,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
         let lengths: HashSet<u32> = doc.dims.iter().flatten().filter(|d| !d.kind.is_angle()).map(|d| d.param as u32).collect();
         let t = solver.new_tmp();
         let max_cols = if EXTRA_MS.with(|c| c.get()) > 0 { 400 } else { 170 };
-        if std::env::var("GXPAD_DEBUG").is_ok() {
+        if std::env::var("GXGEO_DEBUG").is_ok() {
             for e in &rows {
                 eprintln!("fit row: {}", crate::expr::bx::plain(&crate::expr::bx::to_bx(e, &|s| format!("s{s}"))));
             }
@@ -3145,12 +3145,12 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
                 crate::fit::agrees(&f, &fit.checks, &env.vals),
                 agrees_when_perturbed(&f, &env, &rows, &unk, &target_c, &named) != Some(false),
             ];
-            if std::env::var("GXPAD_DEBUG").is_ok() {
+            if std::env::var("GXGEO_DEBUG").is_ok() {
                 eprintln!("fit: formula {} (exact, value, samples, perturbed: {checks:?})", crate::expr::bx::plain(&crate::expr::bx::to_bx(&f, &|s| format!("s{s}"))));
             }
             checks.iter().all(|c| *c).then_some(f)
         });
-        if std::env::var("GXPAD_DEBUG").is_ok() {
+        if std::env::var("GXGEO_DEBUG").is_ok() {
             eprintln!("fit took {:?}: {:?}", tf.elapsed(), f.as_ref().map(complexity));
         }
         f
@@ -3179,7 +3179,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
     set_deadline(Some(work_now().max(deadline) + scaled(extra)));
     let stage_t = std::cell::Cell::new((web_time::Instant::now(), work_ticks()));
     let stage = |name: &str| {
-        if std::env::var("GXPAD_DEBUG").is_ok() {
+        if std::env::var("GXGEO_DEBUG").is_ok() {
             let (t, k) = stage_t.get();
             eprintln!("stage {name}: {:?}, {} ticks", t.elapsed(), work_ticks() - k);
             stage_t.set((web_time::Instant::now(), work_ticks()));
@@ -3222,7 +3222,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
             slice(&mut solver);
             t = solver.solve_target(&target_eqs, &target_vars, &target_c, actual);
         }
-        if std::env::var("GXPAD_DEBUG").is_ok() {
+        if std::env::var("GXGEO_DEBUG").is_ok() {
             eprintln!("direct solve took {:?}", td.elapsed());
         }
         set_deadline(Some(work_now() + scaled(extra)));
@@ -3240,7 +3240,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
     } else {
         None
     };
-    if std::env::var("GXPAD_DEBUG").is_ok() {
+    if std::env::var("GXGEO_DEBUG").is_ok() {
         eprintln!("direct: {:?}", direct.as_ref().map(complexity));
     }
     stage("direct");

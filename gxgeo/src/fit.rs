@@ -217,7 +217,7 @@ impl Sampler {
             }
             // far from converged: the Jacobian is too ill-conditioned here
             if !(last < 1e-22) {
-                if std::env::var("GXPAD_DEBUG").is_ok() {
+                if std::env::var("GXGEO_DEBUG").is_ok() {
                     eprintln!("fit: refinement stopped at residual {last:.1e}");
                 }
                 return None;
@@ -312,7 +312,7 @@ fn smallest_pivot(a: &[f64], m: usize, n: usize) -> f64 {
 /// null space has dimension one, Err(dimension) otherwise (0: none, or not
 /// clearly separated).
 fn null_vector(a: &mut [Dd], m: usize, n: usize) -> Result<Vec<Dd>, usize> {
-    let dbg = std::env::var("GXPAD_DEBUG").is_ok();
+    let dbg = std::env::var("GXGEO_DEBUG").is_ok();
     let mut scale = vec![Dd::ONE; n];
     let mut plain = vec![0.0; m * n];
     for j in 0..n {
@@ -688,7 +688,7 @@ fn term_expr(t: &Term, at: &Atoms, tsym: u32, half: bool) -> Expr {
 
 /// Searches for a formula or polynomial relation for the target of `pb`.
 pub fn fit(pb: &Problem) -> Option<Fit> {
-    let dbg = std::env::var("GXPAD_DEBUG").is_ok();
+    let dbg = std::env::var("GXGEO_DEBUG").is_ok();
     let n = pb.vals.keys().filter(|k| **k < TMP_BASE).max().copied().unwrap_or(0) as usize + 1;
     let mut base = vec![0.0; n];
     for (k, v) in pb.vals {

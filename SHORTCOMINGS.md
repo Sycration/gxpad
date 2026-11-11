@@ -300,12 +300,12 @@ Under 12 parallel test threads the slowest derivations take 10–11 s of real ti
 ## 3. Tools
 
 Environment variables:
-- `GXPAD_DEBUG=1`: per-block log of the derivation (blocks, equations, elimination steps,
+- `GXGEO_DEBUG=1`: per-block log of the derivation (blocks, equations, elimination steps,
   factor sizes, failure reasons, direct solving), the fit (`fit:` lines: atoms, bases, ranks,
   relations, check results), the stages after the blocks with real time and ticks (`stage`),
   and ticks against real time per strategy (`work:`).
-- `GXPAD_DUMP=<file>`: write the last polynomial of a polynomial block, for `factor_dump`.
-- `GXPAD_FACTOR_FILE=<file>` (with optional `GXPAD_MAIN=<var>|cheapest`): factor a dumped
+- `GXGEO_DUMP=<file>`: write the last polynomial of a polynomial block, for `factor_dump`.
+- `GXGEO_FACTOR_FILE=<file>` (with optional `GXGEO_MAIN=<var>|cheapest`): factor a dumped
   polynomial and report timings (`alg::tests::factor_dump`).
 - `GXPAD_DERIVE_FILE=<file.gxp>` (with optional `GXPAD_DERIVE_LEVEL=<n>`): derive every reference
   dimension of a saved construction (`testkit::derive_file`).
@@ -319,11 +319,11 @@ Commands:
 cargo test --no-fail-fast                                   # full suite
 cargo test --lib                                            # unit tests (alg, expr, derive, fit, dd, formula sizes)
 timeout 300 cargo test --test gen_invariants ptolemy_diagonals -- --nocapture   # one test, prints formulas
-GXPAD_DEBUG=1 timeout 300 cargo test --test gen_linkages peaucellier_inversor_rotating -- --nocapture
+GXGEO_DEBUG=1 timeout 300 cargo test --test gen_linkages peaucellier_inversor_rotating -- --nocapture
 GXPAD_DERIVE_FILE=test_examples/gen_constructions/simson_line.gxp \
   cargo test --lib derive_file -- --ignored --nocapture
-GXPAD_DUMP=target/p.poly cargo test --test gen_invariants ptolemy_diagonals
-GXPAD_FACTOR_FILE=target/p.poly GXPAD_MAIN=cheapest cargo test --lib alg::tests::factor_dump -- --ignored --nocapture
+GXGEO_DUMP=target/p.poly cargo test --test gen_invariants ptolemy_diagonals
+GXGEO_FACTOR_FILE=target/p.poly GXGEO_MAIN=cheapest cargo test -p gxgeo --lib alg::tests::factor_dump -- --ignored --nocapture
 ```
 
 Run single tests under `timeout`: a stuck derivation otherwise blocks the run. Formulas do not
