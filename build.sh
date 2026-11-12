@@ -57,6 +57,9 @@ build_linux() {
 
 build_windows() {
   need cargo-zigbuild "cargo install cargo-zigbuild"
+  # rustc requests libunwind for gnullvm with --unwindlib=libunwind, which zig cc ignores, so the
+  # _Unwind_* symbols stay undefined unless libunwind is named explicitly.
+  export CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_RUSTFLAGS="-C link-arg=-lunwind"
   for pair in x64:x86_64-pc-windows-gnu arm64:aarch64-pc-windows-gnullvm; do
     local arch=${pair%%:*} triple=${pair#*:}
     echo "==> windows $arch"
