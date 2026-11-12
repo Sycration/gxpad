@@ -2,11 +2,10 @@
 
 use crate::app::*;
 use crate::canvas::small_icon_btn;
-use crate::expr::bx::Bx;
+use crate::geo;
 use crate::icons::{self, Icon};
 use crate::mathview;
-use crate::ops;
-use crate::model::*;
+use crate::ops::{self, ConKind, DimType};
 use eframe::egui::{self, Color32, FontId, Key, Response, Sense, Stroke, TextEdit, Ui, vec2};
 use std::collections::HashMap;
 
@@ -82,14 +81,10 @@ impl App {
             } else if o {
                 self.open();
             } else if n {
-                let before = std::mem::replace(&mut self.geo.doc, Doc::new());
-                self.geo.push_undo(before);
-                self.path = None;
-                self.sel.clear();
-                self.geo.dirty = true;
-                self.geo.solve_full();
+                self.new_document();
             } else if a {
-                self.sel = self.geo.doc.ents.iter().enumerate().filter(|(i, e)| e.as_ref().is_some_and(|e| !e.hidden) && !self.geo.doc.is_fixed_ent(*i)).map(|(i, _)| Sel::Ent(i)).collect();
+                let d = &self.geo;
+                self.sel = (0..ops::ent_count(d)).filter(|&e| geo::kind(d, e).is_some() && !geo::hidden(d, e) && !geo::is_fixed(d, e)).map(Sel::Ent).collect();
             }
             return;
         }
@@ -160,35 +155,29 @@ impl App {
             let ents: Vec<usize> = self.sel.iter().filter_map(|s| if let Sel::Ent(e) = s { Some(*e) } else { None }).collect();
             match k {
                 Key::H | Key::V => {
-                    let h = k == Key::H;
-                    let mk = |a: usize, b: usize| if h { Con::Horizontal(a, b) } else { Con::Vertical(a, b) };
-                    let cons: Vec<Con> = if ents.len() == 1 && self.geo.doc.is_line(ents[0]) {
-                        let (a, b) = self.geo.doc.line_pts(ents[0]);
-                        vec![mk(a, b)]
-                    } else if ents.len() >= 2 && ents.iter().all(|e| self.geo.doc.is_point(*e)) {
-                        ents.windows(2).map(|w| mk(w[0], w[1])).collect()
-                    } else if !ents.is_empty() && ents.iter().all(|e| self.geo.doc.is_line(*e)) {
-                        ents.iter().map(|l| {
-                            let (a, b) = self.geo.doc.line_pts(*l);
-                            mk(a, b)
-                        }).collect()
+                    let kind = if k == Key::H { ConKind::Horizontal } else { ConKind::Vertical };
+                    let d = &self.geo;
+                    let cons: Vec<(ConKind, usize, usize)> = if ents.len() >= 2 && ents.iter().all(|e| geo::is_point(d, *e)) {
+                        ents.windows(2).map(|w| (kind, w[0], w[1])).collect()
+                    } else if !ents.is_empty() && ents.iter().all(|e| geo::is_line(d, *e)) {
+                        ents.iter().map(|l| (kind, *l, usize::MAX)).collect()
                     } else {
                         vec![]
                     };
-                    if !cons.is_empty() && !ops::add_constraints(&mut self.geo, cons).unwrap_or(false) {
+                    if !cons.is_empty() && !ops::add_constraints(&mut self.geo, &cons).unwrap_or(false) {
                         self.flash_ents(ents);
                     }
                 }
                 Key::T => {
-                    if let [a, b] = ents.as_slice() {
-                        if let Some(c) = self.geo.doc.tangent_con(*a, *b) {
-                            self.add_constraint(c);
+                    if let [a, b] = *ents.as_slice() {
+                        if ops::can_constrain(&self.geo, ConKind::Tangent, a, b) {
+                            self.add_constraint(ConKind::Tangent, a, b);
                         }
                     }
                 }
                 Key::X => {
-                    let ents: Vec<usize> = ents.into_iter().filter(|e| !self.geo.doc.is_point(*e)).collect();
-                    let on = !ents.iter().all(|e| self.geo.doc.ent(*e).is_some_and(|x| x.construction));
+                    let ents: Vec<usize> = ents.into_iter().filter(|e| geo::is_curve(&self.geo, *e)).collect();
+                    let on = !ents.iter().all(|e| ops::ent_construction(&self.geo, *e).unwrap_or(false));
                     ops::set_construction_all(&mut self.geo, &ents, on).ok();
                 }
                 _ => {}
@@ -234,26 +223,25 @@ impl App {
             });
         });
         let w = ui.available_width();
-        for i in 0..self.geo.doc.vars.len() {
-            let Some(v) = self.geo.doc.vars[i].clone() else { continue };
+        for i in 0..ops::var_count(&self.geo) {
+            let g = &self.geo;
+            let (Ok(name), Ok(expr), Ok(numeric)) = (ops::var_name(g, i), ops::var_expr(g, i), ops::var_numeric(g, i)) else { continue };
             let selected = self.sel.contains(&Sel::Var(i));
             let r = ui.horizontal(|ui| {
-                let (resp, new_name) = text_cell(ui, &mut self.bufs, &format!("vn{i}"), &v.name, 54.0, Some(FULL));
+                let (resp, new_name) = text_cell(ui, &mut self.bufs, &format!("vn{i}"), &name, 54.0, Some(FULL));
                 if resp.gained_focus() {
                     self.sel = vec![Sel::Var(i)];
                 }
                 if let Some(nn) = new_name {
-                    let old = v.name.clone();
-                    let nn2 = nn.trim().to_string();
-                    if !self.geo.rename(&old, &nn, move |d| d.vars[i].as_mut().unwrap().name = nn2) {
+                    if !ops::rename(&mut self.geo, &name, &nn).unwrap_or(false) {
                         self.bufs.remove(&format!("vn{i}"));
                     }
                 }
                 let right = 94.0;
                 let fw = (w - 54.0 - right - 24.0).max(60.0);
-                if v.expr.is_empty() {
-                    let locked = self.geo.doc.params[v.param].locked;
-                    let mut val = self.geo.doc.params[v.param].v;
+                if expr.is_empty() {
+                    let locked = ops::var_free(&self.geo, i).unwrap_or(false);
+                    let mut val = ops::var_value(&self.geo, i).unwrap_or(f64::NAN);
                     if locked {
                         let speed = (val.abs() * 0.005).max(0.005);
                         let dv = ui.add_sized(vec2(fw, 22.0), egui::DragValue::new(&mut val).speed(speed).max_decimals(6));
@@ -261,23 +249,15 @@ impl App {
                             self.sel = vec![Sel::Var(i)];
                         }
                         if dv.drag_started() {
-                            self.geo.checkpoint();
+                            // the whole drag is one undo step
+                            ops::checkpoint(&mut self.geo);
                         }
                         if dv.changed() && self.live {
                             if dv.dragged() {
-                                let p = v.param;
-                                let old = self.geo.doc.params[p].v;
-                                self.geo.doc.params[p].v = val;
-                                if !self.geo.solve_full() {
-                                    self.geo.doc.params[p].v = old;
-                                    self.geo.solve_full();
-                                }
+                                ops::drag_var(&mut self.geo, i, val).ok();
                             } else {
                                 ops::set_var(&mut self.geo, i, val).ok();
                             }
-                        }
-                        if dv.drag_stopped() {
-                            self.geo.generation += 1;
                         }
                     } else {
                         let (r, _) = ui.allocate_exact_size(vec2(fw, 22.0), Sense::click());
@@ -291,20 +271,20 @@ impl App {
                     if small_icon_btn(ui, if locked { Icon::Lock } else { Icon::Unlock }, !locked, tip).clicked() {
                         ops::set_var_free(&mut self.geo, i, !locked).ok();
                     }
-                    if small_icon_btn(ui, Icon::Numeric, v.numeric, "Numeric — substitute the value as a number in formulas").clicked() {
-                        ops::set_var_numeric(&mut self.geo, i, !v.numeric).ok();
+                    if small_icon_btn(ui, Icon::Numeric, numeric, "Numeric — substitute the value as a number in formulas").clicked() {
+                        ops::set_var_numeric(&mut self.geo, i, !numeric).ok();
                     }
                 } else {
-                    let err = self.geo.doc.parse_expr(&v.expr, 0).is_err();
-                    let (resp, ne) = text_cell(ui, &mut self.bufs, &format!("ve{i}"), &v.expr, fw, Some(if err { ERR } else { DIMC }));
+                    let err = ops::check_expr(&self.geo, &expr).is_err();
+                    let (resp, ne) = text_cell(ui, &mut self.bufs, &format!("ve{i}"), &expr, fw, Some(if err { ERR } else { DIMC }));
                     if resp.gained_focus() {
                         self.sel = vec![Sel::Var(i)];
                     }
                     if let Some(ne) = ne {
                         ops::set_var_expr(&mut self.geo, i, &ne).ok();
                     }
-                    if small_icon_btn(ui, Icon::Numeric, v.numeric, "Numeric — substitute the value as a number in formulas").clicked() {
-                        ops::set_var_numeric(&mut self.geo, i, !v.numeric).ok();
+                    if small_icon_btn(ui, Icon::Numeric, numeric, "Numeric — substitute the value as a number in formulas").clicked() {
+                        ops::set_var_numeric(&mut self.geo, i, !numeric).ok();
                     }
                 }
                 if small_icon_btn(ui, Icon::Close, false, "Delete").clicked() {
@@ -326,21 +306,21 @@ impl App {
         });
         let w = ui.available_width();
         let mut k = 0;
-        for i in 0..self.geo.doc.ents.len() {
-            let Some(Entity { kind: Ent::Curve { src }, .. }) = self.geo.doc.ents[i].clone() else { continue };
+        for i in 0..ops::ent_count(&self.geo) {
+            let Ok(src) = ops::curve_src(&self.geo, i) else { continue };
             let col = CURVES[k % CURVES.len()];
             k += 1;
             let selected = self.sel.contains(&Sel::Ent(i));
             let r = ui.horizontal(|ui| {
                 let (r, _) = ui.allocate_exact_size(vec2(14.0, 22.0), Sense::hover());
                 ui.painter().circle_filled(r.center(), 5.0, col);
-                let err = self.geo.doc.curve_def(&src).is_err();
+                let err = ops::check_curve(&self.geo, &src).is_err();
                 let (resp, ns) = text_cell(ui, &mut self.bufs, &format!("cv{i}"), &src, (w - 14.0 - 40.0).max(80.0), Some(if err { ERR } else { FULL }));
                 if resp.gained_focus() {
                     self.sel = vec![Sel::Ent(i)];
                 }
                 if let Some(ns) = ns {
-                    if self.geo.doc.curve_def(&ns).is_ok() {
+                    if ops::check_curve(&self.geo, &ns).is_ok() {
                         if !ops::set_curve(&mut self.geo, i, &ns).unwrap_or(false) {
                             self.flash_ents(vec![i]);
                         }
@@ -359,31 +339,25 @@ impl App {
             section(ui, Icon::Dimension);
         });
         let w = ui.available_width();
-        for i in 0..self.geo.doc.dims.len() {
-            let Some(d) = self.geo.doc.dims[i].clone() else { continue };
+        for i in 0..ops::dim_count(&self.geo) {
+            let g = &self.geo;
+            let (Ok(kind), Ok(name), Ok(expr), Ok(driving), Ok(numeric)) = (ops::dim_kind(g, i), ops::dim_name(g, i), ops::dim_expr(g, i), ops::dim_driving(g, i), ops::dim_numeric(g, i)) else { continue };
             let selected = self.sel.contains(&Sel::Dim(i));
-            let angle = d.kind.is_angle();
+            let angle = kind == DimType::Angle;
             let r = ui.horizontal(|ui| {
-                let (resp, nn) = text_cell(ui, &mut self.bufs, &format!("dn{i}"), &d.name, 54.0, Some(MUTED));
+                let (resp, nn) = text_cell(ui, &mut self.bufs, &format!("dn{i}"), &name, 54.0, Some(MUTED));
                 if resp.gained_focus() {
                     self.sel = vec![Sel::Dim(i)];
                 }
                 if let Some(nn) = nn {
-                    let old = d.name.clone();
-                    let nn2 = nn.trim().to_string();
-                    if !self.geo.rename(&old, &nn, move |doc| doc.dims[i].as_mut().unwrap().name = nn2) {
+                    if !ops::rename(&mut self.geo, &name, &nn).unwrap_or(false) {
                         self.bufs.remove(&format!("dn{i}"));
                     }
                 }
                 let fw = (w - 54.0 - 94.0 - 24.0).max(60.0);
-                let shown = if !d.expr.is_empty() {
-                    d.expr.clone()
-                } else {
-                    let v = if d.driving { self.geo.doc.params[d.param].v } else { self.geo.doc.measure_value(i) };
-                    fmt_dim(v, angle)
-                };
-                let err = self.geo.errors.contains_key(&Owner::Dim(i)) || self.geo.conflicts.contains(&Owner::Dim(i));
-                let col = if err { ERR } else if d.driving { DIMC } else { MUTED };
+                let shown = if !expr.is_empty() { expr.clone() } else { fmt_dim(ops::dim_set_value(&self.geo, i).unwrap_or(f64::NAN), angle) };
+                let err = ops::dim_error(&self.geo, i).ok().flatten().is_some() || ops::dim_conflict(&self.geo, i).unwrap_or(false);
+                let col = if err { ERR } else if driving { DIMC } else { MUTED };
                 let (resp, nv) = text_cell(ui, &mut self.bufs, &format!("dv{i}"), &shown, fw, Some(col));
                 if resp.gained_focus() {
                     self.sel = vec![Sel::Dim(i)];
@@ -391,12 +365,12 @@ impl App {
                 if let Some(nv) = nv {
                     self.commit_dim_text(i, &nv);
                 }
-                let (icon, tip) = if d.driving { (Icon::Driving, "Driving — click for reference") } else { (Icon::Reference, "Reference — click to drive") };
-                if small_icon_btn(ui, icon, d.driving, tip).clicked() {
+                let (icon, tip) = if driving { (Icon::Driving, "Driving — click for reference") } else { (Icon::Reference, "Reference — click to drive") };
+                if small_icon_btn(ui, icon, driving, tip).clicked() {
                     self.toggle_driving(i);
                 }
-                if small_icon_btn(ui, Icon::Numeric, d.numeric, "Numeric — substitute the value as a number in formulas").clicked() {
-                    ops::set_dim_numeric(&mut self.geo, i, !d.numeric).ok();
+                if small_icon_btn(ui, Icon::Numeric, numeric, "Numeric — substitute the value as a number in formulas").clicked() {
+                    ops::set_dim_numeric(&mut self.geo, i, !numeric).ok();
                 }
                 if small_icon_btn(ui, Icon::Close, false, "Delete").clicked() {
                     ops::delete_dim(&mut self.geo, i).ok();
@@ -422,7 +396,6 @@ impl App {
             icons::paint(ui.painter(), egui::Rect::from_center_size(r.center(), vec2(40.0, 40.0)), Icon::Latex, Color32::from_rgba_unmultiplied(255, 255, 255, 18));
             return;
         };
-        let style = mathview::Style { sym: FULL, num: Color32::from_rgb(0xff, 0xc6, 0x8a), op: MUTED, func: Color32::from_rgb(0x7f, 0xd1, 0xff) };
         let mut copy: Option<String> = None;
         ui.horizontal(|ui| {
             let val = if f.is_angle { format!("{}  ({})", fmt_val(f.actual), fmt_dim(f.actual, true)) } else { fmt_val(f.actual) };
@@ -432,7 +405,7 @@ impl App {
                 if self.formula_busy() && f.exact {
                     ui.add(egui::Spinner::new().color(MUTED));
                 }
-                if f.bx.is_some() {
+                if !f.rows.is_empty() {
                     if small_icon_btn(ui, Icon::Latex, false, "Copy LaTeX").clicked() {
                         copy = Some(f.latex.clone());
                     }
@@ -474,12 +447,12 @@ impl App {
             }
             return;
         }
-        let Some(b) = &f.bx else { return };
-        let eq = if f.exact { "=" } else { "≈" };
-        let row = Bx::Row(vec![Bx::Sym(f.name.clone()), Bx::Op(eq.into()), b.clone()]);
-        let mut rows = vec![row];
-        for (n, d) in &f.defs {
-            rows.push(Bx::Row(vec![Bx::Sym(n.clone()), Bx::Op("=".into()), d.clone()]));
+        if f.rows.is_empty() {
+            return;
+        }
+        let mut rows = f.rows.clone();
+        if !f.exact {
+            rows[0] = rows[0].replacen(" = ", " \\approx ", 1);
         }
         let mismatch = !((f.value - f.actual).abs() <= 1e-6 * (1.0 + f.actual.abs()));
         egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
@@ -487,13 +460,16 @@ impl App {
             for (k, row) in rows.iter().enumerate() {
                 let p = ui.painter().clone();
                 let mut size: f32 = if k == 0 { 20.0 } else { 16.0 };
-                let mut l = mathview::measure(&p, row, size);
-                while l.w > avail && size > 12.0 {
+                let Some(mut l) = mathview::measure(row, size, FULL) else {
+                    ui.label(egui::RichText::new(row).color(MUTED).monospace());
+                    continue;
+                };
+                while l.x > avail && size > 12.0 {
                     size -= 1.0;
-                    l = mathview::measure(&p, row, size);
+                    l = mathview::measure(row, size, FULL).unwrap_or(l);
                 }
-                let (r, _) = ui.allocate_exact_size(vec2(l.w + 8.0, l.a + l.d + 10.0), Sense::hover());
-                mathview::draw(&p, row, size, r.min.x + 4.0, r.min.y + 5.0 + l.a, &style);
+                let (r, _) = ui.allocate_exact_size(vec2(l.x + 8.0, l.y + 10.0), Sense::hover());
+                mathview::draw(&p, row, size, r.min + vec2(4.0, 5.0), FULL);
             }
             if mismatch && f.value.is_finite() {
                 ui.label(egui::RichText::new(format!("≠ {}", fmt_val(f.value))).color(ERR).size(12.0));

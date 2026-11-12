@@ -1,20 +1,27 @@
 [package]
 name = "gxpad"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "2D constraint-based geometry pad that derives closed-form formulas for measured dimensions"
 license = "GPL-3.0-or-later"
 
 [workspace]
 members = ["gxgeo"]
+exclude = ["vendor"]
 
 [dependencies]
 gxgeo = { path = "gxgeo" }
 eframe = "0.37"
 rfd = "0.17"
+latex-rust = { version = "3.0.3", default-features = false, features = ["std", "egui"] }
 
 [profile.dev]
 opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+# latex-rust 3.0.3 pins egui =0.36.2; the vendored copy takes egui 0.37 (see
+# vendor/latex-rust/Cargo.toml).
+[patch.crates-io]
+latex-rust = { path = "vendor/latex-rust" }

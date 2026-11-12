@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
     size_t dof;
     printf("gxgeo %s: solve %d, dof %zu\n", gx_version(), gx_doc_solve(doc, &dof), dof);
     for (size_t i = 0; i < gx_doc_dim_count(doc); i++) {
-        GxFormula *f = gx_derive(doc, GX_TARGET_DIM, i, 0);
+        GxFormula *f = gx_derive(doc, GX_TARGET_DIM, i, 0, NULL);
         if (!f) {
             printf("dim %zu: %s\n", i, gx_last_error());
             continue;

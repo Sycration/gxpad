@@ -20,7 +20,7 @@ fn derive_through_c_interface() {
         let name = gx_doc_dim_name(doc, 3);
         assert_eq!(text(name), "θ1");
         gx_string_free(name);
-        let f = gx_derive(doc, GX_TARGET_DIM, 3, 0);
+        let f = gx_derive(doc, GX_TARGET_DIM, 3, 0, std::ptr::null());
         assert!(!f.is_null());
         assert_eq!(text((*f).plain), "θ1 = acos((d1^2 + d3^2 - d2^2)/(2d1*d3))");
         assert!((*f).exact && (*f).is_angle);
@@ -49,9 +49,9 @@ fn errors_are_reported() {
         let doc = gx_doc_new();
         assert!(gx_doc_dim_name(doc, 0).is_null());
         assert!(gx_doc_dim_value(doc, 0).is_nan());
-        assert!(gx_derive(doc, GX_TARGET_DIM, 0, 0).is_null());
+        assert!(gx_derive(doc, GX_TARGET_DIM, 0, 0, std::ptr::null()).is_null());
         assert_eq!(text(gx_last_error()), "gone");
-        assert!(gx_derive(doc, 7, 0, 0).is_null());
+        assert!(gx_derive(doc, 7, 0, 0, std::ptr::null()).is_null());
         assert_eq!(text(gx_last_error()), "bad target kind 7");
         gx_doc_free(doc);
 
@@ -96,7 +96,7 @@ fn build_law_of_cosines_through_c_interface() {
         }
         assert!(same(&built, &file));
 
-        let f = gx_derive(doc, GX_TARGET_DIM, ang, 0);
+        let f = gx_derive(doc, GX_TARGET_DIM, ang, 0, std::ptr::null());
         assert_eq!(text((*f).plain), "θ1 = acos((d1^2 + d3^2 - d2^2)/(2d1*d3))");
         gx_formula_free(f);
 
@@ -443,6 +443,28 @@ fn numeric_flags_through_c_interface() {
         // errors
         assert_eq!(gx_doc_var_numeric(doc, 99), -1);
         assert_eq!(gx_doc_dim_numeric(doc, 99), -1);
+        gx_doc_free(doc);
+    }
+}
+
+#[test]
+fn dimension_label_offset_through_c_interface() {
+    unsafe {
+        let doc = gx_doc_new();
+        let o = gx_doc_origin(doc) as usize;
+        let p = gx_doc_add_point(doc, 4.0, 2.0) as usize;
+        let d = gx_doc_add_dim(doc, GX_DIM_DISTANCE, o, p, 0.3, 0.3) as usize;
+        let (mut x, mut y) = (0.0, 0.0);
+        assert_eq!(gx_doc_dim_anchor(doc, d, &mut x, &mut y), 1);
+        assert_eq!((x, y), (2.0, 1.0));
+        assert_eq!(gx_doc_set_dim_offset(doc, d, -1.0, 0.5), 1);
+        assert_eq!(gx_doc_dim_offset(doc, d, &mut x, &mut y), 1);
+        assert_eq!((x, y), (-1.0, 0.5));
+        assert_eq!(gx_doc_dim_offset(doc, d, std::ptr::null_mut(), std::ptr::null_mut()), 1);
+        assert_eq!(gx_doc_set_dim_offset(doc, d, f64::INFINITY, 0.0), -1);
+        assert_eq!(gx_doc_set_dim_offset(doc, 9, 0.0, 0.0), -1);
+        assert_eq!(gx_doc_dim_offset(doc, 9, &mut x, &mut y), -1);
+        assert_eq!(gx_doc_dim_anchor(doc, 9, &mut x, &mut y), -1);
         gx_doc_free(doc);
     }
 }

@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
     ok(gx_doc_solve(doc, &dof), "solve");
     printf("solved, %zu degrees of freedom left\n", dof);
 
-    GxFormula *f = gx_derive(doc, GX_TARGET_DIM, ang, 0);
+    GxFormula *f = gx_derive(doc, GX_TARGET_DIM, ang, 0, NULL);
     if (!f) {
         fprintf(stderr, "derive: %s\n", gx_last_error());
         gx_doc_free(doc);

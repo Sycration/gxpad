@@ -4,11 +4,9 @@
 
 use crate::app::*;
 use crate::canvas::nearest_on;
-use crate::model::*;
-use eframe::egui::{Color32, Painter, Pos2, Response, Shape, Stroke, pos2};
-
-use crate::ops::{self, ConicFeature};
-use gxgeo::build::{bisector_dir, sector_signs, unit};
+use crate::geo::{self, unit};
+use crate::ops::{self, ConicFeature, ConicKind, EntKind};
+use eframe::egui::{Painter, Pos2, Response, Shape, Stroke};
 
 const HIT: f32 = 9.0;
 
@@ -39,7 +37,6 @@ fn feature_of(tool: Tool) -> Option<ConicFeature> {
     }
 }
 
-
 fn seg_x(a: Pos2, b: Pos2, c: Pos2, d: Pos2) -> Option<Pos2> {
     let r = b - a;
     let s = d - c;
@@ -55,13 +52,13 @@ fn seg_x(a: Pos2, b: Pos2, c: Pos2, d: Pos2) -> Option<Pos2> {
 impl App {
     fn hovered_ent(&self) -> Option<usize> {
         match self.hover {
-            Some(Sel::Ent(e)) if self.geo.doc.ent(e).is_some_and(|x| !x.hidden) => Some(e),
+            Some(Sel::Ent(e)) if !geo::hidden(&self.geo, e) => Some(e),
             _ => None,
         }
     }
 
     fn is_segment(&self, e: usize) -> bool {
-        matches!(self.geo.doc.kind(e), Some(Ent::Line { infinite: false, .. }))
+        geo::is_segment(&self.geo, e)
     }
 
     /// Curves (non-point entities) passing near a screen position, nearest first.
@@ -69,7 +66,7 @@ impl App {
         let mut v: Vec<(f32, usize)> = self
             .shapes
             .iter()
-            .filter(|(e, _)| !self.geo.doc.is_point(**e))
+            .filter(|(e, _)| !geo::is_point(&self.geo, **e))
             .map(|(e, p)| (nearest_on(p, m).0, *e))
             .filter(|(d, _)| *d < HIT)
             .collect();
@@ -128,19 +125,11 @@ impl App {
         best.map(|b| self.view.to_w(b.1))
     }
 
-    fn sector_signs(&self, l1: usize, l2: usize, x: [f64; 2], w: [f64; 2]) -> (f64, f64) {
-        sector_signs(&self.geo.doc, l1, l2, x, w)
-    }
-
-    fn bisector_dir(&self, l1: usize, l2: usize, s: (f64, f64)) -> Option<[f64; 2]> {
-        bisector_dir(&self.geo.doc, l1, l2, s)
-    }
-
     /// True when entity c can take the conic feature of the current tool.
     fn conic_target(&self, c: usize) -> bool {
-        match self.geo.doc.kind(c) {
-            Some(Ent::Conic { kind, .. }) => self.tool != Tool::Asymptotes || *kind == ConicKind::Hyperbola,
-            _ => false,
+        match geo::conic(&self.geo, c) {
+            Some((kind, ..)) => self.tool != Tool::Asymptotes || kind == ConicKind::Hyperbola,
+            None => false,
         }
     }
 
@@ -196,7 +185,7 @@ impl App {
             }
             Tool::PerpLine | Tool::ParLine => {
                 if self.picks.is_empty() {
-                    if let Some(l) = hov.filter(|l| self.geo.doc.is_line(*l)) {
+                    if let Some(l) = hov.filter(|l| geo::is_line(&self.geo, *l)) {
                         self.picks = vec![l];
                     }
                     return;
@@ -210,7 +199,7 @@ impl App {
                 let mut ends: Option<(Snap, Snap)> = None;
                 if self.pending.is_empty() {
                     if let Some(l) = hov.filter(|l| self.is_segment(*l)) {
-                        let (a, b) = self.geo.doc.line_pts(l);
+                        let (a, b) = geo::line_pts(&self.geo, l);
                         ends = Some((Snap::Point(a), Snap::Point(b)));
                     }
                 }
@@ -227,7 +216,7 @@ impl App {
             }
             Tool::AngleBisector => {
                 if self.picks.len() < 2 {
-                    if let Some(l) = hov.filter(|l| self.geo.doc.is_line(*l) && !self.picks.contains(l)) {
+                    if let Some(l) = hov.filter(|l| geo::is_line(&self.geo, *l) && !self.picks.contains(l)) {
                         self.picks.push(l);
                     }
                     return;
@@ -241,7 +230,7 @@ impl App {
                     self.pending.push(snap);
                     return;
                 }
-                let Some(c) = hov.filter(|c| !self.geo.doc.is_point(*c) && !self.geo.doc.is_line(*c)) else { return };
+                let Some(c) = hov.filter(|c| geo::is_curve(&self.geo, *c) && !geo::is_line(&self.geo, *c)) else { return };
                 let s0 = self.pending[0];
                 let p0 = self.snap_pos(&s0);
                 let Some(t) = self.tangent_contact(p0, c, m) else {
@@ -255,7 +244,7 @@ impl App {
                     self.pending.push(snap);
                     return;
                 }
-                let Some(l) = hov.filter(|l| self.geo.doc.is_line(*l)) else { return };
+                let Some(l) = hov.filter(|l| geo::is_line(&self.geo, *l)) else { return };
                 let s0 = self.pending[0];
                 let ok = ops::reflection(&mut self.geo, s0, l).is_ok();
                 self.construct_done(ok, vec![l]);
@@ -300,8 +289,7 @@ impl App {
                     p.extend(Shape::dashed_line(&[v.to_s(*a), v.to_s(sp)], Stroke::new(1.0, ACCENT.gamma_multiply(0.4)), 4.0, 4.0));
                     ghost_pt([(a[0] + sp[0]) * 0.5, (a[1] + sp[1]) * 0.5]);
                 } else if let Some(l) = hov.filter(|l| self.is_segment(*l)) {
-                    let (a, b) = self.geo.doc.line_pts(l);
-                    let (a, b) = (self.geo.doc.pval(a), self.geo.doc.pval(b));
+                    let (a, b) = geo::line_ends(&self.geo, l);
                     ghost_pt([(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5]);
                 }
             }
@@ -320,7 +308,7 @@ impl App {
             }
             Tool::PerpLine | Tool::ParLine => {
                 if let Some(&l) = self.picks.first() {
-                    let d = self.geo.doc.line_dir_val(l);
+                    let d = geo::line_dir(&self.geo, l);
                     let d = if self.tool == Tool::PerpLine { [-d[1], d[0]] } else { d };
                     inf_line(sp, d);
                 }
@@ -328,10 +316,7 @@ impl App {
             Tool::PerpBisector => {
                 let ends = match pend.as_slice() {
                     [a] => Some((*a, sp)),
-                    _ => hov.filter(|l| self.is_segment(*l)).map(|l| {
-                        let (a, b) = self.geo.doc.line_pts(l);
-                        (self.geo.doc.pval(a), self.geo.doc.pval(b))
-                    }),
+                    _ => hov.filter(|l| self.is_segment(*l)).map(|l| geo::line_ends(&self.geo, l)),
                 };
                 if let Some((a, b)) = ends {
                     inf_line([(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5], [-(b[1] - a[1]), b[0] - a[0]]);
@@ -339,10 +324,11 @@ impl App {
             }
             Tool::AngleBisector => {
                 if let [l1, l2] = self.picks.as_slice() {
-                    let x = self.geo.doc.shared_point(*l1, *l2).map(|p| self.geo.doc.pval(p)).unwrap_or_else(|| angle_vertex(&self.geo.doc, *l1, *l2));
-                    let s = self.sector_signs(*l1, *l2, x, mw);
-                    if let Some(d) = self.bisector_dir(*l1, *l2, s) {
-                        inf_line(x, d);
+                    // build on a copy: the ghost is exactly what a click creates
+                    let mut d = ops::copy(&self.geo);
+                    if let Ok((l, x)) = ops::angle_bisector(&mut d, *l1, *l2, mw) {
+                        let x = geo::pos(&d, x);
+                        inf_line(x, geo::line_dir(&d, l));
                         ghost_pt(x);
                     }
                 }
@@ -350,7 +336,7 @@ impl App {
             Tool::TangentLine => {
                 if let [a] = pend.as_slice() {
                     let end = hov
-                        .filter(|c| !self.geo.doc.is_point(*c) && !self.geo.doc.is_line(*c))
+                        .filter(|c| geo::is_curve(&self.geo, *c) && !geo::is_line(&self.geo, *c))
                         .and_then(|c| self.tangent_contact(*a, c, m))
                         .unwrap_or(mw);
                     p.line_segment([v.to_s(*a), v.to_s(end)], ghost);
@@ -360,14 +346,14 @@ impl App {
             Tool::Foci | Tool::Directrix | Tool::Asymptotes => {
                 if let Some(c) = hov.filter(|c| self.conic_target(*c)) {
                     // build on a copy: the ghost is exactly what a click creates
-                    let mut d = self.geo.doc.clone();
-                    let n0 = d.ents.len();
-                    let made = feature_of(self.tool).map(|f| d.build_conic_feature(f, c, mw)).unwrap_or_default();
-                    for e in made.into_iter().chain(n0..d.ents.len()) {
-                        match d.ent(e) {
-                            Some(Entity { kind: Ent::Point { .. }, hidden: false, .. }) => ghost_pt(d.pval(e)),
-                            Some(Entity { kind: Ent::Line { a, b, .. }, .. }) => {
-                                let (pa, pb) = (d.pval(*a), d.pval(*b));
+                    let mut d = ops::copy(&self.geo);
+                    let n0 = ops::ent_count(&d);
+                    let made = feature_of(self.tool).and_then(|f| ops::conic_feature(&mut d, f, c, mw).ok()).unwrap_or_default();
+                    for e in made.into_iter().chain(n0..ops::ent_count(&d)) {
+                        match geo::kind(&d, e) {
+                            Some(EntKind::Point) if !geo::hidden(&d, e) => ghost_pt(geo::pos(&d, e)),
+                            Some(EntKind::Line) => {
+                                let (pa, pb) = geo::line_ends(&d, e);
                                 inf_line(pa, [pb[0] - pa[0], pb[1] - pa[1]]);
                             }
                             _ => {}
@@ -377,8 +363,8 @@ impl App {
             }
             Tool::Reflect => {
                 if let [a] = pend.as_slice() {
-                    if let Some(l) = hov.filter(|l| self.geo.doc.is_line(*l)) {
-                        let f = foot(&self.geo.doc, *a, l);
+                    if let Some(l) = hov.filter(|l| geo::is_line(&self.geo, *l)) {
+                        let f = geo::line_foot(&self.geo, *a, l);
                         let q = [2.0 * f[0] - a[0], 2.0 * f[1] - a[1]];
                         p.extend(Shape::dashed_line(&[v.to_s(*a), v.to_s(q)], Stroke::new(1.0, ACCENT.gamma_multiply(0.4)), 4.0, 4.0));
                         ghost_pt(q);
@@ -390,6 +376,5 @@ impl App {
         for q in &pend {
             p.circle_filled(v.to_s(*q), 3.5, ACCENT);
         }
-        let _ = (pos2(0.0, 0.0), Color32::TRANSPARENT);
     }
 }
