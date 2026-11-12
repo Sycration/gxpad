@@ -1,3 +1,6 @@
+// release builds on Windows use the GUI subsystem, so launching gxpad.exe opens no console window
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 use gxpad::app::*;
 use eframe::egui::{self, Color32, CornerRadius, Stroke, vec2};
 use std::collections::HashMap;
