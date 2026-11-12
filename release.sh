@@ -8,7 +8,8 @@
 #   --dry-run  only writes the archives to build/dist, without creating a release
 #
 # Archives: gxpad-TAG-<platform>-<arch>.tar.gz (linux, macos), .zip (windows), gxgeo-TAG-web.tar.gz,
-# plus SHA256SUMS. Each one holds a top-level folder with bin/ and lib/ as in build/, LICENSE and README.md.
+# plus SHA256SUMS. Each one holds a top-level folder with bin/ and lib/ as in build/ and LICENSE; the gxpad
+# archives also hold the gxpad README.md (lib/ holds the gxgeo README.md, from ./build.sh).
 # The release tag points at the current commit, which must be clean and pushed.
 set -euo pipefail
 
@@ -62,7 +63,8 @@ for t in "${targets[@]}"; do
   fi
   mkdir -p "$stage/$name"
   cp -r "$BUILD/$t/." "$stage/$name/"
-  cp LICENSE README.md "$stage/$name/"
+  cp LICENSE "$stage/$name/"
+  [ "$platform" = web ] || cp README.md "$stage/$name/"
   if [ "$platform" = windows ]; then
     (cd "$stage" && bsdtar -a -cf "$DIST/$name.zip" "$name")
   else

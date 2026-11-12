@@ -76,7 +76,8 @@ cargo build -p gxgeo --target wasm32-unknown-unknown --release
 wasm-bindgen --target web --out-dir gxgeo/pkg target/wasm32-unknown-unknown/release/gxgeo.wasm
 ```
 
-Example C and JS clients live in `gxgeo/examples/`.
+Example C and JS clients live in `gxgeo/examples/`. [gxgeo/README.md](gxgeo/README.md) describes
+the library on its own.
 
 ## How the formulas are derived
 

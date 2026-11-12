@@ -2,8 +2,8 @@
 # Release builds of gxpad (desktop program) and gxgeo (C library / Wasm module), collected under build/:
 #
 #   build/<platform>/<arch>/bin   gxpad executable
-#   build/<platform>/<arch>/lib   gxgeo shared library, import library and gxgeo.h
-#   build/web/wasm32/lib          gxgeo Wasm module and its wasm-bindgen JS glue
+#   build/<platform>/<arch>/lib   gxgeo shared library, import library, gxgeo.h and the gxgeo README.md
+#   build/web/wasm32/lib          gxgeo Wasm module, its wasm-bindgen JS glue and the gxgeo README.md
 #
 # Usage: ./build.sh [linux] [windows] [macos] [web]    (no arguments builds everything)
 #
@@ -20,6 +20,7 @@ ROOT=$PWD
 OUT=$ROOT/build
 TARGET_DIR=${CARGO_TARGET_DIR:-$ROOT/target}
 HEADER=$ROOT/gxgeo/include/gxgeo.h
+LIB_README=$ROOT/gxgeo/README.md
 
 # Linux binaries link against this glibc version so that they load on older distributions.
 GLIBC=2.17
@@ -41,7 +42,7 @@ collect() {
   mkdir -p "$dest/bin" "$dest/lib"
   cp "$rel/$exe" "$dest/bin/"
   for f in "$@"; do cp "$rel/$f" "$dest/lib/"; done
-  cp "$HEADER" "$dest/lib/"
+  cp "$HEADER" "$LIB_README" "$dest/lib/"
 }
 
 build_linux() {
@@ -96,6 +97,7 @@ build_web() {
   local dest=$OUT/web/wasm32/lib
   mkdir -p "$dest"
   wasm-bindgen --target web --out-dir "$dest" "$TARGET_DIR/wasm32-unknown-unknown/release/gxgeo.wasm"
+  cp "$LIB_README" "$dest/"
 }
 
 for p in "${platforms[@]}"; do
