@@ -144,6 +144,7 @@ impl Sketch {
         let mut vals = self.vals();
         if sys.solve(&mut vals, &drags, target) {
             self.store(&vals);
+            self.generation += 1;
         }
     }
 
@@ -295,6 +296,25 @@ impl Sketch {
             return idx2;
         }
         idx
+    }
+
+    /// Moves the label of dimension `i` to `off` from the dimension's anchor.
+    /// For a reference angle, the label's sector selects the angle or its
+    /// supplement; a driving angle keeps its choice, so its constraint is
+    /// unchanged. Not an undoable change: a drag calls this repeatedly and
+    /// records one undo step when it ends.
+    pub fn move_dim_label(&mut self, i: usize, off: [f64; 2]) {
+        let Some(dim) = self.doc.dims.get(i).and_then(|d| d.as_ref()) else { return };
+        let (kind, driving, supp0) = (dim.kind, dim.driving, dim.supp);
+        let anchor = self.doc.dim_anchor(&kind);
+        let supp = match kind {
+            DimKind::Angle(l1, l2) if !driving => angle_supp(&self.doc, l1, l2, [anchor[0] + off[0], anchor[1] + off[1]]),
+            _ => supp0,
+        };
+        let x = self.doc.dims[i].as_mut().unwrap();
+        x.off = off;
+        x.supp = supp;
+        self.generation += 1;
     }
 
     /// Sets dimension `i` from typed text: a number (degrees for angles)

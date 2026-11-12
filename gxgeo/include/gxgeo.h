@@ -13,6 +13,9 @@
 // Kind of an entity.
 typedef struct EntKind EntKind;
 
+// A flag that stops a derivation running on another thread. Opaque.
+typedef struct GxCancel GxCancel;
+
 // A geometry document with its solver state and undo history. Opaque.
 typedef struct GxDoc GxDoc;
 
@@ -37,6 +40,14 @@ typedef struct GxWindow {
   double px;
 } GxWindow;
 
+// A subexpression of a formula.
+typedef struct GxDef {
+  // LaTeX name, such as `u_{1}`.
+  char *name;
+  // LaTeX expression; can name earlier subexpressions.
+  char *latex;
+} GxDef;
+
 // A derived formula. Released with `gx_formula_free`.
 typedef struct GxFormula {
   // Name of the target.
@@ -53,6 +64,16 @@ typedef struct GxFormula {
   double value;
   // Measured value of the target.
   double actual;
+  // `name = formula` as LaTeX with repeated subexpressions replaced by
+  // `u_{1}`, `u_{2}`, ..., which `defs` defines. Equal to `latex` when
+  // nothing repeats.
+  char *latex_short;
+  // The `n_defs` subexpressions of `latex_short`, in order.
+  struct GxDef *defs;
+  // Number of entries in `defs`.
+  size_t n_defs;
+  // Complexity of the formula: its number of operations and terms.
+  size_t size;
 } GxFormula;
 
 // Kind of quantity passed to `gx_derive`.
@@ -254,6 +275,66 @@ int gx_doc_undo(struct GxDoc *doc);
 // `doc` is NULL or a document from this library.
 int gx_doc_redo(struct GxDoc *doc);
 
+// Records the current document as an undo step. A drag (`gx_doc_drag_*`)
+// is not undoable by itself, so a checkpoint before it makes the whole drag
+// one undo step. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_checkpoint(struct GxDoc *doc);
+
+// A copy of the document in its current state, with the same solve status
+// and without the undo history, or NULL. Changes to the copy leave `doc` as
+// it is, so a copy suits trying out a change or deriving on another thread.
+// Release it with `gx_doc_free`.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+struct GxDoc *gx_doc_copy(const struct GxDoc *doc);
+
+// Replaces the content of the document with the document decoded from .gxp
+// text, as one undoable change, and solves it. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `text` is NULL or a NUL-terminated string.
+int gx_doc_load_gxp(struct GxDoc *doc, const char *text);
+
+// Replaces the content of the document with an empty document (origin and
+// axes only), as one undoable change. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_clear(struct GxDoc *doc);
+
+// Counter raised by every change of the document, including drags; equal
+// values mean an unchanged document, so it suits keying cached results.
+// 0 for NULL.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+uint64_t gx_doc_generation(const struct GxDoc *doc);
+
+// Number of constraints, dimensions and entities the last solve left
+// unsatisfied.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+size_t gx_doc_conflict_count(const struct GxDoc *doc);
+
+// Number of constraints and dimensions that could not be turned into
+// equations at the last solve; `gx_doc_error` gives their messages.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+size_t gx_doc_error_count(const struct GxDoc *doc);
+
+// Message `k` (below `gx_doc_error_count`), or NULL. Free it with
+// `gx_string_free`.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+char *gx_doc_error(const struct GxDoc *doc, size_t k);
+
 // The origin point.
 //
 // # Safety
@@ -284,6 +365,17 @@ ptrdiff_t gx_doc_add_point(struct GxDoc *doc, double x, double y);
 // # Safety
 // `doc` is NULL or a document from this library.
 ptrdiff_t gx_doc_add_line(struct GxDoc *doc, size_t a, size_t b, bool infinite);
+
+// Adds a line from point a to point b like `gx_doc_add_line`, constrained
+// horizontal (`horizontal` true) or vertical. Returns the line.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_add_line_aligned(struct GxDoc *doc,
+                                  size_t a,
+                                  size_t b,
+                                  bool infinite,
+                                  bool horizontal);
 
 // Adds a circle around point c with starting radius r (the radius stays
 // free until constrained). Returns the entity.
@@ -507,6 +599,42 @@ ptrdiff_t gx_doc_add_asymptotes(struct GxDoc *doc, size_t c, size_t *out, size_t
 // `doc` is NULL or a document from this library.
 int gx_doc_constrain(struct GxDoc *doc, GxCon kind, size_t a, size_t b);
 
+// Like `gx_doc_constrain`; a tangency between two curves whose contact
+// point is solved for starts its contact search at the point of the curves
+// nearest to (x, y), such as where the user clicked.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_constrain_near(struct GxDoc *doc, GxCon kind, size_t a, size_t b, double x, double y);
+
+// 1 when `gx_doc_constrain` would accept these arguments (the constraint
+// might still be rejected for not solving), 0 when not, -1 on error. The
+// document is unchanged.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_can_constrain(const struct GxDoc *doc, GxCon kind, size_t a, size_t b);
+
+// Adds the `n` constraints (kinds[k], a[k], b[k]), each as
+// `gx_doc_constrain` takes it, as one undoable change, rejecting them
+// together when any would not solve or is redundant. Returns 1, 0 when
+// rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `kinds`, `a` and `b` are readable for `n` entries.
+int gx_doc_add_constraints(struct GxDoc *doc,
+                           const GxCon *kinds,
+                           const size_t *a,
+                           const size_t *b,
+                           size_t n);
+
+// Constrains points a and b to be mirror images of each other in line `l`.
+// Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_constrain_symmetric(struct GxDoc *doc, size_t a, size_t b, size_t l);
+
 // Adds a dimension of kind `kind` (`GX_DIM_*`) on entities a and b, with
 // its label at (off_x, off_y) from the dimension's anchor (the midpoint of
 // a length, the vertex of an angle). The dimension is driving when that
@@ -548,6 +676,31 @@ int gx_doc_set_dim_driving(struct GxDoc *doc, size_t i, bool driving);
 // `doc` is NULL or a document from this library.
 int gx_doc_set_dim_numeric(struct GxDoc *doc, size_t i, bool numeric);
 
+// Moves the label of dimension `i` to (off_x, off_y) from the dimension's
+// anchor (see `gx_doc_dim_anchor`), as one undoable change. For a
+// reference angle, the sector holding the label selects the angle or its
+// supplement; a driving angle keeps its choice. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_set_dim_offset(struct GxDoc *doc, size_t i, double off_x, double off_y);
+
+// Moves the label of dimension `i` like `gx_doc_set_dim_offset`, as a drag:
+// not an undoable change by itself (see `gx_doc_checkpoint`). Returns 1, or
+// -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_drag_dim_offset(struct GxDoc *doc, size_t i, double off_x, double off_y);
+
+// Toggles angle dimension `i` between the angle of its lines and its
+// supplement; a driving dimension with a plain value is set to the
+// supplement's value. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_toggle_supp(struct GxDoc *doc, size_t i);
+
 // Adds a value variable named `name` (NULL picks the first unused of a, b,
 // c, k, ...). A free variable is set by `value`, otherwise it is solved
 // from the constraints, starting at `value`. Returns the variable.
@@ -579,6 +732,22 @@ int gx_doc_set_var(struct GxDoc *doc, size_t i, double value);
 // # Safety
 // `doc` is NULL or a document from this library; `text` is NULL or a NUL-terminated string.
 int gx_doc_set_var_expr(struct GxDoc *doc, size_t i, const char *text);
+
+// Checks expression text as `gx_doc_set_var_expr` and `gx_doc_set_dim` read
+// it. Returns 1 when it is valid, 0 with the reason in `gx_last_error` when
+// it does not parse or names an unknown quantity, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `text` is NULL or a NUL-terminated string.
+int gx_doc_check_expr(const struct GxDoc *doc, const char *text);
+
+// Checks a function curve definition as `gx_doc_add_curve` reads it.
+// Returns 1 when it is valid, 0 with the reason in `gx_last_error` when it
+// does not parse, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `src` is NULL or a NUL-terminated string.
+int gx_doc_check_curve(const struct GxDoc *doc, const char *src);
 
 // Makes value variable `i` free (set by its value) or solved from the
 // constraints. Returns 1, 0 when rejected, -1 on error.
@@ -626,6 +795,23 @@ int gx_doc_delete_con(struct GxDoc *doc, size_t c);
 // `doc` is NULL or a document from this library.
 int gx_doc_delete_dim(struct GxDoc *doc, size_t i);
 
+// Deletes the given entities, constraints, dimensions and variables as one
+// undoable change, with everything that depends on the entities. Returns 1,
+// 0 when the constraints would no longer solve (nothing is deleted), -1 on
+// error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; each array is readable for its count of entries.
+int gx_doc_delete(struct GxDoc *doc,
+                  const size_t *ents,
+                  size_t n_ents,
+                  const size_t *cons,
+                  size_t n_cons,
+                  const size_t *dims,
+                  size_t n_dims,
+                  const size_t *vars,
+                  size_t n_vars);
+
 // Locks or unlocks point `e` (fixing or freeing its coordinates). Returns 1,
 // 0 when rejected, -1 on error.
 //
@@ -633,12 +819,26 @@ int gx_doc_delete_dim(struct GxDoc *doc, size_t i);
 // `doc` is NULL or a document from this library.
 int gx_doc_lock_point(struct GxDoc *doc, size_t e, bool on);
 
+// Locks or unlocks the `n` points of `pts` as one undoable change. Returns
+// 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `pts` is readable for `n` entries.
+int gx_doc_lock_points(struct GxDoc *doc, const size_t *pts, size_t n, bool on);
+
 // Sets the construction flag of entity `e` (a dashed helper). Returns 1, 0
 // when rejected, -1 on error.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
 int gx_doc_set_construction(struct GxDoc *doc, size_t e, bool on);
+
+// Sets the construction flag of the `n` non-point entities of `ents` as one
+// undoable change. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `ents` is readable for `n` entries.
+int gx_doc_set_construction_all(struct GxDoc *doc, const size_t *ents, size_t n, bool on);
 
 // Sets the hidden flag of entity `e`. Returns 1, 0 when rejected, -1 on error.
 //
@@ -651,6 +851,13 @@ int gx_doc_set_hidden(struct GxDoc *doc, size_t e, bool on);
 // # Safety
 // `doc` is NULL or a document from this library.
 int gx_doc_set_infinite(struct GxDoc *doc, size_t e, bool on);
+
+// Switches each of the `n` lines of `lines` between infinite and segment, as
+// one undoable change. Returns 1, 0 when rejected, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `lines` is readable for `n` entries.
+int gx_doc_toggle_infinite(struct GxDoc *doc, const size_t *lines, size_t n);
 
 // Pulls point `e` toward (x, y) by solving the constraints with it pinned
 // there (a drag, not an undoable change). Returns 1 when reached, 0 when
@@ -674,6 +881,35 @@ int gx_doc_drag_circle(struct GxDoc *doc, size_t e, double x, double y);
 // # Safety
 // `doc` is NULL or a document from this library.
 int gx_doc_drag_conic_handle(struct GxDoc *doc, size_t e, uint8_t which, double x, double y);
+
+// Pulls each of the `n` points of `pts` toward its target (xy[2k],
+// xy[2k+1]) together, solving the constraints (such as the ends of a
+// dragged line). A drag, not an undoable change. Returns 1, 0 when the
+// points cannot reach their targets, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `pts` is readable for `n` entries and `xy` for `2n`.
+int gx_doc_drag_points(struct GxDoc *doc,
+                       const size_t *pts,
+                       const double *xy,
+                       size_t n);
+
+// Pulls curve `e` so it passes through (x, y), solving the constraints. A
+// drag, not an undoable change. Returns 1, 0 when the curve cannot reach
+// the point, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_drag_curve(struct GxDoc *doc, size_t e, double x, double y);
+
+// Sets value variable `i` to `value` and solves, as a drag: not an undoable
+// change by itself (see `gx_doc_checkpoint`). Returns 1, 0 when the
+// constraints do not solve at that value (the variable keeps its value),
+// -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_drag_var(struct GxDoc *doc, size_t i, double value);
 
 // Gives the point, dimension or variable named `old` the name `new`,
 // rewriting expressions that use it. Returns 1, 0 when `new` is not an
@@ -779,6 +1015,20 @@ int gx_doc_ent_construction(const struct GxDoc *doc, size_t e);
 // `doc` is NULL or a document from this library.
 int gx_doc_ent_hidden(const struct GxDoc *doc, size_t e);
 
+// 1 when the constraints determine entity `e` completely (nothing about its
+// position or shape is left free), 0 when not, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_ent_fixed(const struct GxDoc *doc, size_t e);
+
+// 1 when the last solve left entity `e` in conflict, 0 when not, -1 on
+// error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_ent_conflict(const struct GxDoc *doc, size_t e);
+
 // Number of constraint slots. Deleted constraints leave empty slots.
 //
 // # Safety
@@ -798,6 +1048,36 @@ int gx_doc_con_kind(const struct GxDoc *doc, size_t c);
 // # Safety
 // `doc` is NULL or a document from this library; `out` is NULL or writable for `cap` entries.
 ptrdiff_t gx_doc_con_ents(const struct GxDoc *doc, size_t c, size_t *out, size_t cap);
+
+// 1 when the last solve left constraint `c` unsatisfied, 0 when not, -1 on
+// error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_con_conflict(const struct GxDoc *doc, size_t c);
+
+// Why constraint `c` could not be turned into equations, or NULL when it
+// could (and on error). Free it with `gx_string_free`.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+char *gx_doc_con_error(const struct GxDoc *doc, size_t c);
+
+// 1 for an offset constraint (`GX_CON_OFFSET`) whose offset is turned by
+// 90° (the point of a perpendicular line), 0 otherwise, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_con_turned(const struct GxDoc *doc, size_t c);
+
+// Contact point of tangency constraint `c`, stored in `x` and `y`, with
+// `solved` set when it is a point the solver finds that no entity marks;
+// each output is skipped when NULL. Returns 1, 0 when `c` is not a
+// tangency, -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `x`, `y` and `solved` are NULL or writable.
+int gx_doc_con_contact(const struct GxDoc *doc, size_t c, double *x, double *y, bool *solved);
 
 // Kind of dimension `i` (`GX_DIM_*`), or -1 for an empty slot or a bad index.
 //
@@ -863,6 +1143,81 @@ int gx_doc_dim_driving(const struct GxDoc *doc, size_t i);
 // `doc` is NULL or a document from this library.
 int gx_doc_dim_numeric(const struct GxDoc *doc, size_t i);
 
+// Offset of the label of dimension `i` from the dimension's anchor, stored
+// in `x` and `y` when they are not NULL. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `x` and `y` are NULL or writable.
+int gx_doc_dim_offset(const struct GxDoc *doc, size_t i, double *x, double *y);
+
+// World coordinates of the anchor of dimension `i` (the midpoint of a
+// length, the vertex of an angle, the centre of a circle or conic), stored
+// in `x` and `y` when they are not NULL. The label sits at
+// `gx_doc_dim_offset` from here. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `x` and `y` are NULL or writable.
+int gx_doc_dim_anchor(const struct GxDoc *doc, size_t i, double *x, double *y);
+
+// World coordinates of the anchor a dimension of kind `kind` (`GX_DIM_*`)
+// on entities a and b would have, stored in `x` and `y` when they are not
+// NULL, for placing its label before adding it. Returns 1, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `x` and `y` are NULL or writable.
+int gx_doc_dim_anchor_of(const struct GxDoc *doc,
+                         GxDim kind,
+                         size_t a,
+                         size_t b,
+                         double *x,
+                         double *y);
+
+// Expression driving dimension `i` (empty when a plain value drives it or
+// it is a reference dimension), or NULL on error. Free it with
+// `gx_string_free`.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+char *gx_doc_dim_expr(const struct GxDoc *doc, size_t i);
+
+// The value dimension `i` is set to (radians for angles): for a driving
+// dimension the value it drives toward, which differs from
+// `gx_doc_dim_value` while the constraints conflict; for a reference
+// dimension its measured value. NaN on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+double gx_doc_dim_set_value(const struct GxDoc *doc, size_t i);
+
+// The entities dimension `i` measures, in the order `gx_doc_add_dim` takes
+// them, stored in `out` (up to `cap`); returns their number (1 or 2), -1 on
+// error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `out` is NULL or writable for `cap` entries.
+ptrdiff_t gx_doc_dim_ents(const struct GxDoc *doc, size_t i, size_t *out, size_t cap);
+
+// 1 when angle dimension `i` measures the supplementary angle of its lines,
+// 0 when not (and for other dimensions), -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_dim_supp(const struct GxDoc *doc, size_t i);
+
+// 1 when the last solve left dimension `i` unsatisfied, 0 when not, -1 on
+// error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_dim_conflict(const struct GxDoc *doc, size_t i);
+
+// Why dimension `i` could not be turned into an equation, or NULL when it
+// could (and on error). Free it with `gx_string_free`.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+char *gx_doc_dim_error(const struct GxDoc *doc, size_t i);
+
 // Number of variable slots. Removed variables leave empty slots.
 //
 // # Safety
@@ -902,16 +1257,35 @@ int gx_doc_var_free(const struct GxDoc *doc, size_t i);
 // `doc` is NULL or a document from this library.
 int gx_doc_var_numeric(const struct GxDoc *doc, size_t i);
 
-// Derives the closed-form formula of a dimension or variable, or NULL.
-// `extra_ms` extends the search beyond the default budget (0 for the
-// default; steps of 10000 suit retrying a hard target).
+// New, unset cancel flag. Release it with `gx_cancel_free`.
+struct GxCancel *gx_cancel_new(void);
+
+// Sets cancel flag `c`, from any thread: a derivation given it stops soon
+// and returns NULL. NULL is ignored.
 //
 // # Safety
-// `doc` is NULL or a document from this library.
+// `c` is NULL or a flag from `gx_cancel_new`, not yet released.
+void gx_cancel_set(const struct GxCancel *c);
+
+// Releases a cancel flag once no derivation uses it. NULL is ignored.
+//
+// # Safety
+// `c` is NULL or a flag from `gx_cancel_new`, not yet released.
+void gx_cancel_free(struct GxCancel *c);
+
+// Derives the closed-form formula of a dimension or variable, or NULL.
+// `extra_ms` extends the search beyond the default budget (0 for the
+// default; steps of 10000 suit retrying a hard target). A derivation can
+// take seconds: to run it on another thread, give it a `gx_doc_copy` of
+// the document and, to stop it early, a cancel flag (NULL for none).
+//
+// # Safety
+// `doc` is NULL or a document from this library; `cancel` is NULL or a flag from `gx_cancel_new`.
 struct GxFormula *gx_derive(const struct GxDoc *doc,
                             GxTarget kind,
                             size_t index,
-                            uint64_t extra_ms);
+                            uint64_t extra_ms,
+                            const struct GxCancel *cancel);
 
 // Releases a formula. NULL is ignored.
 //

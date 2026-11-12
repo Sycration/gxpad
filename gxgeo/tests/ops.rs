@@ -1,19 +1,16 @@
 //! Editing operations: drawing samples, the numeric flag, deleting and flags.
 
-use gxgeo::formula::{Target, derive_formula};
-use gxgeo::model::ConicKind;
-use gxgeo::ops::{self, ConKind, DimType};
-use gxgeo::sketch::Sketch;
+use gxgeo::ops::{self, ConKind, ConicKind, DimType, Document, Target};
 
 const WIN: ([f64; 2], [f64; 2], f64) = ([-10.0, -10.0], [10.0, 10.0], 0.02);
 
-fn samples(sk: &Sketch, e: usize) -> Vec<Vec<[f64; 2]>> {
+fn samples(sk: &Document, e: usize) -> Vec<Vec<[f64; 2]>> {
     ops::ent_samples(sk, e, WIN.0, WIN.1, WIN.2).unwrap()
 }
 
 #[test]
 fn samples_draw_each_kind() {
-    let mut sk = Sketch::new();
+    let mut sk = Document::new();
     let a = ops::add_point(&mut sk, 1.0, 2.0).unwrap();
     let b = ops::add_point(&mut sk, 3.0, 2.0).unwrap();
     assert_eq!(samples(&sk, a), vec![vec![[1.0, 2.0]]]);
@@ -53,10 +50,10 @@ fn samples_draw_each_kind() {
 
 /// a = 1.5 (free); line OP horizontal with length L = 2a; R a reference
 /// dimension of the same line.
-fn numeric_setup() -> (Sketch, usize, usize, usize) {
-    let mut sk = Sketch::new();
+fn numeric_setup() -> (Document, usize, usize, usize) {
+    let mut sk = Document::new();
     let a = ops::add_var(&mut sk, Some("a"), 1.5, true).unwrap();
-    let o = sk.doc.origin;
+    let o = ops::origin(&sk);
     let p = ops::add_point(&mut sk, 3.0, 0.5).unwrap();
     let l = ops::add_line(&mut sk, o, p, false).unwrap();
     assert!(ops::constrain(&mut sk, ConKind::Horizontal, l, 0).unwrap());
@@ -67,24 +64,24 @@ fn numeric_setup() -> (Sketch, usize, usize, usize) {
     (sk, a, len, r)
 }
 
-fn plain(sk: &Sketch, t: Target) -> String {
-    derive_formula(&sk.doc, t, 0).unwrap().plain
+fn plain(sk: &Document, t: Target) -> String {
+    ops::derive(sk, t, 0, None).unwrap().plain
 }
 
-fn rhs(sk: &Sketch, t: Target) -> String {
+fn rhs(sk: &Document, t: Target) -> String {
     plain(sk, t).split(" = ").nth(1).unwrap().to_string()
 }
 
 #[test]
 fn numeric_dimension_given_by_expression() {
     let (mut sk, _, len, _) = numeric_setup();
-    let name = sk.doc.dims[len].as_ref().unwrap().name.clone();
+    let name = ops::dim_name(&sk, len).unwrap();
     let h = ops::add_defvar(&mut sk, Some("h"), &name).unwrap();
     assert!(rhs(&sk, Target::Var(h)).contains('a'));
     assert!(ops::set_dim_numeric(&mut sk, len, true).unwrap());
     assert_eq!(rhs(&sk, Target::Var(h)), "3");
     // the dimension keeps its expression and still follows a
-    assert_eq!(sk.doc.dims[len].as_ref().unwrap().expr, "2*a");
+    assert_eq!(ops::dim_expr(&sk, len).unwrap(), "2*a");
     assert!(ops::set_dim_numeric(&mut sk, len, false).unwrap());
     assert!(rhs(&sk, Target::Var(h)).contains('a'));
 }
@@ -92,7 +89,7 @@ fn numeric_dimension_given_by_expression() {
 #[test]
 fn numeric_reference_dimension() {
     let (mut sk, _, _, r) = numeric_setup();
-    let name = sk.doc.dims[r].as_ref().unwrap().name.clone();
+    let name = ops::dim_name(&sk, r).unwrap();
     let k = ops::add_defvar(&mut sk, Some("k"), &name).unwrap();
     assert!(rhs(&sk, Target::Var(k)).contains('a'));
     assert!(ops::set_dim_numeric(&mut sk, r, true).unwrap());
@@ -129,35 +126,74 @@ fn numeric_variables_are_unchanged() {
 
 #[test]
 fn delete_reports_rejection() {
-    let mut sk = Sketch::new();
+    let mut sk = Document::new();
     let p = ops::add_point(&mut sk, 1.0, 1.0).unwrap();
     assert!(ops::delete_ent(&mut sk, p).unwrap());
     assert!(ops::delete_ent(&mut sk, p).is_err());
     // nothing given
-    assert!(!sk.delete(&[], &[], &[], &[]));
+    assert!(!sk.sketch_mut().delete(&[], &[], &[], &[]));
 }
 
 #[test]
 fn toggle_infinite_is_one_change() {
-    let mut sk = Sketch::new();
-    let o = sk.doc.origin;
+    let mut sk = Document::new();
+    let o = ops::origin(&sk);
     let a = ops::add_point(&mut sk, 1.0, 1.0).unwrap();
     let b = ops::add_point(&mut sk, 2.0, -1.0).unwrap();
     let l1 = ops::add_line(&mut sk, o, a, false).unwrap();
     let l2 = ops::add_line(&mut sk, o, b, true).unwrap();
     assert!(ops::toggle_infinite(&mut sk, &[l1, l2]).unwrap());
     assert!(ops::ent_infinite(&sk, l1).unwrap() && !ops::ent_infinite(&sk, l2).unwrap());
-    assert!(sk.undo());
+    assert!(ops::undo(&mut sk));
     assert!(!ops::ent_infinite(&sk, l1).unwrap() && ops::ent_infinite(&sk, l2).unwrap());
     assert!(ops::toggle_infinite(&mut sk, &[a]).is_err());
 }
 
 #[test]
 fn argument_checks() {
-    let mut sk = Sketch::new();
+    let mut sk = Document::new();
     let c = ops::add_point(&mut sk, 0.0, 0.0).unwrap();
     assert!(ops::circle_to(&mut sk, c, c).is_err());
     let pb = ops::add_conic(&mut sk, ConicKind::Parabola, c, 1.0, 1.0, 0.0).unwrap();
     assert!(ops::drag_conic_handle(&mut sk, pb, 1, 0.0, 3.0).is_err());
     assert!(ops::drag_conic_handle(&mut sk, pb, 0, 2.0, 0.0).is_ok());
+}
+
+#[test]
+fn dimension_label_offset() {
+    use std::f64::consts::FRAC_PI_4;
+    let near = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9;
+    let mut sk = Document::new();
+    let o = ops::origin(&sk);
+    let a = ops::add_point(&mut sk, 1.0, 0.0).unwrap();
+    let b = ops::add_point(&mut sk, 1.0, 1.0).unwrap();
+    let l1 = ops::add_line(&mut sk, o, a, false).unwrap();
+    let l2 = ops::add_line(&mut sk, o, b, false).unwrap();
+
+    // length: offset and anchor, undoable
+    let d = ops::add_dim(&mut sk, DimType::Length, l2, 0, [0.2, -0.1]).unwrap();
+    assert!(near(ops::dim_offset(&sk, d).unwrap(), [0.2, -0.1]));
+    assert!(near(ops::dim_anchor(&sk, d).unwrap(), [0.5, 0.5]));
+    ops::set_dim_offset(&mut sk, d, [-0.4, 0.3]).unwrap();
+    assert!(near(ops::dim_offset(&sk, d).unwrap(), [-0.4, 0.3]));
+    assert!(ops::undo(&mut sk));
+    assert!(near(ops::dim_offset(&sk, d).unwrap(), [0.2, -0.1]));
+    assert!(ops::set_dim_offset(&mut sk, d, [f64::NAN, 0.0]).is_err());
+    assert!(ops::set_dim_offset(&mut sk, 99, [0.0, 0.0]).is_err());
+    assert!(ops::dim_offset(&sk, 99).is_err() && ops::dim_anchor(&sk, 99).is_err());
+
+    // driving angle: the label's sector does not change the angle
+    let t = ops::add_dim(&mut sk, DimType::Angle, l1, l2, [0.3, 0.1]).unwrap();
+    assert!(ops::dim_driving(&sk, t).unwrap());
+    ops::set_dim_offset(&mut sk, t, [-0.3, 0.1]).unwrap();
+    assert!((ops::dim_value(&sk, t).unwrap().abs() - FRAC_PI_4).abs() < 1e-9);
+
+    // reference angle: the label's sector selects the angle or its supplement
+    assert!(ops::set_driving(&mut sk, t, false).unwrap());
+    ops::set_dim_offset(&mut sk, t, [0.3, 0.1]).unwrap();
+    assert!((ops::dim_value(&sk, t).unwrap().abs() - FRAC_PI_4).abs() < 1e-9);
+    ops::set_dim_offset(&mut sk, t, [-0.3, 0.1]).unwrap();
+    assert!((ops::dim_value(&sk, t).unwrap().abs() - 3.0 * FRAC_PI_4).abs() < 1e-9);
+    assert!(ops::undo(&mut sk));
+    assert!((ops::dim_value(&sk, t).unwrap().abs() - FRAC_PI_4).abs() < 1e-9);
 }

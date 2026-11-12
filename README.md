@@ -27,7 +27,7 @@ formula for the measured dimension in terms of the driving ones.
 
 ## Build and run
 
-Requires a recent Rust toolchain (edition 2024).
+Requires Rust 1.99 or later (edition 2024; the latex-rust formula renderer needs 1.99).
 
 ```sh
 cargo run --release                                   # empty pad
@@ -35,10 +35,11 @@ cargo run --release -- file.gxp                       # open a construction
 cargo run --release -- file.gxp d5                    # open it and select dimension d5
 ```
 
-The constructions built by the tests are in `test_examples/` and open the same way, for example:
+The constructions built by gxgeo's tests are in `gxgeo/test_examples/` and open the same way,
+for example:
 
 ```sh
-cargo run --release -- test_examples/gen_invariants/ptolemy_diagonals.gxp d5
+cargo run --release -- gxgeo/test_examples/gen_invariants/ptolemy_diagonals.gxp d5
 ```
 
 ## Tests
@@ -47,9 +48,19 @@ cargo run --release -- test_examples/gen_invariants/ptolemy_diagonals.gxp d5
 cargo test --no-fail-fast
 ```
 
-The generated tests (`tests/gen_*.rs`) build constructions with known answers, derive each
-measured dimension, and check that the formula stays correct while the construction is dragged
-and its values changed.
+gxpad's own tests cover the app: tools, drags, undo and the formula panel. The geometry tests
+are gxgeo's: its generated tests (`gxgeo/tests/gen_*.rs`) build constructions with known answers,
+derive each measured dimension, and check that the formula stays correct while the construction
+is dragged and its values changed.
+
+gxpad uses the library only through `gxgeo::ops`, the interface the C and JS bindings wrap one
+to one, so everything the app does can also be done from C and JavaScript. Two tests keep it so:
+gxpad's `public_api` test fails when the app reaches past `gxgeo::ops`, and gxgeo's `parity` test
+fails when a function of `gxgeo::ops` has no C or JS wrapper.
+
+Formulas are drawn from their LaTeX text by [latex-rust](https://crates.io/crates/latex-rust).
+Its 3.0.3 release pins egui 0.36.2, so `vendor/latex-rust` holds a copy whose only change takes
+egui 0.37 (see its `Cargo.toml`); drop it once a release supports egui 0.37.
 
 ## C and WebAssembly interfaces
 

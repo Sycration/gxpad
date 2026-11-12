@@ -58,7 +58,7 @@ int main(void) {
     gx_doc_set_dim_driving(doc, angle, false);
 
     gx_doc_solve(doc, NULL);
-    GxFormula *f = gx_derive(doc, GX_TARGET_DIM, angle, 0);
+    GxFormula *f = gx_derive(doc, GX_TARGET_DIM, angle, 0, NULL);
     if (f) {
         printf("%s\n", f->plain); /* θ1 = acos((d1^2 + d3^2 - d2^2)/(2d1*d3)) */
         gx_formula_free(f);
@@ -126,15 +126,14 @@ gxgeo = { path = "path/to/gxgeo" }
 ```
 
 ```rust
-use gxgeo::formula::{derive_formula, Target};
-use gxgeo::{gxp, sketch::Sketch};
+use gxgeo::ops::{self, Document, Target};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let text = std::fs::read_to_string("triangle.gxp")?;
-    let mut sketch = Sketch::from_doc(gxp::from_str(&text)?);
-    sketch.solve_full();
-    for i in 0..sketch.doc.dims.len() {
-        match derive_formula(&sketch.doc, Target::Dim(i), 0) {
+    let mut doc = Document::from_gxp(&text)?;
+    ops::solve(&mut doc);
+    for i in 0..ops::dim_count(&doc) {
+        match ops::derive(&doc, Target::Dim(i), 0, None) {
             Ok(f) => println!("{}", f.plain),
             Err(e) => println!("dimension {i}: {e}"),
         }
@@ -142,6 +141,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+`gxgeo::ops` is the interface the C and JS bindings wrap: each of its functions has a C function
+(`gx_doc_*`) and a JS method, and the `parity` test keeps it so. The other modules are the library
+internals; `Document::sketch` hands them to Rust code that needs them.
 
 `cargo doc -p gxgeo --open` builds the API documentation.
 
@@ -155,9 +158,12 @@ Documents are saved and loaded as `.gxp` text, a JSON encoding of the document:
 
 A formula is exact where one is found, otherwise some part of it is a number found numerically
 (`exact` is false). The derivation has a default time budget; the `extra_ms` argument of
-`gx_derive`, `deriveDim`, `deriveVar` and `derive_formula` extends it (steps of 10 000 ms suit
-retrying a hard target). A dimension or variable marked numeric appears in the formulas of other
-targets as its current value.
+`gx_derive`, `deriveDim`, `deriveVar` and `ops::derive` extends it (steps of 10 000 ms suit
+retrying a hard target). A derivation can take seconds: run it on a copy of the document
+(`gx_doc_copy`, `copy`, `ops::copy`) on another thread, with a cancel flag (`gx_cancel_new`,
+`Cancel`, `ops::new_cancel`) to stop it early. Besides plain text and LaTeX, a formula has a LaTeX
+form with repeated subexpressions written `u_1`, `u_2`, … and their definitions. A dimension or
+variable marked numeric appears in the formulas of other targets as its current value.
 
 ## Building from source
 

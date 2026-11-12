@@ -2,6 +2,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use gxpad::app::*;
+use gxpad::ops;
 use eframe::egui::{self, Color32, CornerRadius, Stroke, vec2};
 use std::collections::HashMap;
 
@@ -59,6 +60,9 @@ fn main() -> eframe::Result {
             .with_inner_size([1440.0, 900.0])
             .with_min_inner_size([820.0, 520.0])
             .with_title("gxpad"),
+        // smooths the edges of the formula glyphs, which are drawn as
+        // triangle meshes that egui's own anti-aliasing does not cover
+        multisampling: 4,
         ..Default::default()
     };
     eframe::run_native(
@@ -69,14 +73,13 @@ fn main() -> eframe::Result {
             let mut app = App::new();
             if let Some(path) = std::env::args().nth(1) {
                 if let Ok(s) = std::fs::read_to_string(&path) {
-                    if let Ok(d) = gxpad::gxp::from_str(&s) {
-                        app.geo.doc = d;
+                    if let Ok(mut d) = ops::Document::from_gxp(&s) {
+                        ops::solve(&mut d);
+                        app.geo = d;
                         app.path = Some(path.into());
-                        app.geo.dirty = true;
-                        app.geo.solve_full();
                         // an optional second argument: the dimension to select
                         if let Some(name) = std::env::args().nth(2) {
-                            if let Some(i) = app.geo.doc.dims.iter().position(|d| d.as_ref().is_some_and(|d| d.name == name)) {
+                            if let Some(i) = (0..ops::dim_count(&app.geo)).find(|&i| ops::dim_name(&app.geo, i).is_ok_and(|n| n == name)) {
                                 app.sel = vec![Sel::Dim(i)];
                             }
                         }
