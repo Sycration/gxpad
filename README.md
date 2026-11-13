@@ -92,9 +92,15 @@ the library on its own.
 
 ## Windows XP version
 
-`winxp/` holds a native Windows version of gxpad in the style of Windows XP programs, a Visual
-Studio 2008 project that uses gxgeo through its C interface. [winxp/README.md](winxp/README.md)
-describes it and how to build it.
+![gxpad for Windows on Windows XP, with the diagonals of a rhombus](docs/xp.png)
+
+`winxp/` holds a native Windows version of gxpad in the style of Windows XP programs: menus and
+toolbars, a tool box like Paint's, Properties dialogs and printing. It runs on Windows XP (SP2 or
+later) and later versions of Windows, opens the same `.gxp` files, and shows the formulas gxgeo
+derives, typeset by the library. Releases have it as `gxpad-<version>-winxp-x86.zip`.
+
+It is a Visual Studio 2008 project that uses gxgeo through its C interface.
+[winxp/README.md](winxp/README.md) describes it and how to build it.
 
 ## How the formulas are derived
 

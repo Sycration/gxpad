@@ -51,6 +51,9 @@ and needs no redistributable.
 3. For a release, copy both files to `build/winxp/x86/bin`; `./release.sh` then packs them as
    `gxpad-TAG-winxp-x86.zip`.
 
+`vm/` holds scripts that do these steps on a Windows XP virtual machine from the Linux machine that
+hosts it, and drive the program there to try it out; see [vm/README.md](vm/README.md).
+
 `res/toolbar.bmp` (the toolbar and tool box images) and `res/gxpad.ico` come from
 `res/make_icons.py`; run `python3 make_icons.py` in `res/` (requires Pillow) after changing the
 images.
