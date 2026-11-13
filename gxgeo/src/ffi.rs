@@ -404,6 +404,39 @@ pub unsafe extern "C" fn gx_doc_checkpoint(doc: *mut GxDoc) -> c_int {
     })
 }
 
+/// Remaining degrees of freedom after the last solve, or -1 on error.
+///
+/// # Safety
+/// `doc` is NULL or a document from this library.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gx_doc_dof(doc: *const GxDoc) -> isize {
+    index(|| Ok(ops::dof(unsafe { doc_ref(doc) }?)))
+}
+
+/// Number of steps in the undo history (see `gx_doc_join_undo`), or -1 on
+/// error.
+///
+/// # Safety
+/// `doc` is NULL or a document from this library.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gx_doc_undo_len(doc: *const GxDoc) -> isize {
+    index(|| Ok(ops::undo_len(unsafe { doc_ref(doc) }?)))
+}
+
+/// Joins the undo steps recorded since the undo history held `len` steps (a
+/// value of `gx_doc_undo_len` read before them) into one step, so that a
+/// change made with several calls, such as adding points and then a line
+/// through them, undoes at once. Returns 1, 0 when fewer than two steps were
+/// recorded since, -1 on error. The history keeps at most 300 steps; past
+/// that, steps recorded since `len` can be left unjoined.
+///
+/// # Safety
+/// `doc` is NULL or a document from this library.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gx_doc_join_undo(doc: *mut GxDoc, len: usize) -> c_int {
+    status("join undo", || Ok(ops::join_undo(unsafe { doc_mut(doc) }?, len)))
+}
+
 /// A copy of the document in its current state, with the same solve status
 /// and without the undo history, or NULL. Changes to the copy leave `doc` as
 /// it is, so a copy suits trying out a change or deriving on another thread.
@@ -1638,6 +1671,8 @@ pub unsafe extern "C" fn gx_doc_dim_name(doc: *const GxDoc, i: usize) -> *mut c_
 
 /// Current measured value of dimension `i` (radians for angles), or NaN for
 /// an empty slot or a bad index.
+/// A value that is 0 up to the rounding of the solved coordinates is
+/// exactly 0.
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
@@ -1939,5 +1974,40 @@ pub unsafe extern "C" fn gx_formula_free(f: *mut GxFormula) {
 pub unsafe extern "C" fn gx_string_free(s: *mut c_char) {
     if !s.is_null() {
         drop(unsafe { CString::from_raw(s) });
+    }
+}
+
+// ------------------------------------------------------------ typesetting
+
+/// LaTeX text, such as the `latex` or `latex_short` of a `GxFormula`,
+/// typeset in display style as a PNG image: glyphs of color `rgb`
+/// (0xRRGGBB) on a transparent background, at `size_pt` points and `dpi`
+/// dots per inch (a point is 1/72 inch, so 12 pt at 96 dpi puts 16 pixels to
+/// the em). Returns the bytes of the PNG file and stores their number in
+/// `len`, or returns NULL on error. Release the bytes with `gx_bytes_free`.
+///
+/// # Safety
+/// `latex` is NULL or a NUL-terminated string; `len` is writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gx_latex_png(latex: *const c_char, size_pt: f64, dpi: f64, rgb: u32, len: *mut usize) -> *mut u8 {
+    guard(ptr::null_mut(), || {
+        let len = unsafe { len.as_mut() }.ok_or("null length")?;
+        let text = unsafe { in_str(latex) }?;
+        let [_, r, g, b] = rgb.to_be_bytes();
+        let png = ops::latex_png(text, size_pt, dpi, [r, g, b])?.into_boxed_slice();
+        *len = png.len();
+        Ok(Box::into_raw(png).cast::<u8>())
+    })
+}
+
+/// Releases `len` bytes returned by `gx_latex_png`.
+///
+/// # Safety
+/// `p` is NULL or a pointer from `gx_latex_png` with the length it stored,
+/// not yet released.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gx_bytes_free(p: *mut u8, len: usize) {
+    if !p.is_null() {
+        drop(unsafe { Box::from_raw(ptr::slice_from_raw_parts_mut(p, len)) });
     }
 }

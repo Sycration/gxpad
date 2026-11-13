@@ -127,6 +127,27 @@ impl JsDoc {
         ops::checkpoint(&mut self.doc);
     }
 
+    /// Remaining degrees of freedom after the last solve.
+    pub fn dof(&self) -> usize {
+        ops::dof(&self.doc)
+    }
+
+    /// Number of steps in the undo history; see `joinUndo`.
+    #[wasm_bindgen(js_name = undoLen)]
+    pub fn undo_len(&self) -> usize {
+        ops::undo_len(&self.doc)
+    }
+
+    /// Joins the undo steps recorded since the undo history held `len` steps
+    /// (a value of `undoLen` read before them) into one step, so that a
+    /// change made with several calls undoes at once. False when fewer than
+    /// two steps were recorded since. The history keeps at most 300 steps;
+    /// past that, steps recorded since `len` can be left unjoined.
+    #[wasm_bindgen(js_name = joinUndo)]
+    pub fn join_undo(&mut self, len: usize) -> bool {
+        ops::join_undo(&mut self.doc, len)
+    }
+
     /// A copy of the document in its current state, with the same solve
     /// status and without the undo history.
     pub fn copy(&self) -> JsDoc {
@@ -711,7 +732,8 @@ impl JsDoc {
     }
 
     /// Current measured value of dimension `i` (radians for angles); NaN
-    /// for an empty slot or a bad index.
+    /// for an empty slot or a bad index. A value that is 0 up to the
+    /// rounding of the solved coordinates is exactly 0.
     #[wasm_bindgen(js_name = dimValue)]
     pub fn dim_value(&self, i: usize) -> f64 {
         ops::dim_value(&self.doc, i).unwrap_or(f64::NAN)
@@ -1061,6 +1083,17 @@ impl Cancel {
     pub fn cancel(&self) {
         ops::cancel(&self.c);
     }
+}
+
+/// LaTeX text, such as the `latex` or `latexShort` of a `Formula`, typeset
+/// in display style as the bytes of a PNG image: glyphs of color `rgb`
+/// (0xRRGGBB) on a transparent background, at `sizePt` points and `dpi` dots
+/// per inch (a point is 1/72 inch, so 12 pt at 96 dpi puts 16 pixels to the
+/// em).
+#[wasm_bindgen(js_name = latexPng)]
+pub fn latex_png(latex: &str, size_pt: f64, dpi: f64, rgb: u32) -> Result<Vec<u8>, JsError> {
+    let [_, r, g, b] = rgb.to_be_bytes();
+    ops::latex_png(latex, size_pt, dpi, [r, g, b]).map_err(js)
 }
 
 /// Version of the library.

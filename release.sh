@@ -8,9 +8,12 @@
 #   --dry-run  only writes the archives to build/dist, without creating a release
 #
 # Archives: gxpad-TAG-<platform>-<arch>.tar.gz (linux, macos), .zip (windows), gxgeo-TAG-web.tar.gz,
-# plus SHA256SUMS. Each one holds a top-level folder with bin/ and lib/ as in build/ and LICENSE; the gxpad
-# archives also hold the gxpad README.md (lib/ holds the gxgeo README.md, from ./build.sh).
-# The release tag points at the current commit, which must be clean and pushed.
+# gxgeo-TAG-winxp-<arch>.zip, plus SHA256SUMS. Each one holds a top-level folder with bin/ and lib/ as in
+# build/ and LICENSE; the gxpad archives also hold the gxpad README.md (lib/ holds the gxgeo README.md, from
+# ./build.sh). When build/winxp/x86/bin holds gxpad.exe (built with Visual Studio 2008, see
+# winxp/README.md), its archive is gxpad-TAG-winxp-x86.zip with the README.md of winxp/.
+# The release tag points at the current commit, which must be clean and pushed. ./set-version.sh X.Y.Z
+# sets the version beforehand (the crates, and the VERSIONINFO of the Windows XP program).
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -35,7 +38,7 @@ die() { echo "error: $*" >&2; exit 1; }
 
 command -v bsdtar >/dev/null || die "bsdtar is not installed (libarchive), it writes the .zip archives"
 
-targets=(linux/x64 linux/arm64 macos/x64 macos/arm64 windows/x64 windows/arm64 web/wasm32)
+targets=(linux/x64 linux/arm64 macos/x64 macos/arm64 windows/x64 windows/arm64 web/wasm32 winxp/x86 winxp/x64)
 for t in "${targets[@]}"; do
   [ -d "$BUILD/$t" ] || die "build/$t is missing, run ./build.sh first"
 done
@@ -56,16 +59,20 @@ trap 'rm -rf "$stage"' EXIT
 
 for t in "${targets[@]}"; do
   platform=${t%/*} arch=${t#*/}
-  if [ "$platform" = web ]; then
-    name=gxgeo-$tag-web
-  else
-    name=gxpad-$tag-$platform-$arch
-  fi
+  case $platform in
+    web) name=gxgeo-$tag-web ;;
+    winxp) if [ -f "$BUILD/$t/bin/gxpad.exe" ]; then name=gxpad-$tag-winxp-$arch; else name=gxgeo-$tag-winxp-$arch; fi ;;
+    *) name=gxpad-$tag-$platform-$arch ;;
+  esac
   mkdir -p "$stage/$name"
   cp -r "$BUILD/$t/." "$stage/$name/"
   cp LICENSE "$stage/$name/"
-  [ "$platform" = web ] || cp README.md "$stage/$name/"
-  if [ "$platform" = windows ]; then
+  case $name in
+    gxgeo-*) ;;
+    gxpad-*-winxp-*) cp winxp/README.md "$stage/$name/" ;;
+    *) cp README.md "$stage/$name/" ;;
+  esac
+  if [ "$platform" = windows ] || [ "$platform" = winxp ]; then
     (cd "$stage" && bsdtar -a -cf "$DIST/$name.zip" "$name")
   else
     tar -C "$stage" -czf "$DIST/$name.tar.gz" "$name"

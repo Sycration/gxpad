@@ -139,6 +139,21 @@ pub fn redo(doc: &mut Document) -> bool {
     doc.sk.redo()
 }
 
+/// Number of steps in the undo history; see `join_undo`.
+pub fn undo_len(doc: &Document) -> usize {
+    doc.sk.undo.len()
+}
+
+/// Joins the undo steps recorded since the undo history held `len` steps (a
+/// value of `undo_len` read before them) into one step, so that a change
+/// made with several calls, such as adding points and then a line through
+/// them, undoes at once. False when fewer than two steps were recorded
+/// since. The history keeps at most 300 steps; past that, steps recorded
+/// since `len` can be left unjoined.
+pub fn join_undo(doc: &mut Document, len: usize) -> bool {
+    doc.sk.join_undo(len)
+}
+
 /// Records the current document as an undo step. A drag (`drag_point`,
 /// `drag_var`, ...) is not undoable by itself, so a checkpoint before it
 /// makes the whole drag one undo step.
@@ -632,10 +647,23 @@ pub fn dim_expr(doc: &Document, i: usize) -> Result<String, String> {
     Ok(dim(&doc.sk, i)?.expr.clone())
 }
 
-/// Current measured value of dimension `i` (radians for angles).
+/// Current measured value of dimension `i` (radians for angles). A value
+/// that is 0 up to the rounding of the solved coordinates is exactly 0.
 pub fn dim_value(doc: &Document, i: usize) -> Result<f64, String> {
     dim(&doc.sk, i)?;
-    Ok(doc.sk.doc.measure_value(i))
+    Ok(rounded_zero(doc, doc.sk.doc.measure_value(i)))
+}
+
+/// Largest size, relative to the numbers of the document, of a value that
+/// counts as 0. Solved coordinates are exact to a few units in the last
+/// place, so a quantity that is 0 (the offset of a point from a line it lies
+/// on) comes out around 1e-16 times their size, not 0.
+const ROUNDING: f64 = 1e-12;
+
+/// `v`, or 0 when `v` is 0 up to the rounding of the solved coordinates.
+fn rounded_zero(doc: &Document, v: f64) -> f64 {
+    let scale = doc.sk.doc.params.iter().map(|p| p.v.abs()).filter(|a| a.is_finite()).fold(1.0, f64::max);
+    if v.abs() <= ROUNDING * scale { 0.0 } else { v }
 }
 
 /// The value dimension `i` is set to (radians for angles): for a driving
@@ -644,7 +672,7 @@ pub fn dim_value(doc: &Document, i: usize) -> Result<f64, String> {
 /// value.
 pub fn dim_set_value(doc: &Document, i: usize) -> Result<f64, String> {
     let d = dim(&doc.sk, i)?;
-    Ok(if d.driving { doc.sk.doc.params[d.param].v } else { doc.sk.doc.measure_value(i) })
+    Ok(if d.driving { doc.sk.doc.params[d.param].v } else { rounded_zero(doc, doc.sk.doc.measure_value(i)) })
 }
 
 /// The entities dimension `i` measures, in the order `add_dim` takes them:
@@ -912,7 +940,10 @@ pub fn delete_var(doc: &mut Document, i: usize) -> Result<bool, String> {
 
 pub fn var_value(doc: &Document, i: usize) -> Result<f64, String> {
     let sk = &doc.sk;
-    Ok(sk.doc.params[var(sk, i)?.param].v)
+    let v = var(sk, i)?;
+    let p = &sk.doc.params[v.param];
+    // a free variable has exactly the value it was given; a solved or defined one is computed
+    Ok(if v.expr.is_empty() && p.locked { p.v } else { rounded_zero(doc, p.v) })
 }
 
 /// The expression of variable `i`; empty for a value variable.
@@ -1918,8 +1949,40 @@ pub fn derive(doc: &Document, t: Target, extra_ms: u64, cancel: Option<&Cancel>)
         latex: f.latex,
         exact: f.exact,
         is_angle: f.is_angle,
-        value: f.value,
-        actual: f.actual,
+        value: rounded_zero(doc, f.value),
+        actual: rounded_zero(doc, f.actual),
     })
 }
 
+
+// ------------------------------------------------------------ typesetting
+
+/// LaTeX text, such as the `latex` or `latex_short` of a [`Formula`],
+/// typeset in display style as a PNG image: glyphs of color `rgb` on a
+/// transparent background, at `size_pt` points and `dpi` dots per inch (a
+/// point is 1/72 inch, so 12 pt at 96 dpi puts 16 pixels to the em). The
+/// image is as large as the typeset text.
+pub fn latex_png(latex: &str, size_pt: f64, dpi: f64, rgb: [u8; 3]) -> Result<Vec<u8>, String> {
+    use latex_rust::{Color, Dim, MathFont, PngBackground, PngOptions};
+    if !(size_pt.is_finite() && size_pt > 0.0 && size_pt <= 1000.0) {
+        return Err("the size must be above 0 and at most 1000 pt".into());
+    }
+    if !(dpi.is_finite() && dpi > 0.0 && dpi <= 2400.0) {
+        return Err("the resolution must be above 0 and at most 2400 dpi".into());
+    }
+    thread_local! {
+        static FONT: Result<MathFont, String> = MathFont::stix_two_math().map_err(|e| e.to_string());
+    }
+    // the options are exact rationals: sizes to 1/100 point and dot per inch
+    let hundredths = |v: f64| Dim::ratio((v * 100.0).round().max(1.0) as i64, 100);
+    let mut opt = PngOptions::new();
+    opt.font_size_pt = hundredths(size_pt);
+    opt.dpi = hundredths(dpi);
+    opt.color = Color::rgb(rgb[0], rgb[1], rgb[2]);
+    opt.background = PngBackground::Transparent;
+    opt.display = true;
+    FONT.with(|f| {
+        let font = f.as_ref().map_err(|e| e.clone())?;
+        latex_rust::latex_to_png(latex, font, &opt).map_err(|e| e.to_string())
+    })
+}

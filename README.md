@@ -90,6 +90,12 @@ wasm-bindgen --target web --out-dir gxgeo/pkg target/wasm32-unknown-unknown/rele
 Example C and JS clients live in `gxgeo/examples/`. [gxgeo/README.md](gxgeo/README.md) describes
 the library on its own.
 
+## Windows XP version
+
+`winxp/` holds a native Windows version of gxpad in the style of Windows XP programs, a Visual
+Studio 2008 project that uses gxgeo through its C interface. [winxp/README.md](winxp/README.md)
+describes it and how to build it.
+
 ## How the formulas are derived
 
 [SHORTCOMINGS.md](SHORTCOMINGS.md) describes the derivation and where it falls short.

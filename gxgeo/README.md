@@ -18,7 +18,17 @@ gxgeo is a Rust crate, a C shared library and a WebAssembly module with JavaScri
 | Linux | `libgxgeo.so`, `gxgeo.h` |
 | macOS | `libgxgeo.dylib` (install name `@rpath/libgxgeo.dylib`), `gxgeo.h` |
 | Windows | `gxgeo.dll`, `libgxgeo.dll.a` (import library), `gxgeo.h` |
+| Windows XP | `gxgeo.dll`, `gxgeo.lib` (import library), `gxgeo.h` |
 | Web | `gxgeo_bg.wasm`, `gxgeo.js` (ES module), `gxgeo.d.ts` |
+
+The Windows XP builds are for 32-bit Windows XP (x86, which requires a processor with SSE2) and for
+Windows XP x64 and Server 2003 (x64). They use only the C runtime that ships with Windows
+(`msvcrt.dll`), so they need no Visual C++ redistributable. `gxgeo.h` and `gxgeo.lib` also work with
+Visual C++ 2008, whose C compiler is C89 only:
+
+```bat
+cl /Tc program.c gxgeo.lib
+```
 
 ## C
 
@@ -154,6 +164,11 @@ Documents are saved and loaded as `.gxp` text, a JSON encoding of the document:
 `gx_doc_to_gxp` / `gx_doc_from_gxp` in C, `toGxp` / `Doc.fromGxp` in JavaScript and
 `gxgeo::gxp` in Rust. A loaded document is solved before its values are read.
 
+Every change is one undo step. A change made with several calls, such as adding two points and
+then a line between them, becomes one step by reading the length of the undo history before the
+calls and joining the steps recorded since: `gx_doc_undo_len` / `gx_doc_join_undo` in C,
+`undoLen` / `joinUndo` in JavaScript, `ops::undo_len` / `ops::join_undo` in Rust.
+
 ## Formulas
 
 A formula is exact where one is found, otherwise some part of it is a number found numerically
@@ -164,6 +179,11 @@ retrying a hard target). A derivation can take seconds: run it on a copy of the 
 `Cancel`, `ops::new_cancel`) to stop it early. Besides plain text and LaTeX, a formula has a LaTeX
 form with repeated subexpressions written `u_1`, `u_2`, … and their definitions. A dimension or
 variable marked numeric appears in the formulas of other targets as its current value.
+
+The LaTeX of a formula can be typeset as a PNG image at a given size, resolution and color, on a
+transparent background: `gx_latex_png` in C (the bytes are released with `gx_bytes_free`),
+`latexPng` in JavaScript and `ops::latex_png` in Rust. The typesetting is done by
+[latex-rust](https://crates.io/crates/latex-rust) with the STIX Two Math font.
 
 ## Building from source
 

@@ -1,6 +1,6 @@
 [package]
 name = "gxpad"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "2D constraint-based geometry pad that derives closed-form formulas for measured dimensions"
 license = "GPL-3.0-or-later"

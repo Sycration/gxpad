@@ -3,9 +3,25 @@
 #ifndef GXGEO_H
 #define GXGEO_H
 
-#include <stdbool.h>
 #include <stddef.h>
+#if defined(_MSC_VER) && _MSC_VER < 1600
+typedef unsigned __int8 uint8_t;
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int64 uint64_t;
+#else
 #include <stdint.h>
+#endif
+#ifndef __cplusplus
+#if defined(_MSC_VER) && _MSC_VER < 1800
+#ifndef bool
+#define bool unsigned char
+#define true 1
+#define false 0
+#endif
+#else
+#include <stdbool.h>
+#endif
+#endif
 
 // Largest window side, in pixels, that [`Window::new`] accepts.
 #define MAX_PIXELS 20000.0
@@ -282,6 +298,30 @@ int gx_doc_redo(struct GxDoc *doc);
 // # Safety
 // `doc` is NULL or a document from this library.
 int gx_doc_checkpoint(struct GxDoc *doc);
+
+// Remaining degrees of freedom after the last solve, or -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_dof(const struct GxDoc *doc);
+
+// Number of steps in the undo history (see `gx_doc_join_undo`), or -1 on
+// error.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+ptrdiff_t gx_doc_undo_len(const struct GxDoc *doc);
+
+// Joins the undo steps recorded since the undo history held `len` steps (a
+// value of `gx_doc_undo_len` read before them) into one step, so that a
+// change made with several calls, such as adding points and then a line
+// through them, undoes at once. Returns 1, 0 when fewer than two steps were
+// recorded since, -1 on error. The history keeps at most 300 steps; past
+// that, steps recorded since `len` can be left unjoined.
+//
+// # Safety
+// `doc` is NULL or a document from this library.
+int gx_doc_join_undo(struct GxDoc *doc, size_t len);
 
 // A copy of the document in its current state, with the same solve status
 // and without the undo history, or NULL. Changes to the copy leave `doc` as
@@ -1125,6 +1165,8 @@ char *gx_doc_dim_name(const struct GxDoc *doc, size_t i);
 
 // Current measured value of dimension `i` (radians for angles), or NaN for
 // an empty slot or a bad index.
+// A value that is 0 up to the rounding of the solved coordinates is
+// exactly 0.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
@@ -1298,6 +1340,24 @@ void gx_formula_free(struct GxFormula *f);
 // # Safety
 // `s` is NULL or a string from this library, not yet released.
 void gx_string_free(char *s);
+
+// LaTeX text, such as the `latex` or `latex_short` of a `GxFormula`,
+// typeset in display style as a PNG image: glyphs of color `rgb`
+// (0xRRGGBB) on a transparent background, at `size_pt` points and `dpi`
+// dots per inch (a point is 1/72 inch, so 12 pt at 96 dpi puts 16 pixels to
+// the em). Returns the bytes of the PNG file and stores their number in
+// `len`, or returns NULL on error. Release the bytes with `gx_bytes_free`.
+//
+// # Safety
+// `latex` is NULL or a NUL-terminated string; `len` is writable.
+uint8_t *gx_latex_png(const char *latex, double size_pt, double dpi, uint32_t rgb, size_t *len);
+
+// Releases `len` bytes returned by `gx_latex_png`.
+//
+// # Safety
+// `p` is NULL or a pointer from `gx_latex_png` with the length it stored,
+// not yet released.
+void gx_bytes_free(uint8_t *p, size_t len);
 
 #ifdef __cplusplus
 }  // extern "C"

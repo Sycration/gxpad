@@ -197,3 +197,83 @@ fn dimension_label_offset() {
     assert!(ops::undo(&mut sk));
     assert!((ops::dim_value(&sk, t).unwrap().abs() - FRAC_PI_4).abs() < 1e-9);
 }
+
+#[test]
+fn joined_undo_steps_undo_at_once() {
+    let mut sk = Document::new();
+    let first = ops::add_point(&mut sk, 0.0, 0.0).unwrap();
+    let len = ops::undo_len(&sk);
+    // a line between two new points, made with three calls
+    let a = ops::add_point(&mut sk, 1.0, 0.0).unwrap();
+    let b = ops::add_point(&mut sk, 2.0, 1.0).unwrap();
+    let l = ops::add_line(&mut sk, a, b, false).unwrap();
+    assert_eq!(ops::undo_len(&sk), len + 3);
+    assert!(ops::join_undo(&mut sk, len));
+    assert_eq!(ops::undo_len(&sk), len + 1);
+    assert!(ops::undo(&mut sk));
+    for e in [a, b, l] {
+        assert!(ops::ent_kind(&sk, e).is_err(), "entity {e} is still there");
+    }
+    assert!(ops::ent_kind(&sk, first).is_ok());
+    // redo brings back all three
+    assert!(ops::redo(&mut sk));
+    assert!(ops::ent_kind(&sk, l).is_ok());
+    // nothing to join with fewer than two steps
+    let len = ops::undo_len(&sk);
+    assert!(!ops::join_undo(&mut sk, len));
+    ops::add_point(&mut sk, 3.0, 3.0).unwrap();
+    assert!(!ops::join_undo(&mut sk, len));
+    assert!(!ops::join_undo(&mut sk, usize::MAX));
+}
+
+/// Width and height of a PNG image, from its header.
+fn png_size(png: &[u8]) -> (u32, u32) {
+    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
+    assert_eq!(&png[12..16], b"IHDR");
+    let be = |i: usize| u32::from_be_bytes(png[i..i + 4].try_into().unwrap());
+    (be(16), be(20))
+}
+
+#[test]
+fn formula_typeset_as_png() {
+    let mut sk = Document::new();
+    let a = ops::add_point(&mut sk, 0.0, 0.0).unwrap();
+    let b = ops::add_point(&mut sk, 3.0, 4.0).unwrap();
+    let d = ops::add_dim(&mut sk, DimType::Distance, a, b, [0.5, 0.5]).unwrap();
+    ops::set_driving(&mut sk, d, false).unwrap();
+    let f = ops::derive(&sk, Target::Dim(d), 0, None).unwrap();
+    let small = png_size(&ops::latex_png(&f.latex, 12.0, 96.0, [0, 0, 0]).unwrap());
+    let large = png_size(&ops::latex_png(&f.latex, 24.0, 96.0, [0x20, 0x40, 0x80]).unwrap());
+    assert!(small.0 > 20 && small.1 > 8, "{small:?}");
+    // twice the size, about twice the pixels across
+    let ratio = large.0 as f64 / small.0 as f64;
+    assert!((1.8..2.2).contains(&ratio), "{small:?} {large:?}");
+    // the same size at twice the resolution
+    let sharp = png_size(&ops::latex_png(&f.latex, 12.0, 192.0, [0, 0, 0]).unwrap());
+    assert!((sharp.0 as f64 / small.0 as f64 - 2.0).abs() < 0.2, "{small:?} {sharp:?}");
+
+    assert!(ops::latex_png(r"\frac{1}{", 12.0, 96.0, [0, 0, 0]).is_err());
+    assert!(ops::latex_png("x", 0.0, 96.0, [0, 0, 0]).is_err());
+    assert!(ops::latex_png("x", 12.0, f64::NAN, [0, 0, 0]).is_err());
+    assert!(ops::latex_png("x", 12.0, 3000.0, [0, 0, 0]).is_err());
+}
+
+/// A measured quantity that is 0 (the Simson feet are collinear, so the
+/// third foot is 0 from the line through the other two) reads exactly 0,
+/// not the rounding of the solved coordinates.
+#[test]
+fn zero_measurement_is_exactly_zero() {
+    let text = include_str!("../test_examples/gen_constructions/simson_line.gxp");
+    let mut sk = Document::from_gxp(text).unwrap();
+    ops::solve(&mut sk);
+    let offset = (0..ops::dim_count(&sk)).find(|&i| ops::dim_kind(&sk, i) == Ok(DimType::PointLine)).unwrap();
+    assert!(!ops::dim_driving(&sk, offset).unwrap());
+    assert_eq!(ops::dim_value(&sk, offset).unwrap(), 0.0);
+    assert_eq!(ops::dim_set_value(&sk, offset).unwrap(), 0.0);
+    let f = ops::derive(&sk, Target::Dim(offset), 0, None).unwrap();
+    assert!(f.plain.ends_with(" = 0"), "{}", f.plain);
+    assert_eq!((f.value, f.actual), (0.0, 0.0));
+    // a value that is not 0 stays as it is
+    let driving = (0..ops::dim_count(&sk)).find(|&i| ops::dim_driving(&sk, i).unwrap_or(false)).unwrap();
+    assert!(ops::dim_value(&sk, driving).unwrap() > 1.0);
+}

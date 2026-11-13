@@ -1,0 +1,503 @@
+// Resources of gxpad for Windows.
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+IDI_GXPAD ICON "res\\gxpad.ico"
+IDB_TOOLBAR BITMAP "res\\toolbar.bmp"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 0,2,1,0
+ PRODUCTVERSION 0,2,1,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "gxpad"
+            VALUE "FileDescription", "gxpad geometry pad"
+            VALUE "FileVersion", "0.2.1"
+            VALUE "InternalName", "gxpad"
+            VALUE "LegalCopyright", "GNU General Public License, version 3 or later"
+            VALUE "OriginalFilename", "gxpad.exe"
+            VALUE "ProductName", "gxpad"
+            VALUE "ProductVersion", "0.2.1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+// ------------------------------------------------------------ menus
+
+IDR_MENU MENU
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New\tCtrl+N",                ID_FILE_NEW
+        MENUITEM "&Open...\tCtrl+O",            ID_FILE_OPEN
+        MENUITEM "&Save\tCtrl+S",               ID_FILE_SAVE
+        MENUITEM "Save &As...",                 ID_FILE_SAVE_AS
+        MENUITEM SEPARATOR
+        MENUITEM "&Export Formula Picture...",  ID_FILE_EXPORT
+        MENUITEM SEPARATOR
+        MENUITEM "&Print...\tCtrl+P",           ID_FILE_PRINT
+        MENUITEM SEPARATOR
+        MENUITEM "Recent File",                 ID_FILE_MRU1, GRAYED
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       ID_FILE_EXIT
+    END
+    POPUP "&Edit"
+    BEGIN
+        MENUITEM "&Undo\tCtrl+Z",               ID_EDIT_UNDO
+        MENUITEM "&Redo\tCtrl+Y",               ID_EDIT_REDO
+        MENUITEM SEPARATOR
+        MENUITEM "&Copy Formula\tCtrl+C",       ID_EDIT_COPY_FORMULA
+        MENUITEM "Copy Formula as &LaTeX",      ID_EDIT_COPY_LATEX
+        MENUITEM "Copy Formula &Picture",       ID_EDIT_COPY_PICTURE
+        MENUITEM "Copy &Drawing",               ID_EDIT_COPY_DRAWING
+        MENUITEM SEPARATOR
+        MENUITEM "Dele&te\tDel",                ID_EDIT_DELETE
+        MENUITEM "Select &All\tCtrl+A",         ID_EDIT_SELECT_ALL
+        MENUITEM "Select &Objects",             ID_TOOL_SELECT
+        MENUITEM SEPARATOR
+        MENUITEM "Propert&ies...\tAlt+Enter",   ID_EDIT_PROPERTIES
+    END
+    POPUP "&View"
+    BEGIN
+        MENUITEM "&Standard Toolbar",           ID_VIEW_TOOLBAR
+        MENUITEM "&Constraints Toolbar",        ID_VIEW_CONBAR
+        MENUITEM "&Tool Box",                   ID_VIEW_TOOLBOX
+        MENUITEM "Status &Bar",                 ID_VIEW_STATUSBAR
+        MENUITEM "Side &Pane",                  ID_VIEW_PANE
+        MENUITEM SEPARATOR
+        MENUITEM "Zoom &In\tCtrl++",            ID_VIEW_ZOOM_IN
+        MENUITEM "Zoom &Out\tCtrl+-",           ID_VIEW_ZOOM_OUT
+        MENUITEM "&Fit to Window\tHome",        ID_VIEW_FIT
+        MENUITEM SEPARATOR
+        MENUITEM "&Grid",                       ID_VIEW_GRID
+        MENUITEM "Constraint S&ymbols",         ID_VIEW_SYMBOLS
+    END
+    POPUP "&Insert"
+    BEGIN
+        MENUITEM "&Point",                      ID_TOOL_POINT
+        MENUITEM "&Line",                       ID_TOOL_LINE
+        MENUITEM "&Circle",                     ID_TOOL_CIRCLE
+        MENUITEM "Circle Through &Three Points", ID_TOOL_CIRCLE3
+        MENUITEM "&Arc",                        ID_TOOL_ARC
+        MENUITEM "Arc Through Th&ree Points",   ID_TOOL_ARC3
+        MENUITEM SEPARATOR
+        MENUITEM "&Ellipse",                    ID_TOOL_ELLIPSE
+        MENUITEM "&Hyperbola",                  ID_TOOL_HYPERBOLA
+        MENUITEM "Para&bola",                   ID_TOOL_PARABOLA
+        MENUITEM "Ellipse by &Foci",            ID_TOOL_ELLIPSE_FOCI
+        MENUITEM "Hyperbola by F&oci",          ID_TOOL_HYPERBOLA_FOCI
+        MENUITEM "Parabola by Focus and &Directrix", ID_TOOL_PARABOLA_FOCUS
+        MENUITEM SEPARATOR
+        MENUITEM "Di&mension",                  ID_TOOL_DIMENSION
+        MENUITEM SEPARATOR
+        MENUITEM "F&unction...",                ID_INSERT_FUNCTION
+        MENUITEM "&Variable...",                ID_INSERT_VARIABLE
+    END
+    POPUP "&Construct"
+    BEGIN
+        MENUITEM "&Midpoint",                   ID_TOOL_MIDPOINT
+        MENUITEM "&Intersection",               ID_TOOL_INTERSECT
+        MENUITEM "&Perpendicular Line",         ID_TOOL_PERP_LINE
+        MENUITEM "P&arallel Line",              ID_TOOL_PAR_LINE
+        MENUITEM "Perpendicular &Bisector",     ID_TOOL_PERP_BISECTOR
+        MENUITEM "Angle Bi&sector",             ID_TOOL_ANGLE_BISECTOR
+        MENUITEM "&Tangent Line",               ID_TOOL_TANGENT_LINE
+        MENUITEM "&Reflection",                 ID_TOOL_REFLECT
+        MENUITEM SEPARATOR
+        MENUITEM "&Foci of a Conic",            ID_TOOL_FOCI
+        MENUITEM "&Directrix of a Conic",       ID_TOOL_DIRECTRIX
+        MENUITEM "As&ymptotes of a Hyperbola",  ID_TOOL_ASYMPTOTES
+    END
+    POPUP "Co&nstrain"
+    BEGIN
+        MENUITEM "&Coincident",                 ID_CON_COINCIDENT
+        MENUITEM "Point on Cu&rve",             ID_CON_ON_CURVE
+        MENUITEM "&Midpoint",                   ID_CON_MIDPOINT
+        MENUITEM "&Horizontal",                 ID_CON_HORIZONTAL
+        MENUITEM "&Vertical",                   ID_CON_VERTICAL
+        MENUITEM "&Parallel",                   ID_CON_PARALLEL
+        MENUITEM "Perpen&dicular",              ID_CON_PERPENDICULAR
+        MENUITEM "Co&llinear",                  ID_CON_COLLINEAR
+        MENUITEM "&Equal",                      ID_CON_EQUAL
+        MENUITEM "&Tangent",                    ID_CON_TANGENT
+        MENUITEM "C&oncentric",                 ID_CON_CONCENTRIC
+        MENUITEM "&Symmetric",                  ID_CON_SYMMETRIC
+        MENUITEM SEPARATOR
+        MENUITEM "Loc&k Point",                 ID_CON_LOCK
+        MENUITEM "Constr&uction Geometry",      ID_CON_CONSTRUCTION
+        MENUITEM "&Infinite Line",              ID_CON_INFINITE
+    END
+    POPUP "&Dimension"
+    BEGIN
+        MENUITEM "&Distance",                   ID_DIM_DISTANCE
+        MENUITEM "&Horizontal Distance",        ID_DIM_HDIST
+        MENUITEM "&Vertical Distance",          ID_DIM_VDIST
+        MENUITEM "&Length",                     ID_DIM_LENGTH
+        MENUITEM "&Radius",                     ID_DIM_RADIUS
+        MENUITEM "D&iameter",                   ID_DIM_DIAMETER
+        MENUITEM "&Angle",                      ID_DIM_ANGLE
+        MENUITEM "&X Coordinate",               ID_DIM_X
+        MENUITEM "&Y Coordinate",               ID_DIM_Y
+        MENUITEM "Semi-axis &1",                ID_DIM_AXIS_A
+        MENUITEM "Semi-axis &2",                ID_DIM_AXIS_B
+        MENUITEM SEPARATOR
+        MENUITEM "Driving Dimen&sion",          ID_DIM_DRIVING
+        MENUITEM "Use as &Number in Formulas",  ID_DIM_NUMERIC
+        MENUITEM "S&upplementary Angle",        ID_DIM_SUPP
+        MENUITEM SEPARATOR
+        MENUITEM "Search Lon&ger for Formula\tF5", ID_FORMULA_LONGER
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&Help Topics\tF1",            ID_HELP_TOPICS
+        MENUITEM SEPARATOR
+        MENUITEM "&About gxpad",                ID_HELP_ABOUT
+    END
+END
+
+IDR_CONTEXT MENU
+BEGIN
+    POPUP "Selection"
+    BEGIN
+        POPUP "Co&nstrain"
+        BEGIN
+            MENUITEM "&Coincident",             ID_CON_COINCIDENT
+            MENUITEM "Point on Cu&rve",         ID_CON_ON_CURVE
+            MENUITEM "&Midpoint",               ID_CON_MIDPOINT
+            MENUITEM "&Horizontal",             ID_CON_HORIZONTAL
+            MENUITEM "&Vertical",               ID_CON_VERTICAL
+            MENUITEM "&Parallel",               ID_CON_PARALLEL
+            MENUITEM "Perpen&dicular",          ID_CON_PERPENDICULAR
+            MENUITEM "Co&llinear",              ID_CON_COLLINEAR
+            MENUITEM "&Equal",                  ID_CON_EQUAL
+            MENUITEM "&Tangent",                ID_CON_TANGENT
+            MENUITEM "C&oncentric",             ID_CON_CONCENTRIC
+            MENUITEM "&Symmetric",              ID_CON_SYMMETRIC
+            MENUITEM SEPARATOR
+            MENUITEM "Loc&k Point",             ID_CON_LOCK
+            MENUITEM "Constr&uction Geometry",  ID_CON_CONSTRUCTION
+            MENUITEM "&Infinite Line",          ID_CON_INFINITE
+        END
+        POPUP "&Dimension"
+        BEGIN
+            MENUITEM "&Distance",               ID_DIM_DISTANCE
+            MENUITEM "&Horizontal Distance",    ID_DIM_HDIST
+            MENUITEM "&Vertical Distance",      ID_DIM_VDIST
+            MENUITEM "&Length",                 ID_DIM_LENGTH
+            MENUITEM "&Radius",                 ID_DIM_RADIUS
+            MENUITEM "D&iameter",               ID_DIM_DIAMETER
+            MENUITEM "&Angle",                  ID_DIM_ANGLE
+            MENUITEM "&X Coordinate",           ID_DIM_X
+            MENUITEM "&Y Coordinate",           ID_DIM_Y
+            MENUITEM "Semi-axis &1",            ID_DIM_AXIS_A
+            MENUITEM "Semi-axis &2",            ID_DIM_AXIS_B
+            MENUITEM SEPARATOR
+            MENUITEM "Driving Dimen&sion",      ID_DIM_DRIVING
+            MENUITEM "Use as &Number in Formulas", ID_DIM_NUMERIC
+            MENUITEM "S&upplementary Angle",    ID_DIM_SUPP
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Copy Formula",               ID_EDIT_COPY_FORMULA
+        MENUITEM "Dele&te",                     ID_EDIT_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "P&roperties",                 ID_EDIT_PROPERTIES
+    END
+END
+
+IDR_CONTEXT_PAPER MENU
+BEGIN
+    POPUP "Paper"
+    BEGIN
+        MENUITEM "Zoom &In",                    ID_VIEW_ZOOM_IN
+        MENUITEM "Zoom &Out",                   ID_VIEW_ZOOM_OUT
+        MENUITEM "&Fit to Window",              ID_VIEW_FIT
+        MENUITEM SEPARATOR
+        MENUITEM "&Grid",                       ID_VIEW_GRID
+        MENUITEM "Constraint S&ymbols",         ID_VIEW_SYMBOLS
+        MENUITEM SEPARATOR
+        MENUITEM "Select &All",                 ID_EDIT_SELECT_ALL
+        MENUITEM SEPARATOR
+        MENUITEM "Insert F&unction...",         ID_INSERT_FUNCTION
+        MENUITEM "Insert &Variable...",         ID_INSERT_VARIABLE
+    END
+END
+
+IDR_CONTEXT_LIST MENU
+BEGIN
+    POPUP "Dimensions"
+    BEGIN
+        MENUITEM "P&roperties",                 ID_EDIT_PROPERTIES
+        MENUITEM "Dele&te",                     ID_EDIT_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Driving Dimen&sion",          ID_DIM_DRIVING
+        MENUITEM "Use as &Number in Formulas",  ID_DIM_NUMERIC
+        MENUITEM SEPARATOR
+        MENUITEM "&Copy Formula",               ID_EDIT_COPY_FORMULA
+    END
+    POPUP "Variables"
+    BEGIN
+        MENUITEM "P&roperties",                 ID_EDIT_PROPERTIES
+        MENUITEM "Dele&te",                     ID_EDIT_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Use as &Number in Formulas",  ID_DIM_NUMERIC
+        MENUITEM SEPARATOR
+        MENUITEM "&Copy Formula",               ID_EDIT_COPY_FORMULA
+        MENUITEM SEPARATOR
+        MENUITEM "New &Variable...",            ID_INSERT_VARIABLE
+    END
+    POPUP "Functions"
+    BEGIN
+        MENUITEM "P&roperties",                 ID_EDIT_PROPERTIES
+        MENUITEM "Dele&te",                     ID_EDIT_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "New F&unction...",            ID_INSERT_FUNCTION
+    END
+END
+
+IDR_ACCEL ACCELERATORS
+BEGIN
+    "N",            ID_FILE_NEW,            VIRTKEY, CONTROL
+    "O",            ID_FILE_OPEN,           VIRTKEY, CONTROL
+    "S",            ID_FILE_SAVE,           VIRTKEY, CONTROL
+    "S",            ID_FILE_SAVE_AS,        VIRTKEY, CONTROL, SHIFT
+    "P",            ID_FILE_PRINT,          VIRTKEY, CONTROL
+    "Z",            ID_EDIT_UNDO,           VIRTKEY, CONTROL
+    "Y",            ID_EDIT_REDO,           VIRTKEY, CONTROL
+    "Z",            ID_EDIT_REDO,           VIRTKEY, CONTROL, SHIFT
+    VK_BACK,        ID_EDIT_UNDO,           VIRTKEY, ALT
+    "C",            ID_EDIT_COPY_FORMULA,   VIRTKEY, CONTROL
+    "A",            ID_EDIT_SELECT_ALL,     VIRTKEY, CONTROL
+    VK_DELETE,      ID_EDIT_DELETE,         VIRTKEY
+    VK_RETURN,      ID_EDIT_PROPERTIES,     VIRTKEY, ALT
+    VK_ADD,         ID_VIEW_ZOOM_IN,        VIRTKEY, CONTROL
+    0xBB,           ID_VIEW_ZOOM_IN,        VIRTKEY, CONTROL
+    VK_SUBTRACT,    ID_VIEW_ZOOM_OUT,       VIRTKEY, CONTROL
+    0xBD,           ID_VIEW_ZOOM_OUT,       VIRTKEY, CONTROL
+    VK_HOME,        ID_VIEW_FIT,            VIRTKEY
+    VK_F1,          ID_HELP_TOPICS,         VIRTKEY
+    VK_F5,          ID_FORMULA_LONGER,      VIRTKEY
+END
+
+// ------------------------------------------------------------ dialogs
+
+IDD_DIMENSION DIALOGEX 0, 0, 250, 170
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dimension Properties"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LTEXT           "&Name:", -1, 7, 9, 40, 8
+    EDITTEXT        IDC_NAME, 50, 7, 80, 14, ES_AUTOHSCROLL
+    LTEXT           "", IDC_KIND_TEXT, 138, 9, 105, 8
+    GROUPBOX        "Value", -1, 7, 28, 236, 84
+    AUTORADIOBUTTON "&Set the value (driving dimension):", IDC_DRIVING, 14, 41, 200, 10, WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDC_VALUE, 26, 54, 210, 14, ES_AUTOHSCROLL
+    AUTORADIOBUTTON "&Measure only (reference dimension)", IDC_MEASURED, 14, 73, 200, 10
+    LTEXT           "", IDC_HINT, 14, 88, 222, 20
+    AUTOCHECKBOX    "&Use the value as a number in other formulas", IDC_NUMERIC, 7, 118, 236, 10, WS_GROUP | WS_TABSTOP
+    AUTOCHECKBOX    "Measure the su&pplementary angle", IDC_SUPP, 7, 132, 236, 10
+    DEFPUSHBUTTON   "OK", IDOK, 139, 149, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 193, 149, 50, 14
+END
+
+IDD_VARIABLE DIALOGEX 0, 0, 240, 160
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Variable Properties"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LTEXT           "&Name:", -1, 7, 9, 40, 8
+    EDITTEXT        IDC_NAME, 50, 7, 80, 14, ES_AUTOHSCROLL
+    LTEXT           "(empty for the next free letter)", -1, 136, 9, 97, 8
+    GROUPBOX        "Value", -1, 7, 28, 226, 90
+    AUTORADIOBUTTON "&Free, with the value:", IDC_FREE, 14, 42, 110, 10, WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDC_VALUE, 130, 40, 96, 14, ES_AUTOHSCROLL
+    AUTORADIOBUTTON "&Solved from the constraints, starting at that value", IDC_SOLVED, 14, 60, 212, 10
+    AUTORADIOBUTTON "&Defined by the expression:", IDC_DEFINED, 14, 78, 160, 10
+    EDITTEXT        IDC_EXPR, 26, 92, 200, 14, ES_AUTOHSCROLL
+    AUTOCHECKBOX    "&Use the value as a number in formulas", IDC_NUMERIC, 7, 124, 226, 10, WS_GROUP | WS_TABSTOP
+    DEFPUSHBUTTON   "OK", IDOK, 129, 139, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 183, 139, 50, 14
+END
+
+IDD_FUNCTION DIALOGEX 0, 0, 260, 90
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Function Properties"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LTEXT           "&Equation:", -1, 7, 9, 36, 8
+    EDITTEXT        IDC_EQUATION, 45, 7, 208, 14, ES_AUTOHSCROLL
+    LTEXT           "Type y = f(x), such as y = sin(x) + a, or an equation in x and y, such as x^2 + y^2 = r^2. Functions can use variables and dimensions.", IDC_EQUATION_NOTE, 7, 28, 246, 28
+    DEFPUSHBUTTON   "OK", IDOK, 149, 69, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 203, 69, 50, 14
+END
+
+IDD_POINT DIALOGEX 0, 0, 200, 100
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Point Properties"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LTEXT           "&Name:", -1, 7, 9, 40, 8
+    EDITTEXT        IDC_NAME, 50, 7, 70, 14, ES_AUTOHSCROLL
+    LTEXT           "X:", -1, 7, 30, 40, 8
+    LTEXT           "", IDC_X, 50, 30, 140, 8
+    LTEXT           "Y:", -1, 7, 43, 40, 8
+    LTEXT           "", IDC_Y, 50, 43, 140, 8
+    AUTOCHECKBOX    "&Locked (the point stays where it is)", IDC_LOCKED, 7, 60, 186, 10
+    DEFPUSHBUTTON   "OK", IDOK, 89, 79, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 143, 79, 50, 14
+END
+
+IDD_SHAPE DIALOGEX 0, 0, 210, 90
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Properties"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LTEXT           "Type:", -1, 7, 9, 40, 8
+    LTEXT           "", IDC_KIND_TEXT, 50, 9, 150, 8
+    AUTOCHECKBOX    "&Construction geometry (drawn dashed, as a guide)", IDC_CONSTRUCTION, 7, 28, 196, 10
+    AUTOCHECKBOX    "&Infinite line (extends past its points)", IDC_INFINITE, 7, 44, 196, 10
+    DEFPUSHBUTTON   "OK", IDOK, 99, 69, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 153, 69, 50, 14
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 236, 122
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About gxpad"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    ICON            IDI_GXPAD, IDC_ABOUT_ICON, 10, 10, 21, 20
+    LTEXT           "gxpad for Windows", -1, 42, 10, 186, 8
+    LTEXT           "Version 0.2.1", IDC_VERSION, 42, 22, 186, 8
+    LTEXT           "", IDC_LIBVERSION, 42, 34, 186, 8
+    LTEXT           "Draws geometric constructions and finds closed-form formulas for what you measure.", -1, 42, 50, 186, 18
+    LTEXT           "This program is free software, distributed under the GNU General Public License, version 3 or later.", IDC_LICENSE, 42, 72, 186, 18
+    DEFPUSHBUTTON   "OK", IDOK, 179, 101, 50, 14
+END
+
+IDD_HELP DIALOGEX 0, 0, 340, 200
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "gxpad Help"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LISTBOX         IDC_TOPICS, 7, 7, 100, 168, LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_TOPIC_TEXT, 113, 7, 220, 168, ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
+    DEFPUSHBUTTON   "Close", IDOK, 283, 180, 50, 14
+END
+
+// ------------------------------------------------------------ strings
+
+STRINGTABLE
+BEGIN
+    IDS_APP                 "gxpad"
+    IDS_UNTITLED            "Untitled"
+    IDS_READY               "Ready"
+    IDS_FILTER              "gxpad Drawings (*.gxp)|*.gxp|All Files (*.*)|*.*||"
+    IDS_PNG_FILTER          "PNG Pictures (*.png)|*.png||"
+    IDS_SAVE_CHANGES        "Do you want to save the changes to %s?"
+    IDS_OPEN_FAILED         "The file could not be opened."
+    IDS_SAVE_FAILED         "The file could not be saved."
+
+    ID_FILE_NEW             "Creates a new drawing\nNew (Ctrl+N)"
+    ID_FILE_OPEN            "Opens a drawing\nOpen (Ctrl+O)"
+    ID_FILE_SAVE            "Saves the drawing\nSave (Ctrl+S)"
+    ID_FILE_SAVE_AS         "Saves the drawing under a new name\nSave As"
+    ID_FILE_EXPORT          "Saves the formula as a PNG picture\nExport Formula Picture"
+    ID_FILE_PRINT           "Prints the drawing and the formula\nPrint (Ctrl+P)"
+    ID_FILE_EXIT            "Quits gxpad and asks to save changes\nExit"
+    ID_FILE_MRU1            "Opens this drawing"
+    ID_EDIT_UNDO            "Undoes the last change\nUndo (Ctrl+Z)"
+    ID_EDIT_REDO            "Redoes the last undone change\nRedo (Ctrl+Y)"
+    ID_EDIT_COPY_FORMULA    "Copies the formula to the Clipboard as text\nCopy Formula (Ctrl+C)"
+    ID_EDIT_COPY_LATEX      "Copies the formula to the Clipboard as LaTeX\nCopy Formula as LaTeX"
+    ID_EDIT_COPY_PICTURE    "Copies the formula to the Clipboard as a picture\nCopy Formula Picture"
+    ID_EDIT_COPY_DRAWING    "Copies the drawing to the Clipboard as a picture\nCopy Drawing"
+    ID_EDIT_DELETE          "Deletes the selection\nDelete (Del)"
+    ID_EDIT_SELECT_ALL      "Selects every shape in the drawing\nSelect All (Ctrl+A)"
+    ID_EDIT_PROPERTIES      "Shows the properties of the selection\nProperties (Alt+Enter)"
+    ID_VIEW_TOOLBAR         "Shows or hides the standard toolbar\nStandard Toolbar"
+    ID_VIEW_CONBAR          "Shows or hides the toolbar of constraints and dimensions\nConstraints Toolbar"
+    ID_VIEW_TOOLBOX         "Shows or hides the tool box\nTool Box"
+    ID_VIEW_STATUSBAR       "Shows or hides the status bar\nStatus Bar"
+    ID_VIEW_PANE            "Shows or hides the pane of dimensions, variables, functions and the formula\nSide Pane"
+    ID_VIEW_ZOOM_IN         "Shows the drawing larger\nZoom In (Ctrl++)"
+    ID_VIEW_ZOOM_OUT        "Shows more of the drawing\nZoom Out (Ctrl+-)"
+    ID_VIEW_FIT             "Fits the whole drawing in the window\nFit to Window (Home)"
+    ID_VIEW_GRID            "Shows or hides the grid\nGrid"
+    ID_VIEW_SYMBOLS         "Shows or hides the symbols of the constraints\nConstraint Symbols"
+    ID_INSERT_FUNCTION      "Adds a function curve, such as y = sin(x)\nFunction"
+    ID_INSERT_VARIABLE      "Adds a variable for dimensions and functions to use\nVariable"
+
+    ID_TOOL_SELECT          "Selects and moves shapes\nSelect"
+    ID_TOOL_POINT           "Places points\nPoint"
+    ID_TOOL_LINE            "Draws line segments\nLine"
+    ID_TOOL_CIRCLE          "Draws circles from the center\nCircle"
+    ID_TOOL_CIRCLE3         "Draws a circle through three points\nCircle Through Three Points"
+    ID_TOOL_ARC             "Draws arcs from the center\nArc"
+    ID_TOOL_ARC3            "Draws an arc through three points\nArc Through Three Points"
+    ID_TOOL_ELLIPSE         "Draws ellipses from the center\nEllipse"
+    ID_TOOL_HYPERBOLA       "Draws hyperbolas from the center\nHyperbola"
+    ID_TOOL_PARABOLA        "Draws parabolas from the vertex\nParabola"
+    ID_TOOL_ELLIPSE_FOCI    "Draws an ellipse from its foci and a point on it\nEllipse by Foci"
+    ID_TOOL_HYPERBOLA_FOCI  "Draws a hyperbola from its foci and a point on it\nHyperbola by Foci"
+    ID_TOOL_PARABOLA_FOCUS  "Draws a parabola from its focus and directrix line\nParabola by Focus and Directrix"
+    ID_TOOL_DIMENSION       "Measures shapes: click one or two, then click where the label goes\nDimension"
+    ID_TOOL_MIDPOINT        "Adds the midpoint of a segment or of two points\nMidpoint"
+    ID_TOOL_INTERSECT       "Adds a point where two curves cross\nIntersection"
+    ID_TOOL_PERP_LINE       "Draws a line perpendicular to a line\nPerpendicular Line"
+    ID_TOOL_PAR_LINE        "Draws a line parallel to a line\nParallel Line"
+    ID_TOOL_PERP_BISECTOR   "Draws the perpendicular bisector of a segment or of two points\nPerpendicular Bisector"
+    ID_TOOL_ANGLE_BISECTOR  "Draws the bisector of the angle between two lines\nAngle Bisector"
+    ID_TOOL_TANGENT_LINE    "Draws a line from a point that touches a curve\nTangent Line"
+    ID_TOOL_REFLECT         "Adds the mirror image of a point in a line\nReflection"
+    ID_TOOL_FOCI            "Adds the foci of a conic\nFoci of a Conic"
+    ID_TOOL_DIRECTRIX       "Adds a directrix of a conic\nDirectrix of a Conic"
+    ID_TOOL_ASYMPTOTES      "Adds the asymptotes of a hyperbola\nAsymptotes of a Hyperbola"
+
+    ID_CON_COINCIDENT       "Makes two selected points coincide\nCoincident"
+    ID_CON_ON_CURVE         "Keeps a selected point on a selected line or curve\nPoint on Curve"
+    ID_CON_MIDPOINT         "Keeps a selected point in the middle of a selected line\nMidpoint"
+    ID_CON_HORIZONTAL       "Makes the selected lines horizontal, or the selected points level\nHorizontal"
+    ID_CON_VERTICAL         "Makes the selected lines vertical, or the selected points one above the other\nVertical"
+    ID_CON_PARALLEL         "Makes the selected lines parallel\nParallel"
+    ID_CON_PERPENDICULAR    "Makes two selected lines perpendicular\nPerpendicular"
+    ID_CON_COLLINEAR        "Puts two selected lines on one line\nCollinear"
+    ID_CON_EQUAL            "Gives the selected lines equal lengths, or the selected circles equal radii\nEqual"
+    ID_CON_TANGENT          "Makes two selected curves touch\nTangent"
+    ID_CON_CONCENTRIC       "Gives two selected circles or conics one center, or puts a point at the center\nConcentric"
+    ID_CON_SYMMETRIC        "Makes two selected points mirror images in a selected line\nSymmetric"
+    ID_CON_LOCK             "Locks the selected points where they are\nLock Point"
+    ID_CON_CONSTRUCTION     "Makes the selected shapes construction geometry, drawn dashed\nConstruction Geometry"
+    ID_CON_INFINITE         "Extends the selected line past its points\nInfinite Line"
+
+    ID_DIM_DISTANCE         "Measures the distance between two points, or from a point to a line\nDistance"
+    ID_DIM_HDIST            "Measures the horizontal distance between two points\nHorizontal Distance"
+    ID_DIM_VDIST            "Measures the vertical distance between two points\nVertical Distance"
+    ID_DIM_LENGTH           "Measures the length of a line\nLength"
+    ID_DIM_RADIUS           "Measures the radius of a circle or arc\nRadius"
+    ID_DIM_DIAMETER         "Measures the diameter of a circle or arc\nDiameter"
+    ID_DIM_ANGLE            "Measures the angle between two lines\nAngle"
+    ID_DIM_X                "Measures the x coordinate of a point\nX Coordinate"
+    ID_DIM_Y                "Measures the y coordinate of a point\nY Coordinate"
+    ID_DIM_AXIS_A           "Measures the first semi-axis of a conic\nSemi-axis 1"
+    ID_DIM_AXIS_B           "Measures the second semi-axis of an ellipse or hyperbola\nSemi-axis 2"
+    ID_DIM_DRIVING          "Makes the dimension set its value, or only measure\nDriving Dimension"
+    ID_DIM_NUMERIC          "Shows the value as a number in the formulas of other dimensions\nUse as Number in Formulas"
+    ID_DIM_SUPP             "Measures the other angle between the two lines\nSupplementary Angle"
+    ID_FORMULA_LONGER       "Looks ten seconds longer for an exact or simpler formula\nSearch Longer (F5)"
+    ID_HELP_TOPICS          "Shows how to use gxpad\nHelp Topics (F1)"
+    ID_HELP_ABOUT           "Shows the version of gxpad\nAbout gxpad"
+END

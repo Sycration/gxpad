@@ -165,6 +165,17 @@ impl Sketch {
         self.push_undo(d);
     }
 
+    /// Joins the undo steps recorded after the history held `len` steps into
+    /// one step: the step kept is the document before the first of them.
+    /// False when fewer than two steps were recorded since.
+    pub fn join_undo(&mut self, len: usize) -> bool {
+        if self.undo.len() < len.saturating_add(2) {
+            return false;
+        }
+        self.undo.truncate(len + 1);
+        true
+    }
+
     /// Returns false when there is nothing to undo.
     pub fn undo(&mut self) -> bool {
         let Some(d) = self.undo.pop() else { return false };

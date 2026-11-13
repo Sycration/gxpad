@@ -468,3 +468,49 @@ fn dimension_label_offset_through_c_interface() {
         gx_doc_free(doc);
     }
 }
+
+#[test]
+fn undo_steps_join_through_c_interface() {
+    unsafe {
+        let doc = gx_doc_new();
+        let len = gx_doc_undo_len(doc);
+        assert!(len >= 0);
+        let a = gx_doc_add_point(doc, 0.0, 0.0);
+        let b = gx_doc_add_point(doc, 1.0, 1.0);
+        let l = gx_doc_add_line(doc, a as usize, b as usize, false);
+        assert!(l >= 0);
+        assert_eq!(gx_doc_join_undo(doc, len as usize), 1);
+        assert_eq!(gx_doc_undo_len(doc), len + 1);
+        assert_eq!(gx_doc_undo(doc), 1);
+        assert_eq!(gx_doc_ent_kind(doc, a as usize), -1);
+        assert_eq!(gx_doc_join_undo(doc, len as usize), 0);
+        assert_eq!(gx_doc_undo_len(std::ptr::null()), -1);
+        // two free points: four degrees of freedom
+        assert_eq!(gx_doc_redo(doc), 1);
+        gx_doc_solve(doc, std::ptr::null_mut());
+        assert_eq!(gx_doc_dof(doc), 4);
+        assert_eq!(gx_doc_dof(std::ptr::null()), -1);
+        gx_doc_free(doc);
+    }
+}
+
+#[test]
+fn latex_png_through_c_interface() {
+    unsafe {
+        let latex = CString::new(r"x = \sqrt{a^{2} + b^{2}}").unwrap();
+        let mut len = 0usize;
+        let p = gx_latex_png(latex.as_ptr(), 12.0, 96.0, 0x204080, &mut len);
+        assert!(!p.is_null());
+        let png = std::slice::from_raw_parts(p, len);
+        assert_eq!(&png[..4], b"\x89PNG");
+        gx_bytes_free(p, len);
+
+        let bad = CString::new(r"\frac{1}{").unwrap();
+        assert!(gx_latex_png(bad.as_ptr(), 12.0, 96.0, 0, &mut len).is_null());
+        assert!(!gx_last_error().is_null());
+        assert!(gx_latex_png(latex.as_ptr(), -1.0, 96.0, 0, &mut len).is_null());
+        assert!(gx_latex_png(latex.as_ptr(), 12.0, 96.0, 0, std::ptr::null_mut()).is_null());
+        assert_eq!(text(gx_last_error()), "null length");
+        gx_bytes_free(std::ptr::null_mut(), 0);
+    }
+}
