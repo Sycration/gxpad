@@ -9,8 +9,8 @@ IDI_GXPAD ICON "res\\gxpad.ico"
 IDB_TOOLBAR BITMAP "res\\toolbar.bmp"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,2,1,0
- PRODUCTVERSION 0,2,1,0
+ FILEVERSION 0,2,2,0
+ PRODUCTVERSION 0,2,2,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -23,12 +23,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "gxpad"
             VALUE "FileDescription", "gxpad geometry pad"
-            VALUE "FileVersion", "0.2.1"
+            VALUE "FileVersion", "0.2.2"
             VALUE "InternalName", "gxpad"
             VALUE "LegalCopyright", "GNU General Public License, version 3 or later"
             VALUE "OriginalFilename", "gxpad.exe"
             VALUE "ProductName", "gxpad"
-            VALUE "ProductVersion", "0.2.1"
+            VALUE "ProductVersion", "0.2.2"
         END
     END
     BLOCK "VarFileInfo"
@@ -63,6 +63,15 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "&Copy Formula\tCtrl+C",       ID_EDIT_COPY_FORMULA
         MENUITEM "Copy Formula as &LaTeX",      ID_EDIT_COPY_LATEX
+        POPUP "Copy Formula as Cod&e"
+        BEGIN
+            MENUITEM "&C",                      ID_EDIT_COPY_C
+            MENUITEM "&Rust",                   ID_EDIT_COPY_RUST
+            MENUITEM "&JavaScript",             ID_EDIT_COPY_JS
+            MENUITEM "&Python",                 ID_EDIT_COPY_PYTHON
+            MENUITEM "&Mathematica",            ID_EDIT_COPY_MATHEMATICA
+            MENUITEM "Ma&xima",                 ID_EDIT_COPY_MAXIMA
+        END
         MENUITEM "Copy Formula &Picture",       ID_EDIT_COPY_PICTURE
         MENUITEM "Copy &Drawing",               ID_EDIT_COPY_DRAWING
         MENUITEM SEPARATOR
@@ -381,7 +390,7 @@ FONT 8, "MS Shell Dlg 2"
 BEGIN
     ICON            IDI_GXPAD, IDC_ABOUT_ICON, 10, 10, 21, 20
     LTEXT           "gxpad for Windows", -1, 42, 10, 186, 8
-    LTEXT           "Version 0.2.1", IDC_VERSION, 42, 22, 186, 8
+    LTEXT           "Version 0.2.2", IDC_VERSION, 42, 22, 186, 8
     LTEXT           "", IDC_LIBVERSION, 42, 34, 186, 8
     LTEXT           "Draws geometric constructions and finds closed-form formulas for what you measure.", -1, 42, 50, 186, 18
     LTEXT           "This program is free software, distributed under the GNU General Public License, version 3 or later.", IDC_LICENSE, 42, 72, 186, 18
@@ -423,6 +432,12 @@ BEGIN
     ID_EDIT_REDO            "Redoes the last undone change\nRedo (Ctrl+Y)"
     ID_EDIT_COPY_FORMULA    "Copies the formula to the Clipboard as text\nCopy Formula (Ctrl+C)"
     ID_EDIT_COPY_LATEX      "Copies the formula to the Clipboard as LaTeX\nCopy Formula as LaTeX"
+    ID_EDIT_COPY_C          "Copies the formula to the Clipboard as C code\nCopy Formula as C"
+    ID_EDIT_COPY_RUST       "Copies the formula to the Clipboard as Rust code\nCopy Formula as Rust"
+    ID_EDIT_COPY_JS         "Copies the formula to the Clipboard as JavaScript code\nCopy Formula as JavaScript"
+    ID_EDIT_COPY_PYTHON     "Copies the formula to the Clipboard as Python code\nCopy Formula as Python"
+    ID_EDIT_COPY_MATHEMATICA "Copies the formula to the Clipboard as Mathematica code\nCopy Formula as Mathematica"
+    ID_EDIT_COPY_MAXIMA     "Copies the formula to the Clipboard as Maxima code\nCopy Formula as Maxima"
     ID_EDIT_COPY_PICTURE    "Copies the formula to the Clipboard as a picture\nCopy Formula Picture"
     ID_EDIT_COPY_DRAWING    "Copies the drawing to the Clipboard as a picture\nCopy Drawing"
     ID_EDIT_DELETE          "Deletes the selection\nDelete (Del)"

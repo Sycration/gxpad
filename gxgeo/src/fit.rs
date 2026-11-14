@@ -267,7 +267,7 @@ fn scan(e: &Expr, unknown: &HashSet<u32>, args: &mut Vec<Expr>, outside: &mut Ha
 }
 
 /// Pivot sizes of a Householder QR with column pivoting of the m×n matrix
-/// `a` (row-major, columns scaled to unit length), in f64: a cheap first
+/// `a` (column by column, columns scaled to unit length), in f64: a cheap first
 /// look that tells a clearly full-rank matrix.
 fn smallest_pivot(a: &[f64], m: usize, n: usize) -> f64 {
     let mut a = a.to_vec();
@@ -275,7 +275,7 @@ fn smallest_pivot(a: &[f64], m: usize, n: usize) -> f64 {
     for k in 0..n.min(m) {
         let (mut best, mut bn) = (k, -1.0);
         for j in k..n {
-            let s: f64 = (k..m).map(|i| a[i * n + j] * a[i * n + j]).sum();
+            let s: f64 = (k..m).map(|i| a[j * m + i] * a[j * m + i]).sum();
             if s > bn {
                 bn = s;
                 best = j;
@@ -288,18 +288,18 @@ fn smallest_pivot(a: &[f64], m: usize, n: usize) -> f64 {
         }
         if best != k {
             for i in 0..m {
-                a.swap(i * n + k, i * n + best);
+                a.swap(k * m + i, best * m + i);
             }
         }
-        let alpha = if a[k * n + k] >= 0.0 { -norm } else { norm };
-        let mut v: Vec<f64> = (k..m).map(|i| a[i * n + k]).collect();
+        let alpha = if a[k * m + k] >= 0.0 { -norm } else { norm };
+        let mut v: Vec<f64> = (k..m).map(|i| a[k * m + i]).collect();
         v[0] -= alpha;
         let vn: f64 = v.iter().map(|x| x * x).sum();
         if vn > 0.0 {
             for j in k..n {
-                let d: f64 = (k..m).map(|i| v[i - k] * a[i * n + j]).sum::<f64>() * 2.0 / vn;
+                let d: f64 = (k..m).map(|i| v[i - k] * a[j * m + i]).sum::<f64>() * 2.0 / vn;
                 for i in k..m {
-                    a[i * n + j] -= d * v[i - k];
+                    a[j * m + i] -= d * v[i - k];
                 }
             }
         }
@@ -315,16 +315,19 @@ fn null_vector(a: &mut [Dd], m: usize, n: usize) -> Result<Vec<Dd>, usize> {
     let dbg = std::env::var("GXGEO_DEBUG").is_ok();
     let mut scale = vec![Dd::ONE; n];
     let mut plain = vec![0.0; m * n];
+    // column by column from here on: the reflections run down the columns
+    let mut cols = vec![Dd::ZERO; m * n];
     for j in 0..n {
         let s = (0..m).fold(Dd::ZERO, |s, i| s + a[i * n + j] * a[i * n + j]).sqrt();
         if s.hi > 0.0 {
             scale[j] = s;
         }
         for i in 0..m {
-            a[i * n + j] = a[i * n + j] / scale[j];
-            plain[i * n + j] = a[i * n + j].hi;
+            cols[j * m + i] = a[i * n + j] / scale[j];
+            plain[j * m + i] = cols[j * m + i].hi;
         }
     }
+    let a = &mut cols[..];
     if m < n {
         return Err(0);
     }
@@ -344,7 +347,7 @@ fn null_vector(a: &mut [Dd], m: usize, n: usize) -> Result<Vec<Dd>, usize> {
     // squared norms of the remaining parts of the columns: downdated after
     // each step, and computed afresh whenever they have shrunk so far that
     // the downdated values have lost their digits
-    let fresh = |a: &[Dd], k: usize, j: usize| (k..m).fold(Dd::ZERO, |s, i| s + a[i * n + j] * a[i * n + j]).hi;
+    let fresh = |a: &[Dd], k: usize, j: usize| (k..m).fold(Dd::ZERO, |s, i| s + a[j * m + i] * a[j * m + i]).hi;
     let mut cn: Vec<f64> = (0..n).map(|j| fresh(a, 0, j)).collect();
     let mut at_fresh = cn.clone();
     for k in 0..n {
@@ -368,24 +371,24 @@ fn null_vector(a: &mut [Dd], m: usize, n: usize) -> Result<Vec<Dd>, usize> {
             cn.swap(k, best);
             at_fresh.swap(k, best);
             for i in 0..m {
-                a.swap(i * n + k, i * n + best);
+                a.swap(k * m + i, best * m + i);
             }
         }
-        let x0 = a[k * n + k];
-        let nd = (k..m).fold(Dd::ZERO, |s, i| s + a[i * n + k] * a[i * n + k]).sqrt();
+        let x0 = a[k * m + k];
+        let nd = (k..m).fold(Dd::ZERO, |s, i| s + a[k * m + i] * a[k * m + i]).sqrt();
         let alpha = if x0.hi >= 0.0 { -nd } else { nd };
-        let mut v: Vec<Dd> = (k..m).map(|i| a[i * n + k]).collect();
+        let mut v: Vec<Dd> = (k..m).map(|i| a[k * m + i]).collect();
         v[0] = v[0] - alpha;
         let vn = v.iter().fold(Dd::ZERO, |s, x| s + *x * *x);
         if vn.hi > 0.0 {
             let f = Dd::from(2.0) / vn;
             for j in k..n {
-                let d = (k..m).fold(Dd::ZERO, |s, i| s + v[i - k] * a[i * n + j]) * f;
+                let d = (k..m).fold(Dd::ZERO, |s, i| s + v[i - k] * a[j * m + i]) * f;
                 for i in k..m {
-                    a[i * n + j] = a[i * n + j] - d * v[i - k];
+                    a[j * m + i] = a[j * m + i] - d * v[i - k];
                 }
                 if j > k {
-                    let h = a[k * n + j].hi;
+                    let h = a[j * m + k].hi;
                     cn[j] -= h * h;
                 }
             }
@@ -415,11 +418,11 @@ fn null_vector(a: &mut [Dd], m: usize, n: usize) -> Result<Vec<Dd>, usize> {
     let mut y = vec![Dd::ZERO; n];
     y[n - 1] = Dd::ONE;
     for i in (0..rank).rev() {
-        let mut s = a[i * n + (n - 1)];
+        let mut s = a[(n - 1) * m + i];
         for j in i + 1..rank {
-            s = s + a[i * n + j] * y[j];
+            s = s + a[j * m + i] * y[j];
         }
-        y[i] = -s / a[i * n + i];
+        y[i] = -s / a[i * m + i];
     }
     let mut x = vec![Dd::ZERO; n];
     for (k, &j) in perm.iter().enumerate() {

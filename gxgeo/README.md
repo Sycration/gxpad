@@ -180,6 +180,20 @@ retrying a hard target). A derivation can take seconds: run it on a copy of the 
 form with repeated subexpressions written `u_1`, `u_2`, … and their definitions. A dimension or
 variable marked numeric appears in the formulas of other targets as its current value.
 
+A formula can also be written as source code in C, Rust, JavaScript, Python, Mathematica or
+Maxima: `gx_formula_code` with a `GX_LANG_*` constant in C (the string is released with
+`gx_string_free`), `Formula.code` with `"c"`, `"rust"`, `"js"`, `"python"`, `"mathematica"` or
+`"maxima"` in JavaScript, and `ops::formula_code` with an `ops::Lang` in Rust. The code is one
+statement per line: the repeated subexpressions assigned to temporaries `u_1`, `u_2`, …, then the
+formula assigned to a variable named after the target. The other quantities are read from
+variables of their names, made into identifiers of the language (Greek letters spelled out except
+in Mathematica). Angles are in radians. The law of cosines example in Python reads
+
+```python
+import math
+theta1 = math.acos((d1**2 + d3**2 - d2**2) / (2 * d1 * d3))
+```
+
 The LaTeX of a formula can be typeset as a PNG image at a given size, resolution and color, on a
 transparent background: `gx_latex_png` in C (the bytes are released with `gx_bytes_free`),
 `latexPng` in JavaScript and `ops::latex_png` in Rust. The typesetting is done by

@@ -27,6 +27,18 @@ fn text_cell(ui: &mut Ui, bufs: &mut HashMap<String, String>, key: &str, current
     (resp, out)
 }
 
+/// Menu label of a language formulas are copied as.
+fn lang_label(l: ops::Lang) -> &'static str {
+    match l {
+        ops::Lang::C => "C",
+        ops::Lang::Rust => "Rust",
+        ops::Lang::Js => "JavaScript",
+        ops::Lang::Python => "Python",
+        ops::Lang::Mathematica => "Mathematica",
+        ops::Lang::Maxima => "Maxima",
+    }
+}
+
 fn section(ui: &mut Ui, icon: Icon) -> egui::Rect {
     let (r, _) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::hover());
     icons::paint(ui.painter(), r, icon, MUTED);
@@ -406,6 +418,14 @@ impl App {
                     ui.add(egui::Spinner::new().color(MUTED));
                 }
                 if !f.rows.is_empty() {
+                    let code = small_icon_btn(ui, Icon::Code, false, "Copy as code");
+                    egui::Popup::menu(&code).show(|ui| {
+                        for (lang, text) in &f.code {
+                            if ui.button(lang_label(*lang)).clicked() {
+                                copy = Some(text.clone());
+                            }
+                        }
+                    });
                     if small_icon_btn(ui, Icon::Latex, false, "Copy LaTeX").clicked() {
                         copy = Some(f.latex.clone());
                     }

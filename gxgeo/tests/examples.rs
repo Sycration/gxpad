@@ -55,6 +55,17 @@ fn known_short_formulas_stay_short() {
         ("gen_linkages/hinged_triangles_median", 40),
         ("gen_triangle_centers/incenter_distance_to_sides_floating", 90),
         ("gen_variables/pentagon_golden_ratio", 120),
+        // nested roots, short in the normal form of their roots (`nf`)
+        ("gen_constructions/simson_feet_distance", 330),
+        ("gen_constructions/fermat_point", 420),
+        ("gen_constructions/pedal_triangle_sides", 380),
+        ("gen_constructions/varignon_other_diagonal", 300),
+        ("gen_functions/quadratic_fit_solved_coefficients", 370),
+        ("gen_conics/confocal_orthogonal", 300),
+        ("gen_linkages/four_bar_floating_distances", 370),
+        // joints on two circles around computed joints (`solve_circle_circle`)
+        ("gen_linkages/four_bar_coupler_triangle_point", 950),
+        ("gen_linkages/peaucellier_inversor_rotating", 2600),
     ];
     derive::set_time_scale(1.0);
     for (file, limit) in cases {

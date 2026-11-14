@@ -144,6 +144,7 @@ bool cmd_state(UINT id, bool *checked) {
         return true;
     }
     if ((id >= ID_CON_FIRST && id <= ID_CON_INFINITE) || (id >= ID_DIM_FIRST && id <= ID_DIM_SUPP)) return action_enabled(id, checked);
+    if (id >= ID_EDIT_COPY_C && id <= ID_EDIT_COPY_MAXIMA) return pane_has_formula();
     switch (id) {
     case ID_FILE_EXPORT: return pane_has_formula();
     case ID_EDIT_UNDO: return gx_doc_undo_len(d) > 0;
@@ -583,6 +584,10 @@ void command(UINT id) {
     }
     if ((id >= ID_CON_FIRST && id <= ID_CON_INFINITE) || (id >= ID_DIM_FIRST && id <= ID_DIM_SUPP)) {
         action_run(id);
+        return;
+    }
+    if (id >= ID_EDIT_COPY_C && id <= ID_EDIT_COPY_MAXIMA) {
+        pane_copy_code(id - ID_EDIT_COPY_C);
         return;
     }
     if (id >= ID_FILE_MRU1 && id <= ID_FILE_MRU4) {

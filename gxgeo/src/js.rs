@@ -9,7 +9,7 @@
 //! return false when the change is rejected (the constraints would not
 //! solve, or it is redundant).
 
-use crate::ops::{self, ConKind, ConicFeature, DimType, Document, Target};
+use crate::ops::{self, ConKind, ConicFeature, DimType, Document, Lang, Target};
 use wasm_bindgen::prelude::*;
 
 /// A geometry document with its solver state and undo history.
@@ -44,6 +44,22 @@ pub struct Formula {
     pub defs: Vec<Def>,
     /// Complexity of the formula: its number of operations and terms.
     pub size: usize,
+    src: ops::Formula,
+}
+
+#[wasm_bindgen]
+impl Formula {
+    /// The formula as source code in language `lang`: "c", "rust", "js",
+    /// "python", "mathematica" or "maxima". Statements assign the repeated
+    /// subexpressions of the formula to temporaries `u_1`, `u_2`, ... and
+    /// then the formula to a variable named after the target, one per line,
+    /// reading the other quantities from variables of their names (names
+    /// are made into identifiers of the language, Greek letters spelled
+    /// out). Angles are in radians. C needs `<math.h>`; the Python code
+    /// imports `math` when it uses it.
+    pub fn code(&self, lang: &str) -> Result<String, JsError> {
+        Ok(ops::formula_code(&self.src, Lang::from_name(lang).map_err(js)?))
+    }
 }
 
 /// A subexpression of a formula.
@@ -1047,8 +1063,10 @@ impl JsDoc {
 
 impl JsDoc {
     fn derive(&self, t: Target, extra_ms: Option<u32>, cancel: Option<Cancel>) -> Result<Formula, JsError> {
-        let f = ops::derive(&self.doc, t, extra_ms.unwrap_or(0) as u64, cancel.as_ref().map(|c| &c.c)).map_err(js)?;
+        let src = ops::derive(&self.doc, t, extra_ms.unwrap_or(0) as u64, cancel.as_ref().map(|c| &c.c)).map_err(js)?;
+        let f = src.clone();
         Ok(Formula {
+            src,
             name: f.name,
             plain: f.plain,
             latex: f.latex,

@@ -63,7 +63,7 @@
 #define IDC_FORMULA_TEXT        1116
 #define IDC_FORMULA_VIEW        1117
 #define IDC_FORMULA_COPY        1118
-#define IDC_FORMULA_LATEX       1119
+#define IDC_FORMULA_COPY_AS     1119
 #define IDC_FORMULA_LONGER      1120
 #define IDC_FORMULA_PROGRESS    1121
 #define IDC_FORMULA_STATE       1122
@@ -92,6 +92,13 @@
 #define ID_EDIT_DELETE          40027
 #define ID_EDIT_SELECT_ALL      40028
 #define ID_EDIT_PROPERTIES      40029
+// the languages of Copy Formula as Code, in the order of GX_LANG_*
+#define ID_EDIT_COPY_C          40031
+#define ID_EDIT_COPY_RUST       40032
+#define ID_EDIT_COPY_JS         40033
+#define ID_EDIT_COPY_PYTHON     40034
+#define ID_EDIT_COPY_MATHEMATICA 40035
+#define ID_EDIT_COPY_MAXIMA     40036
 
 #define ID_VIEW_TOOLBAR         40041
 #define ID_VIEW_CONBAR          40042

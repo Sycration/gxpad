@@ -252,6 +252,7 @@ void pane_formula_update();     // starts the derivation for the selection
 void pane_search_longer();
 bool pane_has_formula();
 void pane_copy_formula(bool latex);
+void pane_copy_code(GxLang lang);
 void pane_copy_picture();
 void pane_save_picture();
 void pane_layout();

@@ -482,7 +482,10 @@ const Topic TOPICS[] = {
      L"driving dimensions and variables, so it holds for any values you give them.\r\n\r\n"
      L"Finding a formula can take a few seconds; a moving bar shows that gxpad is still looking. When the formula is "
      L"approximate or long, Search Longer looks for a better one with ten more seconds each time.\r\n\r\n"
-     L"Copy puts the formula on the Clipboard as text, Copy LaTeX as LaTeX for documents. File > Export Formula Picture "
+     L"Copy puts the formula on the Clipboard as text. Copy As puts it there as LaTeX for documents, or as code in C, "
+     L"Rust, JavaScript, Python, Mathematica or Maxima: the repeated parts of the formula go into variables u_1, u_2, "
+     L"... first, the other quantities are read from variables of their names, and angles are in radians. "
+     L"File > Export Formula Picture "
      L"saves it as a PNG picture. Mark a dimension \"Use as a number in formulas\" to have its value appear in other "
      L"formulas instead of its name."},
     {L"Variables and functions",

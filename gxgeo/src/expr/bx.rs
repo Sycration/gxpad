@@ -95,7 +95,7 @@ fn first_sym(e: &Expr) -> u32 {
     s.first().copied().unwrap_or(u32::MAX)
 }
 
-fn sorted_terms(ts: &[Expr]) -> Vec<Expr> {
+pub(crate) fn sorted_terms(ts: &[Expr]) -> Vec<Expr> {
     let key = |t: &Expr| {
         let d = degree(t);
         ((-d * 1000.0) as i64, first_sym(t))

@@ -239,6 +239,24 @@ fn has_sqrt_of_sum(e: &Expr) -> bool {
     }
 }
 
+/// The arguments of the sines and cosines in `e`.
+fn sin_cos_args(e: &Expr, out: &mut std::collections::BTreeSet<Expr>) {
+    match e.node() {
+        Node::Num(_) | Node::Pi | Node::Sym(_) => {}
+        Node::Add(ts) | Node::Mul(ts) => ts.iter().for_each(|t| sin_cos_args(t, out)),
+        Node::Pow(a, b) | Node::Atan2(a, b) => {
+            sin_cos_args(a, out);
+            sin_cos_args(b, out);
+        }
+        Node::Fun(f, a) => {
+            if matches!(f, Fun::Sin | Fun::Cos) {
+                out.insert(a.clone());
+            }
+            sin_cos_args(a, out);
+        }
+    }
+}
+
 fn has_sin_cos(e: &Expr) -> bool {
     match e.node() {
         Node::Fun(Fun::Sin | Fun::Cos, _) => true,
@@ -419,6 +437,8 @@ struct BlockSolver<'a> {
     /// Polynomial elimination down to this variable only: it is never
     /// eliminated, and the others are not solved for.
     keep: Option<u32>,
+    /// Set once a block's result was too large for the normal form.
+    normal_off: bool,
 }
 
 fn has_inverse_trig(e: &Expr) -> bool {
@@ -923,12 +943,83 @@ impl<'a> BlockSolver<'a> {
         Some(vec![(vars[0], x), (vars[1], y)])
     }
 
+    /// A point (x, y) on two circles whose centres already carry square
+    /// roots (a joint of a linkage hung from two computed joints). With
+    /// d = c2 − c1, D² = |d|², k = (r1² − r2² + D²)/2 and h = √(r1²·D² − k²)
+    /// the point is c1 + (k·d ± h·d⊥)/D²: one new root, over the roots of the
+    /// centres. Substitution reaches the same point through a quadratic in
+    /// one coordinate whose coefficients repeat those roots many times.
+    fn solve_circle_circle(&mut self, eqs: &[Expr], vars: &[u32]) -> Option<Vec<(u32, Expr)>> {
+        if eqs.len() != 2 || vars.len() != 2 {
+            return None;
+        }
+        let ps: Vec<crate::expr::poly::Poly> = eqs.iter().map(|e| poly(&expand(e), vars)).collect::<Option<_>>()?;
+        if total_degree(&ps[0]) != 2 || total_degree(&ps[1]) != 2 {
+            return None;
+        }
+        let get = |p: &crate::expr::poly::Poly, m: [u32; 2]| p.get(&m.to_vec()).cloned().unwrap_or_else(zero);
+        // the normal form where it is smaller (the centres share their roots)
+        let tidy_in = |this: &Self, e: Expr, ms: u64| {
+            if complexity(&e) <= FIT_ABOVE || crate::nf::degenerate_seen() {
+                return e;
+            }
+            set_deadline(Some((work_now() + scaled(ms)).min(this.deadline)));
+            let n = crate::nf::normal_form(&e, &|s| this.env.get(s)).filter(|n| complexity(n) < complexity(&e) && !has_float(n) && same_function(n, &e, this.env));
+            set_deadline(Some(this.deadline));
+            n.unwrap_or(e)
+        };
+        let tidy = |this: &Self, e: Expr| tidy_in(this, e, 30);
+        // centre and squared radius of each circle
+        let mut circles = Vec::new();
+        for p in &ps {
+            let q = get(p, [2, 0]);
+            if !self.env.is_zero(&get(p, [1, 1])) || !self.env.is_zero(&sub(q.clone(), get(p, [0, 2]))) || self.env.is_zero(&q) {
+                return None;
+            }
+            let a = tidy(self, div(get(p, [1, 0]), mul(vec![int(-2), q.clone()])));
+            let b = tidy(self, div(get(p, [0, 1]), mul(vec![int(-2), q.clone()])));
+            let r2 = tidy(self, sub(add(vec![sq(a.clone()), sq(b.clone())]), div(get(p, [0, 0]), q)));
+            circles.push((a, b, r2));
+        }
+        if !circles.iter().any(|c| self.has_root(&c.0) || self.has_root(&c.1)) {
+            return None;
+        }
+        let ((a1, b1, r1), (a2, b2, r2)) = (circles[0].clone(), circles[1].clone());
+        let (dx, dy) = (tidy(self, sub(a2, a1.clone())), tidy(self, sub(b2, b1.clone())));
+        let dd = tidy(self, add(vec![sq(dx.clone()), sq(dy.clone())]));
+        let k = tidy(self, mul(vec![rat(1, 2), add(vec![r1.clone(), neg(r2), dd.clone()])]));
+        let h = sqrt(tidy(self, sub(mul(vec![r1, dd.clone()]), sq(k.clone()))));
+        if self.env.is_zero(&dd) || past_deadline() {
+            return None;
+        }
+        let mut best: Option<(f64, Expr, Expr)> = None;
+        for s in [1i64, -1] {
+            let x = add(vec![a1.clone(), div(sub(mul(vec![k.clone(), dx.clone()]), mul(vec![int(s), dy.clone(), h.clone()])), dd.clone())]);
+            let y = add(vec![b1.clone(), div(add(vec![mul(vec![k.clone(), dy.clone()]), mul(vec![int(s), dx.clone(), h.clone()])]), dd.clone())]);
+            let d = self.close(&x, vars[0]).max(self.close(&y, vars[1]));
+            if best.as_ref().is_none_or(|bst| d < bst.0) {
+                best = Some((d, x, y));
+            }
+        }
+        let (d, x, y) = best?;
+        if !(d < 1e-6) {
+            return None;
+        }
+        if std::env::var("GXGEO_DEBUG").is_ok() {
+            eprintln!("  point on two circles");
+        }
+        // (the coordinates as a whole: the parts above often cancel further)
+        Some(vec![(vars[0], tidy_in(self, x, 60)), (vars[1], tidy_in(self, y, 60))])
+    }
+
     /// Solves a square block of equations for `vars`.
     fn solve_block(&mut self, eqs: Vec<Expr>, vars: Vec<u32>) -> Option<Vec<(u32, Expr)>> {
         let eqs: Vec<Expr> = eqs.iter().map(|e| self.prep(&simplify_radical_atoms(e, &vars, self.env), &vars)).collect();
         if let Some(r) = self.solve_ray_circle(&eqs, &vars) {
             return Some(r);
         }
+        // (its result is finished like the others below: normal form or simplification)
+        let two_circles = self.solve_circle_circle(&eqs, &vars);
         self.budget = 80;
         // Blocks of three or more unknowns go to polynomial elimination first
         // (with part of the remaining time): substitution there tends to nest
@@ -945,7 +1036,10 @@ impl<'a> BlockSolver<'a> {
             r
         };
         let poly_first = vars.len() >= 3;
-        let mut found = if poly_first { with_share(self, 0.45, true) } else { None };
+        let mut found = two_circles;
+        if found.is_none() && poly_first {
+            found = with_share(self, 0.45, true);
+        }
         if found.is_none() {
             found = with_share(self, if poly_first { 0.6 } else { 0.4 }, false);
         }
@@ -957,6 +1051,31 @@ impl<'a> BlockSolver<'a> {
 
         for (v, e) in steps.into_iter().rev() {
             let e2 = subst_map(&e, &result);
+            // the normal form first, where it is much smaller: it keeps the
+            // roots of one block from piling up in the next (a form only a
+            // little smaller has larger polynomials, which makes the
+            // elimination in the next block slower)
+            if complexity(&e2) > FIT_ABOVE && !self.normal_off && !crate::nf::degenerate_seen() {
+                let slice = (work_now() + scaled(60)).min(full);
+                set_deadline(Some(slice));
+                let n = crate::nf::normal_form(&e2, &|s| self.env.get(s)).filter(|n| {
+                    2 * complexity(n) <= complexity(&e2) && !has_float(n) && self.close(n, v) < 1e-6 && same_function(n, &e2, self.env)
+                });
+                // out of time once: the later, larger results would be too
+                self.normal_off = n.is_none() && work_now() > slice;
+                set_deadline(Some(full));
+                if let Some(n) = n {
+                    // (a small result may still simplify to something shorter, a half angle say)
+                    let n = if e2.size() > 200 {
+                        n
+                    } else {
+                        let s = simplify_result(&e2);
+                        if complexity(&s) < complexity(&n) { s } else { n }
+                    };
+                    result.insert(v, n);
+                    continue;
+                }
+            }
             // large intermediate results get a short time slice of their own:
             // the target is simplified again at the end, and a long pass here
             // rarely shrinks them much
@@ -1039,7 +1158,7 @@ impl<'a> BlockSolver<'a> {
             eprintln!("  angles as cos/sin unknowns: {:?}", angles.iter().map(|a| a.0).collect::<Vec<_>>());
         }
         let env2 = Env { vals };
-        let mut sub = BlockSolver { env: &env2, tmp: self.tmp, budget: self.budget, deadline: self.deadline, keep: self.keep };
+        let mut sub = BlockSolver { env: &env2, tmp: self.tmp, budget: self.budget, deadline: self.deadline, keep: self.keep, normal_off: false };
         let r = sub.solve_block_poly(&eqs, &new_vars);
         self.tmp = sub.tmp;
         let r: HashMap<u32, Expr> = r?.into_iter().collect();
@@ -1110,7 +1229,7 @@ impl<'a> BlockSolver<'a> {
             back.push((t, kind));
         }
         let env2 = Env { vals };
-        let mut sub = BlockSolver { env: &env2, tmp: self.tmp, budget: self.budget, deadline: self.deadline, keep: self.keep };
+        let mut sub = BlockSolver { env: &env2, tmp: self.tmp, budget: self.budget, deadline: self.deadline, keep: self.keep, normal_off: false };
         let r = sub.solve_polys(&ctx, polys, vars, true);
         self.tmp = sub.tmp;
         let r = r?;
@@ -1405,7 +1524,7 @@ impl<'a> BlockSolver<'a> {
         let env2 = Env { vals };
         let mut all = vars.to_vec();
         all.push(t);
-        let mut bs = BlockSolver { env: &env2, tmp: self.tmp, budget: 80, deadline: self.deadline, keep: Some(t) };
+        let mut bs = BlockSolver { env: &env2, tmp: self.tmp, budget: 80, deadline: self.deadline, keep: Some(t), normal_off: false };
         let es: Vec<Expr> = eqs
             .iter()
             .chain(std::iter::once(&sub(sym(t), target.clone())))
@@ -1435,7 +1554,7 @@ impl<'a> BlockSolver<'a> {
         all.push(t);
         let mut eqs: Vec<Expr> = roots.iter().map(|(r, b)| sub(sq(sym(*r)), b.clone())).collect();
         eqs.push(sub(sym(t), body));
-        let mut bs = BlockSolver { env: &env2, tmp: self.tmp, budget: 80, deadline: self.deadline, keep: Some(t) };
+        let mut bs = BlockSolver { env: &env2, tmp: self.tmp, budget: 80, deadline: self.deadline, keep: Some(t), normal_off: false };
         let es: Vec<Expr> = eqs.iter().map(|e| bs.prep(e, &all)).collect();
         let r = bs.solve_block_poly(&es, &all);
         self.tmp = bs.tmp;
@@ -2010,13 +2129,25 @@ fn factor_sums(e: &Expr) -> Expr {
     if fs.iter().filter(|f| !f.is_const()).count() < 2 || past_deadline() {
         return r;
     }
-    // the factors carry p's content only up to a constant; each factor gets
-    // the sign with more positive terms (d2 + d3 - d1 rather than d1 - d2 - d3)
-    let prod = fs.iter().fold(MPoly::one(p.n), |acc, f| acc.mul(f));
-    let Some(c) = p.div_exact(&prod).filter(|c| c.is_const()) else { return r };
-    let mut c = c;
+    // the factors carry p's content only up to a constant, and each stands
+    // for all its powers; each factor gets the sign with more positive terms
+    // (d2 + d3 - d1 rather than d1 - d2 - d3)
+    let mut c = p.clone();
+    let mut fs_m: Vec<&MPoly> = Vec::new();
+    for f in fs.iter().filter(|f| !f.is_const()) {
+        while let Some(h) = c.div_exact(f).filter(|h| !h.is_zero()) {
+            c = h;
+            fs_m.push(f);
+            if fs_m.len() > 64 {
+                return r;
+            }
+        }
+    }
+    if !c.is_const() {
+        return r;
+    }
     let mut parts: Vec<Expr> = Vec::new();
-    for f in &fs {
+    for f in fs_m {
         // numeric content out of the factor: 2a + 2b = 2(a + b)
         use num_integer::Integer;
         let g = f.t.values().fold(BigInt::from(0), |g, v| g.gcd(v.numer()));
@@ -2564,8 +2695,9 @@ fn derive_strategies(doc: &Doc, target: &Expr, extra_ms: u64) -> Result<Derived,
     // base-geometry anchor first and the target anchor second, keeping the
     // simplest exact result. Extra time goes mostly to the first.
     let extra0 = extra_ms * 7 / 10;
-    let (first, grounded) = derive_impl(doc, target, 0, 1500 + extra0)?;
-    if !grounded || valid(&first) && first.exact && complexity(&first.expr) < 300 {
+    let (first, grounded, normalized) = derive_impl(doc, target, 0, 1500 + extra0)?;
+    // (a formula in normal form comes out the same from the other grounding)
+    if !grounded || valid(&first) && first.exact && (normalized || complexity(&first.expr) < 300) {
         return Ok(checked(first));
     }
     let second = derive_impl(doc, target, 1, 600 + (extra_ms - extra0)).ok().map(|r| r.0);
@@ -2619,7 +2751,7 @@ fn scaled(ms: u64) -> std::time::Duration {
     std::time::Duration::from_millis((ms as f64 * TIME_SCALE.with(|c| c.get())) as u64)
 }
 
-fn derive_impl(doc: &Doc, target: &Expr, strategy: u8, budget_ms: u64) -> Result<(Derived, bool), String> {
+fn derive_impl(doc: &Doc, target: &Expr, strategy: u8, budget_ms: u64) -> Result<(Derived, bool, bool), String> {
     let deadline = work_now() + scaled(budget_ms);
     set_deadline(Some(deadline));
     // real-time safeguard for work that the work clock undercounts
@@ -2635,7 +2767,7 @@ fn derive_impl(doc: &Doc, target: &Expr, strategy: u8, budget_ms: u64) -> Result
     r
 }
 
-fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Instant) -> Result<(Derived, bool), String> {
+fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Instant) -> Result<(Derived, bool, bool), String> {
 
     let (pos, ang) = doc.assumptions();
     set_assumptions(pos, ang);
@@ -2839,16 +2971,25 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
             let p0e = doc.ents.iter().position(|e| matches!(e, Some(Entity { kind: Ent::Point { x, .. }, .. }) if *x == p0.0));
             let mut p1: Option<(usize, usize)> = None;
             if let Some(p0e) = p0e {
+                // Among the points at a dimensioned length from p0, the one
+                // that closes the most triangles with it: a point at
+                // dimensioned lengths from both ends of the base comes from
+                // one square root, anything further away from nested ones.
+                let joined = |x: usize, y: usize| dim_pairs.iter().any(|(a, b)| (*a == x && *b == y) || (*a == y && *b == x));
+                let mut best: Option<(usize, (usize, usize))> = None;
                 for (a, b) in &dim_pairs {
                     let other = if *a == p0e { Some(*b) } else if *b == p0e { Some(*a) } else { None };
                     if let Some(q) = other.filter(|q| doc.is_point(*q)) {
                         let qp = doc.pparams(q);
                         if comp_u.contains(&(qp.0 as u32)) && comp_u.contains(&(qp.1 as u32)) {
-                            p1 = Some(qp);
-                            break;
+                            let shared = (0..doc.ents.len()).filter(|&e| e != p0e && e != q && doc.is_point(e) && joined(e, p0e) && joined(e, q)).count();
+                            if best.is_none_or(|bst| shared > bst.0) {
+                                best = Some((shared, qp));
+                            }
                         }
                     }
                 }
+                p1 = best.map(|b| b.1);
             }
             if let (Some(p0e), None) = (p0e, p1) {
                 for (i, e) in doc.ents.iter().enumerate() {
@@ -2912,17 +3053,22 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
                 .collect();
             if let Some(&(pe, po)) = pivots.iter().find(|(_, po)| rot_invariant(*po)) {
                 // the partner: a point joined to the pivot by a dimensioned length, else the first one away from it
-                let mut p1: Option<(usize, usize)> = None;
+                // (the one that closes the most triangles with the pivot, as above)
+                let joined = |x: usize, y: usize| dim_pairs.iter().any(|(a, b)| (*a == x && *b == y) || (*a == y && *b == x));
+                let mut best: Option<(usize, (usize, usize))> = None;
                 for (a, b) in &dim_pairs {
                     let other = if *a == pe { Some(*b) } else if *b == pe { Some(*a) } else { None };
                     if let Some(q) = other.filter(|q| doc.is_point(*q)) {
                         let qp = doc.pparams(q);
                         if comp_u.contains(&(qp.0 as u32)) && comp_u.contains(&(qp.1 as u32)) {
-                            p1 = Some(qp);
-                            break;
+                            let shared = (0..doc.ents.len()).filter(|&e| e != pe && e != q && doc.is_point(e) && joined(e, pe) && joined(e, q)).count();
+                            if best.is_none_or(|bst| shared > bst.0) {
+                                best = Some((shared, qp));
+                            }
                         }
                     }
                 }
+                let mut p1: Option<(usize, usize)> = best.map(|b| b.1);
                 if p1.is_none() {
                     p1 = comp_pts.iter().copied().find(|q| ((env.get(q.0 as u32) - po[0]).hypot(env.get(q.1 as u32) - po[1])) > 1e-6);
                 }
@@ -3032,8 +3178,9 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
         eprintln!("names: {:?}", ks);
         eprintln!("target: {}", crate::expr::bx::plain(&crate::expr::bx::to_bx(&target_c, &|s| format!("s{s}"))));
     }
+    crate::nf::reset_degenerate();
     let blocks_start = work_now();
-    let mut solver = BlockSolver { env: &env, tmp: TMP_BASE, budget: 0, deadline, keep: None };
+    let mut solver = BlockSolver { env: &env, tmp: TMP_BASE, budget: 0, deadline, keep: None, normal_off: false };
     // the equations of the needed blocks, for solving for the target directly
     let mut target_vars: Vec<u32> = Vec::new();
     let mut target_eqs: Vec<Expr> = Vec::new();
@@ -3093,12 +3240,15 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
     };
     let rows: Vec<Expr> = ce.iter().map(|&i| eqs[i].clone()).collect();
     // A formula fitted to samples of the construction (see `fit`).
-    let run_fit = |solver: &mut BlockSolver| -> Option<Expr> {
+    // (`brief`: a formula in normal form is in hand; the fit only has to
+    // find a much simpler relation, and those are in its first, small bases)
+    let run_fit = |solver: &mut BlockSolver, brief: bool| -> Option<Expr> {
         if unk.is_empty() {
             return None;
         }
         let tf = web_time::Instant::now();
-        let s = work_now() + scaled(700 + EXTRA_MS.with(|c| c.get()) / 4);
+        let extra = EXTRA_MS.with(|c| c.get());
+        let s = work_now() + scaled(if brief && extra == 0 { 250 } else { 700 + extra / 4 });
         set_deadline(Some(s));
         let lengths: HashSet<u32> = doc.dims.iter().flatten().filter(|d| !d.kind.is_angle()).map(|d| d.param as u32).collect();
         let t = solver.new_tmp();
@@ -3116,7 +3266,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
                     let mut vals = env.vals.clone();
                     vals.insert(t, if cos { actual.cos() } else { actual });
                     let env2 = Env { vals };
-                    let mut bs = BlockSolver { env: &env2, tmp: solver.tmp, budget: 80, deadline: s, keep: None };
+                    let mut bs = BlockSolver { env: &env2, tmp: solver.tmp, budget: 80, deadline: s, keep: None, normal_off: false };
                     let c = bs.candidates(&p, t, 0);
                     let x = bs.pick(c, t, false)?;
                     if cos { fun(Fun::Acos, x) } else { x }
@@ -3163,9 +3313,48 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
     let brief = if strategy == 0 { (work_now() + scaled(150)).min(deadline) } else { deadline };
     let (mut sol, mut exact) = run_blocks(&mut solver, brief);
     let small = |e: &Expr| complexity(e) <= FIT_ABOVE;
+    // The formula in the normal form of its tower of square roots (see
+    // `nf`): exact arithmetic that takes milliseconds where it applies.
+    let normalize = |raw: &Expr| -> Option<Expr> {
+        // (a zero denominator or negative radicand met in a block is in the whole formula too)
+        if crate::nf::degenerate_seen() {
+            return None;
+        }
+        let (tn, kn) = (web_time::Instant::now(), work_ticks());
+        set_deadline(Some(work_now() + scaled(300 + EXTRA_MS.with(|c| c.get()) / 10)));
+        let terms = if EXTRA_MS.with(|c| c.get()) > 0 { 60_000 } else { 8000 };
+        let n = crate::nf::normal_form_sized(raw, &|s| env.get(s), terms)
+            .filter(|n| !has_float(n) && (env.eval(n) - actual).abs() <= 1e-8 * (1.0 + actual.abs()) && same_function(n, raw, &env));
+        if std::env::var("GXGEO_DEBUG").is_ok() {
+            eprintln!("normal form: {} -> {:?} in {:?}, {} ticks", complexity(raw), n.as_ref().map(complexity), tn.elapsed(), work_ticks() - kn);
+        }
+        // √(2 − 2cos θ) as 2·sin(θ/2), and the angles that leaves resolved
+        n.map(|n| {
+            let h = resolve_abs(&half_angles(&n, &env), &env);
+            let ok = (env.eval(&h) - actual).abs() <= 1e-8 * (1.0 + actual.abs());
+            if ok && complexity(&h) < complexity(&n) { h } else { n }
+        })
+    };
+    let mut normal: Option<Expr> = None;
+    // (the formula the normal form was taken of)
+    let mut normal_of: Option<Expr> = None;
+    if exact {
+        let raw = resolve_abs(&subst_map(&target_c, &sol), &env);
+        if !small(&raw) {
+            normal = normalize(&raw);
+            normal_of = Some(raw);
+        }
+    }
     let mut fitted: Option<Expr> = None;
-    if strategy == 0 && !(exact && small(&subst_map(&target_c, &sol))) {
-        fitted = run_fit(&mut solver);
+    // (an angle that is a combination of the given angles is found by the fit only)
+    // (so are half angles: √(2 − 2cos θ) = 2·sin(θ/2))
+    let settled = |n: &Expr| {
+        let mut rs = std::collections::BTreeSet::new();
+        radicands(n, &mut rs);
+        small(n) && !has_inverse_trig(n) && !rs.iter().any(has_sin_cos)
+    };
+    if strategy == 0 && !(exact && (small(&subst_map(&target_c, &sol)) || normal.as_ref().is_some_and(settled))) {
+        fitted = run_fit(&mut solver, normal.is_some());
     }
     if strategy == 0 && !exact && !fitted.as_ref().is_some_and(|f| complexity(f) <= FIT_SETTLES) {
         // the whole block time again: the brief pass and the fit used some up
@@ -3187,11 +3376,32 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
     };
     stage("blocks");
     let result = resolve_abs(&subst_map(&target_c, &sol), &env);
+    let raw_result = result.clone();
     stage("substitution");
     // numbers from blocks solved numerically do not follow the parameters,
     // so constancy only says something about an exact formula
     let result = if exact { fold_constants(&result, &env) } else { result };
     stage("constant folding");
+    if exact && normal_of.as_ref() != Some(&raw_result) && !small(&result) {
+        normal = normalize(&result);
+        set_deadline(Some(work_now() + scaled(extra)));
+    }
+    let mut normalized = false;
+    let result = match normal {
+        Some(n) if exact => {
+            // much smaller than the formula as substituted: that one is not worth simplifying
+            if 4 * complexity(&n) < complexity(&result) {
+                normalized = true;
+                n
+            } else {
+                let s = simplify_result(&result);
+                normalized = complexity(&n) <= complexity(&s);
+                if normalized { n } else { s }
+            }
+        }
+        _ => result,
+    };
+    stage("normal form");
     // A large or numeric result: the target can have a much simpler formula
     // than the coordinates it is measured from (a distance between points with
     // nested radicals), so it is solved for directly, from the needed blocks'
@@ -3269,6 +3479,25 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
         let f = fourier_best(&result);
         if complexity(&f) < complexity(&result) && (env.eval(&f) - actual).abs() <= 1e-9 * (1.0 + actual.abs()) { f } else { result }
     };
+    // √(2 − 2cos θ) as 2·sin(θ/2); the normal form then writes what else
+    // depends on θ in the half angle too
+    let result = if result.size() < 1500 {
+        let h = resolve_abs(&half_angles(&result, &env), &env);
+        // (a formula that already mixes θ and θ/2 goes to the normal form as well)
+        let mut args = std::collections::BTreeSet::new();
+        sin_cos_args(&result, &mut args);
+        let mixed = args.iter().any(|a| args.contains(&mul(vec![int(2), a.clone()])));
+        if h == result && !mixed {
+            result
+        } else {
+            set_deadline(Some(work_now() + scaled(100)));
+            let ok = |x: &Expr| !has_float(x) && (env.eval(x) - actual).abs() <= 1e-9 * (1.0 + actual.abs());
+            let n = crate::nf::normal_form(&h, &|s| env.get(s)).filter(|n| same_function(n, &h, &env));
+            [Some(h), n].into_iter().flatten().filter(|x| ok(x)).fold(result, |best, x| if complexity(&x) < complexity(&best) { x } else { best })
+        }
+    } else {
+        result
+    };
     // factored sums only help a formula small enough to read
     let result = if result.size() < 1500 {
         // a short slice of its own: the simplification may have used up its time
@@ -3287,7 +3516,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
     let _ = free;
     let exact = exact && !has_float(&result);
     let grounded = !ground.is_empty();
-    Ok((Derived { expr: result, exact, value, actual }, grounded))
+    Ok((Derived { expr: result, exact, value, actual }, grounded, normalized && exact))
 }
 
 #[cfg(test)]
@@ -3394,3 +3623,4 @@ mod factor_sums_tests {
         assert_eq!(show(&f), "sqrt((a*c + b*d)*(a*d + b*c))/sqrt(a*b + c*d)");
     }
 }
+

@@ -14,6 +14,7 @@ pub mod gxp;
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 pub mod js;
 pub mod model;
+pub(crate) mod nf;
 pub mod ops;
 pub mod sketch;
 pub mod solver;

@@ -1395,7 +1395,7 @@ dependencies = [
 
 [[package]]
 name = "gxgeo"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "js-sys",
  "latex-rust",
@@ -1412,7 +1412,7 @@ dependencies = [
 
 [[package]]
 name = "gxpad"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "eframe",
  "gxgeo",
