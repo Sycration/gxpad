@@ -15,7 +15,7 @@ const size_t SETTLED_SIZE = 60;     // an exact formula this small is not search
 enum Tab { TAB_DIMS, TAB_VARS, TAB_FUNCS };
 
 HWND pane, tabs, list, btn_add, btn_props, btn_delete;
-HWND box, text, view, btn_copy, btn_latex, btn_longer, progress, state;
+HWND box, text, view, btn_copy, btn_copy_as, btn_longer, progress, state;
 HIMAGELIST swatches;
 bool filling;
 
@@ -29,6 +29,7 @@ struct Formula {
     wstr name, plain, err;
     std::string latex;
     std::vector<std::string> rows;  // `name = formula` with u_k, then u_k = ...
+    wstr code[GX_LANG_MAXIMA + 1];  // the formula as code, by GX_LANG_*
     bool exact, is_angle;
     double value, actual;
     size_t size;
@@ -213,7 +214,7 @@ void show_state() {
     SetWindowTextW(state, st.c_str());
     bool f = shown.valid && shown.err.empty() && !shown.rows.empty();
     EnableWindow(btn_copy, f);
-    EnableWindow(btn_latex, f);
+    EnableWindow(btn_copy_as, f);
     EnableWindow(btn_longer, pane_can_search_longer());
 }
 
@@ -262,6 +263,7 @@ void take_result(Job *j) {
         f.latex = g->latex;
         f.rows.push_back(g->latex_short);
         for (size_t k = 0; k < g->n_defs; k++) f.rows.push_back(std::string(g->defs[k].name) + " = " + g->defs[k].latex);
+        for (GxLang l = 0; l <= GX_LANG_MAXIMA; l++) f.code[l] = take(gx_formula_code(g, l));
         f.exact = g->exact;
         f.is_angle = g->is_angle;
         f.value = g->value;
@@ -287,6 +289,28 @@ void take_result(Job *j) {
         level_for = f.level + 1;
         start(f.target, level_for);
     }
+}
+
+// the languages of gx_formula_code, by GX_LANG_*
+const wchar_t *lang_names[] = {L"C", L"Rust", L"JavaScript", L"Python", L"Mathematica", L"Maxima"};
+const wchar_t *lang_labels[] = {L"&C", L"&Rust", L"&JavaScript", L"&Python", L"&Mathematica", L"Ma&xima"};
+
+// A menu of the languages, with the commands ID_EDIT_COPY_C to ID_EDIT_COPY_MAXIMA.
+HMENU code_menu() {
+    HMENU m = CreatePopupMenu();
+    for (GxLang l = 0; l <= GX_LANG_MAXIMA; l++) AppendMenuW(m, MF_STRING, ID_EDIT_COPY_C + l, lang_labels[l]);
+    return m;
+}
+
+// The menu of the Copy As button, below the button: LaTeX, then the languages.
+void copy_as_menu() {
+    RECT r;
+    GetWindowRect(btn_copy_as, &r);
+    HMENU m = code_menu();
+    InsertMenuW(m, 0, MF_BYPOSITION | MF_STRING, ID_EDIT_COPY_LATEX, L"&LaTeX");
+    InsertMenuW(m, 1, MF_BYPOSITION | MF_SEPARATOR, 0, 0);
+    TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN, r.left, r.bottom, 0, g_frame, 0);
+    DestroyMenu(m);
 }
 
 LRESULT CALLBACK view_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
@@ -361,6 +385,7 @@ LRESULT CALLBACK view_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         HMENU m = CreatePopupMenu();
         AppendMenuW(m, MF_STRING | (shown.valid && shown.err.empty() ? 0 : MF_GRAYED), ID_EDIT_COPY_FORMULA, L"&Copy Formula");
         AppendMenuW(m, MF_STRING | (shown.valid && shown.err.empty() ? 0 : MF_GRAYED), ID_EDIT_COPY_LATEX, L"Copy as &LaTeX");
+        AppendMenuW(m, MF_POPUP | (shown.valid && shown.err.empty() ? 0 : MF_GRAYED), (UINT_PTR)code_menu(), L"Copy as C&ode");
         AppendMenuW(m, MF_STRING | (shown.valid && shown.err.empty() ? 0 : MF_GRAYED), ID_EDIT_COPY_PICTURE, L"Copy &Picture");
         AppendMenuW(m, MF_SEPARATOR, 0, 0);
         AppendMenuW(m, MF_STRING | (shown.valid && shown.err.empty() ? 0 : MF_GRAYED), ID_FILE_EXPORT, L"&Save Picture As...");
@@ -544,7 +569,7 @@ LRESULT CALLBACK pane_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case IDC_PANE_PROPS: list_props(); return 0;
         case IDC_PANE_DELETE: delete_selection(); return 0;
         case IDC_FORMULA_COPY: pane_copy_formula(false); return 0;
-        case IDC_FORMULA_LATEX: pane_copy_formula(true); return 0;
+        case IDC_FORMULA_COPY_AS: copy_as_menu(); return 0;
         case IDC_FORMULA_LONGER: pane_search_longer(); return 0;
         }
         break;
@@ -655,7 +680,7 @@ HWND pane_create(HWND parent) {
     text = child(L"STATIC", L"", SS_LEFT | SS_ENDELLIPSIS | SS_NOPREFIX, 0, IDC_FORMULA_TEXT);
     view = child(L"GxpadFormula", L"", WS_HSCROLL | WS_VSCROLL, WS_EX_CLIENTEDGE, IDC_FORMULA_VIEW);
     btn_copy = child(L"BUTTON", L"&Copy", BS_PUSHBUTTON | WS_TABSTOP, 0, IDC_FORMULA_COPY);
-    btn_latex = child(L"BUTTON", L"Copy &LaTeX", BS_PUSHBUTTON | WS_TABSTOP, 0, IDC_FORMULA_LATEX);
+    btn_copy_as = child(L"BUTTON", L"Copy &As >>", BS_PUSHBUTTON | WS_TABSTOP, 0, IDC_FORMULA_COPY_AS);
     btn_longer = child(L"BUTTON", L"&Search Longer", BS_PUSHBUTTON | WS_TABSTOP, 0, IDC_FORMULA_LONGER);
     progress = child(PROGRESS_CLASSW, L"", PBS_MARQUEE, 0, IDC_FORMULA_PROGRESS);
     state = child(L"STATIC", L"", SS_LEFT | SS_NOPREFIX, 0, IDC_FORMULA_STATE);
@@ -694,7 +719,7 @@ void pane_layout() {
     MoveWindow(view, ix, y, iw, rowy - gap - y > 20 ? rowy - gap - y : 20, TRUE);
     int b1 = 60, b2 = 84, b3 = 96;
     MoveWindow(btn_copy, ix, rowy, b1, bh, TRUE);
-    MoveWindow(btn_latex, ix + b1 + gap, rowy, b2, bh, TRUE);
+    MoveWindow(btn_copy_as, ix + b1 + gap, rowy, b2, bh, TRUE);
     MoveWindow(btn_longer, ix + b1 + b2 + 2 * gap, rowy, b3, bh, TRUE);
     // the moving bar shows a running search next to the buttons
     int px = ix + b1 + b2 + b3 + 3 * gap + 2;
@@ -774,6 +799,18 @@ void pane_copy_formula(bool latex) {
     if (!pane_has_formula()) return;
     clip_text(latex ? widen(shown.latex.c_str()) : shown.plain);
     set_status(latex ? L"The formula was copied as LaTeX." : L"The formula was copied.");
+}
+
+void pane_copy_code(GxLang lang) {
+    if (!pane_has_formula() || lang > GX_LANG_MAXIMA || shown.code[lang].empty()) return;
+    // the Clipboard holds lines ending in CR LF
+    wstr s;
+    for (size_t k = 0; k < shown.code[lang].size(); k++) {
+        if (shown.code[lang][k] == L'\n') s += L'\r';
+        s += shown.code[lang][k];
+    }
+    clip_text(s);
+    set_status(L"The formula was copied as " + wstr(lang_names[lang]) + L" code.");
 }
 
 void pane_copy_picture() {

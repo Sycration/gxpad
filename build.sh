@@ -83,6 +83,8 @@ build_macos() {
     need o64-clang "install osxcross and put its target/bin on PATH, or set OSXCROSS_BIN"
     bin=$(dirname "$(command -v o64-clang)")
   fi
+  # The osxcross clang finds its ld64 (<triple>-ld) only through PATH and otherwise runs the ld of the host.
+  export PATH=$bin:$PATH
   for pair in x64:x86_64 arm64:aarch64; do
     local arch=${pair%%:*} cpu=${pair#*:} triple=${pair#*:}-apple-darwin
     local clang

@@ -21,9 +21,10 @@ import time
 HOST = os.environ.get("XP_HOST", "192.168.122.112")
 USER = os.environ.get("XP_USER", "user")
 PASS = os.environ.get("XP_PASS", "user")
-# The FTP server of the XP machine answers PASV with a port its firewall blocks, so
-# transfers use active mode: the server connects back to this address.
-LOCAL_IP = os.environ.get("XP_LOCAL_IP", "192.168.122.1")
+# Transfers use passive mode, which needs the FTP server allowed through the firewall of XP.
+# With this address set they use active mode instead: the server connects back to it, which
+# the firewall of this machine has to allow.
+LOCAL_IP = os.environ.get("XP_LOCAL_IP", "")
 
 IAC, DONT, DO, WONT, WILL, SB, SE = 255, 254, 253, 252, 251, 250, 240
 
@@ -33,7 +34,8 @@ def ftp_url(path):
 
 
 def curl(args):
-    cmd = ["curl", "-sS", "--max-time", "120", "-P", LOCAL_IP, "--user", f"{USER}:{PASS}"] + args
+    active = ["-P", LOCAL_IP] if LOCAL_IP else []
+    cmd = ["curl", "-sS", "--max-time", "120"] + active + ["--user", f"{USER}:{PASS}"] + args
     # an old server sometimes drops a transfer (426); a second attempt goes through
     for _ in range(3):
         if subprocess.run(cmd).returncode == 0:

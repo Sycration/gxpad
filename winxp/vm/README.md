@@ -34,9 +34,11 @@ next to a copy of `build/winxp/x86/lib/gxgeo.dll` (see `winxp/README.md`).
 - Windows XP with Visual Studio 2008 (its `vcbuild`, Visual C++ and Windows SDK 6.0A); the Express edition
   lacks some of the libraries the project uses.
 - The telnet server running, and an account that is an administrator (for `at /interactive`).
-- An FTP server whose root is `C:\` and where the account may write. With FileZilla Server, passive
-  mode needs its data ports open in the firewall of XP; `vm.py` uses active mode instead, where the
-  server connects to `XP_LOCAL_IP`.
+- An FTP server whose root is `C:\` and where the account may write. `vm.py` uses passive mode, which
+  needs the server's data ports open in the firewall of XP; for FileZilla Server, allow the program:
+  `netsh firewall add allowedprogram program="C:\Program Files\FileZilla Server\FileZilla server.exe" name="FileZilla Server" mode=ENABLE`.
+  With `XP_LOCAL_IP` set it uses active mode instead, where the server connects back to this machine
+  (on Fedora, firewalld's `libvirt` zone refuses that connection).
 - For `ui.py`: a USB tablet as the pointing device of the virtual machine (absolute positions), and
   access to libvirt (`virsh -c qemu:///system list` works).
 
@@ -46,7 +48,7 @@ next to a copy of `build/winxp/x86/lib/gxgeo.dll` (see `winxp/README.md`).
 | --- | --- | --- |
 | `XP_HOST` | `192.168.122.112` | address of the XP machine |
 | `XP_USER`, `XP_PASS` | `user`, `user` | the account for telnet and FTP |
-| `XP_LOCAL_IP` | `192.168.122.1` | address of this machine on the network of the XP machine |
+| `XP_LOCAL_IP` | (none) | for active-mode FTP: address of this machine on the network of the XP machine |
 | `XP_DIR` | `C:\gxpad` | where the repository files go on the XP machine |
 | `XP_VS` | `C:\Program Files\Microsoft Visual Studio 9.0` | the installation of Visual Studio 2008 |
 | `XP_DOMAIN` | `winxp` | the libvirt name of the virtual machine |
