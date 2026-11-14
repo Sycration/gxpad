@@ -2,6 +2,7 @@
 //! differentiation, substitution, evaluation and compilation to bytecode.
 
 pub mod bx;
+pub mod code;
 pub mod parse;
 pub mod poly;
 

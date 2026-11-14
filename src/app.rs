@@ -156,6 +156,8 @@ pub struct FormulaView {
     pub err: Option<String>,
     pub plain: String,
     pub latex: String,
+    /// The formula as code in each language.
+    pub code: Vec<(ops::Lang, String)>,
     pub ms: f64,
     /// "Search harder" level the formula was derived at (10 s more per level).
     pub level: u32,
@@ -556,6 +558,7 @@ pub fn compute_formula(doc: &Document, target: Sel, level: u32, cancel: Option<&
         err: None,
         plain: String::new(),
         latex: String::new(),
+        code: vec![],
         ms: 0.0,
         level,
         size: 0,
@@ -577,6 +580,7 @@ pub fn compute_formula(doc: &Document, target: Sel, level: u32, cancel: Option<&
     match ops::derive(doc, t, level as u64 * SEARCH_HARDER_MS, cancel) {
         Ok(f) => {
             fv.rows = std::iter::once(f.latex_short.clone()).chain(f.defs.iter().map(|(n, d)| format!("{n} = {d}"))).collect();
+            fv.code = ops::Lang::ALL.iter().map(|&l| (l, ops::formula_code(&f, l))).collect();
             fv.name = f.name;
             fv.is_angle = f.is_angle;
             fv.plain = f.plain;

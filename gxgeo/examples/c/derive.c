@@ -45,6 +45,9 @@ int main(int argc, char **argv) {
             continue;
         }
         printf("%s\n  latex: %s\n  exact %d, value %.12g, measured %.12g\n", f->plain, f->latex, f->exact, f->value, f->actual);
+        char *code = gx_formula_code(f, GX_LANG_C);
+        printf("  C: %s\n", code);
+        gx_string_free(code);
         gx_formula_free(f);
     }
     gx_doc_free(doc);

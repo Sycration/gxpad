@@ -1876,6 +1876,7 @@ pub fn ent_samples(doc: &Document, e: usize, min: [f64; 2], max: [f64; 2], px: f
 
 // ------------------------------------------------------------ formulas
 
+pub use crate::expr::code::Lang;
 pub use crate::formula::Target;
 
 /// A derived formula.
@@ -1904,6 +1905,8 @@ pub struct Formula {
     pub actual: f64,
     /// Complexity of the formula: its number of operations and terms.
     pub size: usize,
+    /// The formula as code in each language of `Lang::ALL`; see [`formula_code`].
+    code: [String; Lang::ALL.len()],
 }
 
 /// A flag that stops a derivation running on another thread; see `derive`.
@@ -1940,7 +1943,9 @@ pub fn derive(doc: &Document, t: Target, extra_ms: u64, cancel: Option<&Cancel>)
     let nm = |s: u32| crate::formula::sym_name(&names, s);
     let (main, defs) = crate::expr::cse(&f.expr, crate::formula::CSE_BASE, 6);
     let lhs = latex(&Bx::Sym(f.name.clone()));
+    let code = Lang::ALL.map(|l| crate::expr::code::program(l, &f.name, &main, &defs, &nm));
     Ok(Formula {
+        code,
         latex_short: format!("{lhs} = {}", latex(&to_bx(&main, &nm))),
         defs: defs.iter().map(|(s, e)| (latex(&Bx::Sym(nm(*s))), latex(&to_bx(e, &nm)))).collect(),
         size: crate::expr::complexity(&f.expr),
@@ -1954,6 +1959,16 @@ pub fn derive(doc: &Document, t: Target, extra_ms: u64, cancel: Option<&Cancel>)
     })
 }
 
+/// Formula `f` as source code in language `lang`: statements that assign
+/// the repeated subexpressions of the formula to temporaries `u_1`, `u_2`,
+/// ... and then the formula to a variable named after the target, one per
+/// line, reading the other quantities from variables of their names (names
+/// are made into identifiers of the language, Greek letters spelled out).
+/// Angles are in radians. C needs `<math.h>`; the Python code imports
+/// `math` when it uses it.
+pub fn formula_code(f: &Formula, lang: Lang) -> String {
+    f.code[lang as usize].clone()
+}
 
 // ------------------------------------------------------------ typesetting
 

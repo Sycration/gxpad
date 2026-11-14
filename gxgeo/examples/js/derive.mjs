@@ -16,6 +16,7 @@ for (let i = 0; i < doc.dimCount; i++) {
   try {
     const f = doc.deriveDim(i);
     console.log(`${f.plain}\n  latex: ${f.latex}\n  exact ${f.exact}, value ${f.value}, measured ${f.actual}`);
+    console.log(`  JavaScript: ${f.code("js")}`);
   } catch (e) {
     console.log(`dim ${i}: ${e.message}`);
   }

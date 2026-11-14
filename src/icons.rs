@@ -71,6 +71,7 @@ pub enum Icon {
     HyperbolaFoci,
     ParabolaFocus,
     Numeric,
+    Code,
 }
 
 fn poly(p: &Painter, pts: Vec<Pos2>, s: Stroke) {
@@ -512,6 +513,12 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, col: Color32) {
             p.line_segment([at(0.4, -0.6), at(0.4, 0.6)], s);
             p.line_segment([at(-0.7, -0.2), at(0.7, -0.2)], thin);
             p.line_segment([at(-0.7, 0.2), at(0.7, 0.2)], thin);
+        }
+        Icon::Code => {
+            // </>
+            poly(p, vec![at(-0.45, -0.55), at(-0.95, 0.0), at(-0.45, 0.55)], s);
+            poly(p, vec![at(0.45, -0.55), at(0.95, 0.0), at(0.45, 0.55)], s);
+            p.line_segment([at(0.2, -0.75), at(-0.2, 0.75)], thin);
         }
     }
 }

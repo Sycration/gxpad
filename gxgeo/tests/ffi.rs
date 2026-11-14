@@ -25,6 +25,20 @@ fn derive_through_c_interface() {
         assert_eq!(text((*f).plain), "θ1 = acos((d1^2 + d3^2 - d2^2)/(2d1*d3))");
         assert!((*f).exact && (*f).is_angle);
         assert!(((*f).value - gx_doc_dim_value(doc, 3)).abs() < 1e-9);
+        for (lang, want) in [
+            (GX_LANG_C, "double theta1 = acos((pow(d1, 2.0) + pow(d3, 2.0) - pow(d2, 2.0)) / (2.0 * d1 * d3));"),
+            (GX_LANG_RUST, "let theta1: f64 = ((d1.powi(2) + d3.powi(2) - d2.powi(2)) / (2.0 * d1 * d3)).acos();"),
+            (GX_LANG_JS, "const theta1 = Math.acos((d1 ** 2 + d3 ** 2 - d2 ** 2) / (2 * d1 * d3));"),
+            (GX_LANG_PYTHON, "import math\ntheta1 = math.acos((d1**2 + d3**2 - d2**2) / (2 * d1 * d3))"),
+            (GX_LANG_MATHEMATICA, "θ1 = ArcCos[(d1^2 + d3^2 - d2^2) / (2 * d1 * d3)]"),
+            (GX_LANG_MAXIMA, "theta1 : acos((d1^2 + d3^2 - d2^2) / (2 * d1 * d3));"),
+        ] {
+            let code = gx_formula_code(f, lang);
+            assert_eq!(text(code), want);
+            gx_string_free(code);
+        }
+        assert!(gx_formula_code(f, 6).is_null());
+        assert_eq!(text(gx_last_error()), "unknown language 6");
         gx_formula_free(f);
 
         // round trip through .gxp text
@@ -58,6 +72,7 @@ fn errors_are_reported() {
         assert_eq!(gx_doc_solve(std::ptr::null_mut(), std::ptr::null_mut()), -1);
         gx_doc_free(std::ptr::null_mut());
         gx_formula_free(std::ptr::null_mut());
+        assert!(gx_formula_code(std::ptr::null(), GX_LANG_C).is_null());
         gx_string_free(std::ptr::null_mut());
     }
 }

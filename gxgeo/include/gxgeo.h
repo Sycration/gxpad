@@ -98,6 +98,9 @@ typedef uint32_t GxTarget;
 // Entity kind returned by `gx_doc_ent_kind`.
 typedef uint32_t GxEnt;
 
+// Language passed to `gx_formula_code`.
+typedef uint32_t GxLang;
+
 
 
 
@@ -109,6 +112,24 @@ typedef uint32_t GxEnt;
 
 // A variable: the index refers to `gx_doc_var_*`.
 #define GX_TARGET_VAR 1
+
+// C99 with `<math.h>`.
+#define GX_LANG_C 0
+
+// Rust, on `f64`.
+#define GX_LANG_RUST 1
+
+// JavaScript.
+#define GX_LANG_JS 2
+
+// Python 3 with the `math` module.
+#define GX_LANG_PYTHON 3
+
+// Wolfram Mathematica.
+#define GX_LANG_MATHEMATICA 4
+
+// Maxima.
+#define GX_LANG_MAXIMA 5
 
 // Points a and b coincide.
 #define GX_CON_COINCIDENT 0
@@ -1328,6 +1349,19 @@ struct GxFormula *gx_derive(const struct GxDoc *doc,
                             size_t index,
                             uint64_t extra_ms,
                             const struct GxCancel *cancel);
+
+// Formula `f` as source code in language `lang` (`GX_LANG_*`), or NULL:
+// statements that assign the repeated subexpressions of the formula to
+// temporaries `u_1`, `u_2`, ... and then the formula to a variable named
+// after the target, one per line, reading the other quantities from
+// variables of their names (names are made into identifiers of the
+// language, Greek letters spelled out). Angles are in radians. C needs
+// `<math.h>`; the Python code imports `math` when it uses it. Release the
+// string with `gx_string_free`.
+//
+// # Safety
+// `f` is NULL or a formula from `gx_derive`, not yet released.
+char *gx_formula_code(const struct GxFormula *f, GxLang lang);
 
 // Releases a formula. NULL is ignored.
 //

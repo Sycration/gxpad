@@ -14,7 +14,7 @@
 //! - Strings and formulas returned are owned by the caller and released with
 //!   `gx_string_free` and `gx_formula_free`; documents with `gx_doc_free`.
 
-use crate::ops::{self, ConKind, ConicFeature, DimType, Document, EntKind, Target};
+use crate::ops::{self, ConKind, ConicFeature, DimType, Document, EntKind, Lang, Target};
 use std::cell::RefCell;
 use std::ffi::{CStr, CString, c_char, c_int};
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -31,6 +31,21 @@ pub type GxTarget = u32;
 pub const GX_TARGET_DIM: GxTarget = 0;
 /// A variable: the index refers to `gx_doc_var_*`.
 pub const GX_TARGET_VAR: GxTarget = 1;
+
+/// Language passed to `gx_formula_code`.
+pub type GxLang = u32;
+/// C99 with `<math.h>`.
+pub const GX_LANG_C: GxLang = 0;
+/// Rust, on `f64`.
+pub const GX_LANG_RUST: GxLang = 1;
+/// JavaScript.
+pub const GX_LANG_JS: GxLang = 2;
+/// Python 3 with the `math` module.
+pub const GX_LANG_PYTHON: GxLang = 3;
+/// Wolfram Mathematica.
+pub const GX_LANG_MATHEMATICA: GxLang = 4;
+/// Maxima.
+pub const GX_LANG_MAXIMA: GxLang = 5;
 
 /// Constraint kind passed to `gx_doc_constrain`, with its arguments a and b.
 pub type GxCon = u32;
@@ -174,6 +189,14 @@ pub struct GxDef {
     pub name: *mut c_char,
     /// LaTeX expression; can name earlier subexpressions.
     pub latex: *mut c_char,
+}
+
+/// A `GxFormula` with the formula it was made from, which
+/// `gx_formula_code` reads. Callers see only the `GxFormula` at its start.
+#[repr(C)]
+struct FormulaBox {
+    f: GxFormula,
+    src: ops::Formula,
 }
 
 /// A flag that stops a derivation running on another thread. Opaque.
@@ -1925,22 +1948,46 @@ pub unsafe extern "C" fn gx_derive(doc: *const GxDoc, kind: GxTarget, index: usi
             GX_TARGET_VAR => Target::Var(index),
             _ => return Err(format!("bad target kind {kind}")),
         };
-        let f = ops::derive(d, t, extra_ms, unsafe { cancel.as_ref() }.map(|c| &c.c))?;
+        let src = ops::derive(d, t, extra_ms, unsafe { cancel.as_ref() }.map(|c| &c.c))?;
+        let f = src.clone();
         let defs: Box<[GxDef]> = f.defs.into_iter().map(|(n, l)| GxDef { name: out_str(n), latex: out_str(l) }).collect();
         let n_defs = defs.len();
-        Ok(Box::into_raw(Box::new(GxFormula {
-            name: out_str(f.name),
-            plain: out_str(f.plain),
-            latex: out_str(f.latex),
-            exact: f.exact,
-            is_angle: f.is_angle,
-            value: f.value,
-            actual: f.actual,
-            latex_short: out_str(f.latex_short),
-            defs: Box::into_raw(defs) as *mut GxDef,
-            n_defs,
-            size: f.size,
-        })))
+        let b = Box::into_raw(Box::new(FormulaBox {
+            f: GxFormula {
+                name: out_str(f.name),
+                plain: out_str(f.plain),
+                latex: out_str(f.latex),
+                exact: f.exact,
+                is_angle: f.is_angle,
+                value: f.value,
+                actual: f.actual,
+                latex_short: out_str(f.latex_short),
+                defs: Box::into_raw(defs) as *mut GxDef,
+                n_defs,
+                size: f.size,
+            },
+            src,
+        }));
+        Ok(b.cast::<GxFormula>())
+    })
+}
+
+/// Formula `f` as source code in language `lang` (`GX_LANG_*`), or NULL:
+/// statements that assign the repeated subexpressions of the formula to
+/// temporaries `u_1`, `u_2`, ... and then the formula to a variable named
+/// after the target, one per line, reading the other quantities from
+/// variables of their names (names are made into identifiers of the
+/// language, Greek letters spelled out). Angles are in radians. C needs
+/// `<math.h>`; the Python code imports `math` when it uses it. Release the
+/// string with `gx_string_free`.
+///
+/// # Safety
+/// `f` is NULL or a formula from `gx_derive`, not yet released.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gx_formula_code(f: *const GxFormula, lang: GxLang) -> *mut c_char {
+    guard(ptr::null_mut(), || {
+        let b = unsafe { f.cast::<FormulaBox>().as_ref() }.ok_or("null formula")?;
+        Ok(out_str(ops::formula_code(&b.src, Lang::from_index(lang)?)))
     })
 }
 
@@ -1953,7 +2000,7 @@ pub unsafe extern "C" fn gx_formula_free(f: *mut GxFormula) {
     if f.is_null() {
         return;
     }
-    let f = unsafe { Box::from_raw(f) };
+    let FormulaBox { f, .. } = *unsafe { Box::from_raw(f.cast::<FormulaBox>()) };
     for s in [f.name, f.plain, f.latex, f.latex_short] {
         unsafe { gx_string_free(s) };
     }
