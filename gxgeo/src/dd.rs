@@ -27,7 +27,21 @@ fn quick_two_sum(a: f64, b: f64) -> (f64, f64) {
 #[inline]
 fn two_prod(a: f64, b: f64) -> (f64, f64) {
     let p = a * b;
-    (p, a.mul_add(b, -p))
+    // with a fused multiply-add instruction the error is one operation;
+    // without one `mul_add` is a library call, and Dekker's product (the
+    // same exact error, from the split halves of a and b) is much faster
+    #[cfg(target_feature = "fma")]
+    {
+        (p, a.mul_add(b, -p))
+    }
+    #[cfg(not(target_feature = "fma"))]
+    {
+        const SPLIT: f64 = 134217729.0; // 2^27 + 1
+        let (ca, cb) = (SPLIT * a, SPLIT * b);
+        let (ah, bh) = (ca - (ca - a), cb - (cb - b));
+        let (al, bl) = (a - ah, b - bh);
+        (p, ((ah * bh - p) + ah * bl + al * bh) + al * bl)
+    }
 }
 
 pub const PI: Dd = Dd { hi: 3.141592653589793, lo: 1.2246467991473532e-16 };

@@ -1188,11 +1188,45 @@ fn gave_up(p: &MPoly) -> Vec<MPoly> {
 
 const PRIMES: [u64; 4] = [4611686018427387847, 4611686018427387817, 4611686018427387787, 4611686018427387761];
 
-fn mulm(a: u64, b: u64, p: u64) -> u64 {
-    ((a as u128 * b as u128) % p as u128) as u64
+/// x modulo one of `PRIMES`. They are 2^62 − c with small c, so 2^62 ≡ c
+/// and the high part folds onto the low part without a division.
+#[inline]
+fn redm(x: u128, p: u64) -> u64 {
+    const MASK: u64 = (1 << 62) - 1;
+    let c = (1u64 << 62) - p;
+    let y = (x >> 62) * c as u128 + (x as u64 & MASK) as u128;
+    let mut z = (y >> 62) as u64 * c + (y as u64 & MASK);
+    while z >= p {
+        z -= p;
+    }
+    z
 }
+#[inline]
+fn mulm(a: u64, b: u64, p: u64) -> u64 {
+    redm(a as u128 * b as u128, p)
+}
+#[inline]
 fn addm(a: u64, b: u64, p: u64) -> u64 {
-    ((a as u128 + b as u128) % p as u128) as u64
+    let s = a + b;
+    if s >= p { s - p } else { s }
+}
+
+/// Hasher for packed monomial keys: they are already well spread.
+#[derive(Default)]
+struct KeyHasher(u64);
+impl std::hash::Hasher for KeyHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.0 = (self.0.rotate_left(5) ^ *b as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        }
+    }
+    fn write_u128(&mut self, k: u128) {
+        let x = (k as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ ((k >> 64) as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
+        self.0 = x ^ (x >> 29);
+    }
 }
 fn negm(a: u64, p: u64) -> u64 {
     if a == 0 { 0 } else { p - a }
@@ -1213,9 +1247,16 @@ fn invm(a: u64, p: u64) -> u64 {
 }
 fn qmod(c: &Q, p: u64) -> Option<u64> {
     use num_integer::Integer;
-    let pb = BigInt::from(p);
-    let nm = c.numer().mod_floor(&pb).to_u64()?;
-    let dm = c.denom().mod_floor(&pb).to_u64()?;
+    // (most coefficients are small integers)
+    let part = |x: &BigInt| match x.to_i64() {
+        Some(v) => Some((v as i128).rem_euclid(p as i128) as u64),
+        None => x.mod_floor(&BigInt::from(p)).to_u64(),
+    };
+    let nm = part(c.numer())?;
+    if c.denom().is_one() {
+        return Some(nm);
+    }
+    let dm = part(c.denom())?;
     if dm == 0 { None } else { Some(mulm(nm, invm(dm, p), p)) }
 }
 
@@ -1306,7 +1347,8 @@ impl PP {
         let deg = |k: Key| trunc.map_or(0, |(vs, _)| vs.iter().map(|&v| kexp(k, v)).sum::<u32>());
         let lim = trunc.map_or(u32::MAX, |(_, d)| d);
         let bs: Vec<(Key, u64, u32)> = o.t.iter().map(|(k, c)| (*k, *c, deg(*k))).collect();
-        let mut acc: std::collections::HashMap<Key, u128> = std::collections::HashMap::new();
+        let mut acc: std::collections::HashMap<Key, u128, std::hash::BuildHasherDefault<KeyHasher>> = Default::default();
+        acc.reserve((self.t.len() * bs.len()).min(1 << 14));
         let mut work = 0usize;
         let p2 = (pr as u128) * (pr as u128);
         for (ka, ca) in &self.t {
@@ -1314,6 +1356,8 @@ impl PP {
             if da > lim {
                 continue;
             }
+            // (a product term is a multiplication and a table update)
+            crate::expr::charge(bs.len() as u64 / 10 + 1);
             work += bs.len();
             if work > 1 << 16 {
                 work = 0;
@@ -1332,7 +1376,7 @@ impl PP {
                 }
             }
         }
-        PP { t: acc.into_iter().map(|(k, v)| (k, (v % pr as u128) as u64)).filter(|(_, v)| *v != 0).collect() }
+        PP { t: acc.into_iter().map(|(k, v)| (k, redm(v, pr))).filter(|(_, v)| *v != 0).collect() }
     }
     fn mul(&self, o: &PP, pr: u64) -> PP {
         self.mul_t(o, pr, None)
@@ -1895,6 +1939,23 @@ mod tests {
     }
     fn c(n: usize, v: i64) -> MPoly {
         MPoly::constant(n, q(v))
+    }
+
+    #[test]
+    fn reduction_modulo_the_primes() {
+        let mut x: u128 = 0x1234_5678_9ABC_DEF0_0FED_CBA9_8765_4321;
+        for _ in 0..2000 {
+            x = x.wrapping_mul(0x2545_F491_4F6C_DD1D_9E37_79B9_7F4A_7C15).wrapping_add(0x1405_7B7E_F767_814F);
+            for p in PRIMES {
+                assert_eq!(redm(x, p) as u128, x % p as u128);
+                assert_eq!(redm(x >> 70, p) as u128, (x >> 70) % p as u128);
+            }
+        }
+        for p in PRIMES {
+            assert_eq!(redm(u128::MAX, p) as u128, u128::MAX % p as u128);
+            assert_eq!(mulm(p - 1, p - 1, p), 1);
+            assert_eq!(addm(p - 1, p - 1, p), p - 2);
+        }
     }
 
     #[test]
