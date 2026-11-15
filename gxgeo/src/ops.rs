@@ -75,9 +75,9 @@ pub fn copy(doc: &Document) -> Document {
     Document { sk }
 }
 
-/// The document encoded as indented .gxp text.
+/// The document encoded as .gxp text.
 pub fn to_gxp(doc: &Document) -> Result<String, String> {
-    crate::gxp::to_string_pretty(&doc.sk.doc).map_err(|e| e.to_string())
+    Ok(crate::gxp::to_string(&doc.sk.doc))
 }
 
 /// Replaces the content of the document with the document decoded from .gxp
@@ -86,6 +86,29 @@ pub fn load_gxp(doc: &mut Document, text: &str) -> Result<(), String> {
     let d = crate::gxp::from_str(text).map_err(|e| e.to_string())?;
     doc.sk.load(d);
     Ok(())
+}
+
+/// Applies .gxp statements to the document: lines of a .gxp file, without
+/// the header. What they make is added as one undoable change, rejected
+/// (Ok(false)) when the constraints would not solve or already imply what
+/// it adds. A `where` line placing a point that is there drags it.
+pub fn apply_gxp(doc: &mut Document, text: &str) -> Result<bool, String> {
+    let a = crate::gxp::apply(&doc.sk.doc, text).map_err(|e| e.to_string())?;
+    if let Some(d) = a.doc {
+        if !doc.sk.try_change(true, |x| *x = d) {
+            return Ok(false);
+        }
+    }
+    for (e, p) in a.moves {
+        drag_point(doc, e, p[0], p[1])?;
+    }
+    Ok(true)
+}
+
+/// The entity named `name` as a .gxp file names it: a point or curve by its
+/// name, or a line by its points run together (`AB`).
+pub fn ent_by_name(doc: &Document, name: &str) -> Result<usize, String> {
+    crate::gxp::lookup(&doc.sk.doc, name)
 }
 
 /// Replaces the content of the document with an empty document (origin and
@@ -1680,7 +1703,7 @@ pub fn ent_kind(doc: &Document, e: usize) -> Result<EntKind, String> {
     })
 }
 
-/// Name of entity `e` (points are named, other entities have an empty name).
+/// Name of entity `e`: points are named, curves when a .gxp file names them.
 pub fn ent_name(doc: &Document, e: usize) -> Result<String, String> {
     let sk = &doc.sk;
     Ok(ent_of(&sk.doc, e)?.name.clone())

@@ -52,7 +52,9 @@ def key(k, down):
 # characters that are not their own QEMU key code
 CHARS = {" ": "spc", ".": "dot", ",": "comma", "-": "minus", "=": "equal", "/": "slash", "*": "kp_multiply",
          ";": "semicolon", "\\": "backslash", "'": "apostrophe", ":": ("shift", "semicolon"),
-         "(": ("shift", "9"), ")": ("shift", "0"), "^": ("shift", "6"), "+": ("shift", "equal"), "_": ("shift", "minus")}
+         "(": ("shift", "9"), ")": ("shift", "0"), "^": ("shift", "6"), "+": ("shift", "equal"), "_": ("shift", "minus"),
+         "?": ("shift", "slash"), "|": ("shift", "backslash"), "<": ("shift", "comma"), ">": ("shift", "dot"),
+         "[": "bracket_left", "]": "bracket_right", "~": ("shift", "grave_accent")}
 NAMES = {"ctrl": "ctrl", "shift": "shift", "alt": "alt", "enter": "ret", "esc": "esc", "del": "delete", "tab": "tab",
          "home": "home", "bksp": "backspace"}
 

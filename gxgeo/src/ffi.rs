@@ -357,7 +357,7 @@ pub unsafe extern "C" fn gx_doc_from_gxp(text: *const c_char) -> *mut GxDoc {
     })
 }
 
-/// Document encoded as indented .gxp text, or NULL.
+/// Document encoded as .gxp text, or NULL.
 ///
 /// # Safety
 /// `doc` is NULL or a document from this library.
@@ -483,6 +483,28 @@ pub unsafe extern "C" fn gx_doc_load_gxp(doc: *mut GxDoc, text: *const c_char) -
         ops::load_gxp(unsafe { doc_mut(doc) }?, unsafe { in_str(text) }?)?;
         Ok(1)
     })
+}
+
+/// Applies .gxp statements (lines of a .gxp file, without the header) to the
+/// document as one undoable change; a `where` line placing a point that is
+/// there drags it. Returns 1, 0 when the change is rejected (the
+/// constraints would not solve or already imply it), -1 on error.
+///
+/// # Safety
+/// `doc` is NULL or a document from this library; `text` is NULL or a NUL-terminated string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gx_doc_apply_gxp(doc: *mut GxDoc, text: *const c_char) -> c_int {
+    status("change", || ops::apply_gxp(unsafe { doc_mut(doc) }?, unsafe { in_str(text) }?))
+}
+
+/// The entity named `name` as a .gxp file names it (a point or curve by its
+/// name, a line by its points run together: `AB`), or -1.
+///
+/// # Safety
+/// `doc` is NULL or a document from this library; `name` is NULL or a NUL-terminated string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gx_doc_ent_by_name(doc: *const GxDoc, name: *const c_char) -> isize {
+    index(|| ops::ent_by_name(unsafe { doc_ref(doc) }?, unsafe { in_str(name) }?))
 }
 
 /// Replaces the content of the document with an empty document (origin and
@@ -1337,7 +1359,8 @@ pub unsafe extern "C" fn gx_doc_ent_kind(doc: *const GxDoc, e: usize) -> c_int {
     } as c_int))
 }
 
-/// Name of entity `e`, or NULL for an empty name, an empty slot or a bad
+/// Name of entity `e` (points are named, curves when a .gxp file names
+/// them), or NULL for an empty name, an empty slot or a bad
 /// index. Free the result with `gx_string_free`.
 ///
 /// # Safety

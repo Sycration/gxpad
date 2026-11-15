@@ -42,6 +42,24 @@ for example:
 cargo run --release -- gxgeo/test_examples/gen_invariants/ptolemy_diagonals.gxp d5
 ```
 
+## Command line
+
+`gx` is gxpad's geometry on the command line: each line is a statement of the
+[.gxp format](docs/gxp-format.md), and `?` derives the formula of a measure. It is built with the
+rest and ships next to gxpad; see [gxcli/README.md](gxcli/README.md).
+
+```sh
+cargo run --release -p gxcli                          # gx, interactive
+cargo run --release -p gxcli -- file.gxp              # open a construction in gx
+```
+
+## Release builds
+
+`./build.sh` builds release binaries for every platform into `build/<platform>/<arch>/`: `bin/`
+holds gxpad and gx, `lib/` the gxgeo C library. Windows XP gets gx and the gxgeo DLL (gxpad for
+XP is the program in `winxp/`), and the web the gxgeo Wasm module. The comment at the top of
+`build.sh` lists what each platform needs; `./release.sh` packs `build/` into release archives.
+
 ## Tests
 
 ```sh

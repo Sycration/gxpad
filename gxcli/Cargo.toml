@@ -1,0 +1,15 @@
+[package]
+name = "gxcli"
+version = "0.3.0"
+edition = "2024"
+description = "An interactive command line for gxpad's geometry, in the statements of the .gxp format"
+license = "GPL-3.0-or-later"
+
+[[bin]]
+name = "gx"
+path = "src/main.rs"
+
+[dependencies]
+gxgeo = { path = "../gxgeo" }
+# with-dirs (the home crate) would import a function Windows XP does not have; gx finds ~ itself
+rustyline = { version = "17.0.2", default-features = false, features = ["with-file-history"] }

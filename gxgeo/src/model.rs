@@ -3,28 +3,22 @@
 
 use crate::expr::parse::{parse, parse_equation};
 use crate::expr::*;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-/// True for `false`: skips serializing a field that is at its default.
-fn is_false(b: &bool) -> bool {
-    !*b
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Param {
     pub v: f64,
     pub locked: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ConicKind {
     Ellipse,
     Hyperbola,
     Parabola,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum Ent {
     Point { x: usize, y: usize },
     Line { a: usize, b: usize, infinite: bool },
@@ -34,17 +28,15 @@ pub enum Ent {
     Curve { src: String },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Entity {
     pub kind: Ent,
     pub name: String,
-    #[serde(default)]
     pub construction: bool,
-    #[serde(default)]
     pub hidden: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Con {
     Coincident(usize, usize),
     OnCurve(usize, usize),
@@ -80,7 +72,7 @@ pub enum Con {
     Asymptote { q: usize, c: usize, s: f64 },
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DimKind {
     Distance(usize, usize),
     HDist(usize, usize),
@@ -136,7 +128,7 @@ impl DimKind {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Dim {
     pub kind: DimKind,
     pub name: String,
@@ -153,11 +145,10 @@ pub struct Dim {
     /// When true, formula derivation substitutes the dimension's current
     /// value as a plain number, so neither its name nor what it is computed
     /// from appears in formulas. Solving is unaffected.
-    #[serde(default, skip_serializing_if = "is_false")]
     pub numeric: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Var {
     pub name: String,
     /// Empty for value variables (stored in `param`), otherwise a defining expression.
@@ -166,7 +157,6 @@ pub struct Var {
     /// When true, formula derivation substitutes the variable's current value
     /// as a plain number, so neither its name nor what it is computed from
     /// appears in formulas. Solving is unaffected.
-    #[serde(default, skip_serializing_if = "is_false")]
     pub numeric: bool,
 }
 
@@ -192,7 +182,7 @@ pub fn norm2(a: &Pt) -> Expr {
     sq(a.0.clone()) + sq(a.1.clone())
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Doc {
     pub params: Vec<Param>,
     pub ents: Vec<Option<Entity>>,

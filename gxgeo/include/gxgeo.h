@@ -280,7 +280,7 @@ struct GxDoc *gx_doc_new(void);
 // `text` is NULL or a NUL-terminated string.
 struct GxDoc *gx_doc_from_gxp(const char *text);
 
-// Document encoded as indented .gxp text, or NULL.
+// Document encoded as .gxp text, or NULL.
 //
 // # Safety
 // `doc` is NULL or a document from this library.
@@ -359,6 +359,22 @@ struct GxDoc *gx_doc_copy(const struct GxDoc *doc);
 // # Safety
 // `doc` is NULL or a document from this library; `text` is NULL or a NUL-terminated string.
 int gx_doc_load_gxp(struct GxDoc *doc, const char *text);
+
+// Applies .gxp statements (lines of a .gxp file, without the header) to the
+// document as one undoable change; a `where` line placing a point that is
+// there drags it. Returns 1, 0 when the change is rejected (the
+// constraints would not solve or already imply it), -1 on error.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `text` is NULL or a NUL-terminated string.
+int gx_doc_apply_gxp(struct GxDoc *doc, const char *text);
+
+// The entity named `name` as a .gxp file names it (a point or curve by its
+// name, a line by its points run together: `AB`), or -1.
+//
+// # Safety
+// `doc` is NULL or a document from this library; `name` is NULL or a NUL-terminated string.
+ptrdiff_t gx_doc_ent_by_name(const struct GxDoc *doc, const char *name);
 
 // Replaces the content of the document with an empty document (origin and
 // axes only), as one undoable change. Returns 1, or -1 on error.
@@ -994,7 +1010,8 @@ size_t gx_doc_ent_count(const struct GxDoc *doc);
 // `doc` is NULL or a document from this library.
 int gx_doc_ent_kind(const struct GxDoc *doc, size_t e);
 
-// Name of entity `e`, or NULL for an empty name, an empty slot or a bad
+// Name of entity `e` (points are named, curves when a .gxp file names
+// them), or NULL for an empty name, an empty slot or a bad
 // index. Free the result with `gx_string_free`.
 //
 // # Safety

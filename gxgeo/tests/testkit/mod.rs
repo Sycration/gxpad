@@ -87,7 +87,7 @@ fn example_path() -> Option<std::path::PathBuf> {
 impl Drop for Kit {
     fn drop(&mut self) {
         let Some(path) = example_path() else { return };
-        let Ok(text) = gxgeo::gxp::to_string_pretty(&self.sk().doc) else { return };
+        let text = gxgeo::gxp::to_string(&self.sk().doc);
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }

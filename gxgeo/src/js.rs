@@ -114,7 +114,7 @@ impl JsDoc {
         Ok(JsDoc { doc: Document::from_gxp(text).map_err(js)? })
     }
 
-    /// Document encoded as indented .gxp text.
+    /// Document encoded as .gxp text.
     #[wasm_bindgen(js_name = toGxp)]
     pub fn to_gxp(&self) -> Result<String, JsError> {
         ops::to_gxp(&self.doc).map_err(js)
@@ -175,6 +175,23 @@ impl JsDoc {
     #[wasm_bindgen(js_name = loadGxp)]
     pub fn load_gxp(&mut self, text: &str) -> Result<(), JsError> {
         ops::load_gxp(&mut self.doc, text).map_err(js)
+    }
+
+    /// Applies .gxp statements (lines of a .gxp file, without the header) to
+    /// the document as one undoable change; a `where` line placing a point
+    /// that is there drags it. False when the change is rejected (the
+    /// constraints would not solve or already imply it).
+    #[wasm_bindgen(js_name = applyGxp)]
+    pub fn apply_gxp(&mut self, text: &str) -> Result<bool, JsError> {
+        ops::apply_gxp(&mut self.doc, text).map_err(js)
+    }
+
+    /// The entity named `name` as a .gxp file names it (a point or curve by
+    /// its name, a line by its points run together: `AB`); undefined when
+    /// there is none.
+    #[wasm_bindgen(js_name = entByName)]
+    pub fn ent_by_name(&self, name: &str) -> Option<usize> {
+        ops::ent_by_name(&self.doc, name).ok()
     }
 
     /// Replaces the content of the document with an empty document (origin
@@ -884,8 +901,8 @@ impl JsDoc {
         ops::ent_kind(&self.doc, e).ok().map(|k| k.name().to_string())
     }
 
-    /// Name of entity `e` (points are named); undefined for an empty slot, a
-    /// bad index or an unnamed entity.
+    /// Name of entity `e` (points are named, curves when a .gxp file names
+    /// them); undefined for an empty slot, a bad index or an unnamed entity.
     #[wasm_bindgen(js_name = entName)]
     pub fn ent_name(&self, e: usize) -> Option<String> {
         ops::ent_name(&self.doc, e).ok()
