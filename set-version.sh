@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Sets the version of gxpad, gxgeo and gx everywhere it is written down:
-#   Cargo.toml, gxgeo/Cargo.toml, gxcli/Cargo.toml   version of the three crates (and their entries in Cargo.lock)
-#   winxp/gxpad.rc                                   VERSIONINFO of the Windows XP program (the version Windows
+# Sets the version of sgpad, sggeo and sg everywhere it is written down:
+#   Cargo.toml, sggeo/Cargo.toml, sgcli/Cargo.toml   version of the three crates (and their entries in Cargo.lock)
+#   winxp/sgpad.rc                                   VERSIONINFO of the Windows XP program (the version Windows
 #                                                    shows in the file properties) and the version on its About box
 #
 # Usage: ./set-version.sh X.Y.Z
@@ -13,16 +13,16 @@ v=${1:-}
 commas="${BASH_REMATCH[1]},${BASH_REMATCH[2]},${BASH_REMATCH[3]},0"
 
 # the first `version =` line of each manifest is the one of its [package]
-for f in Cargo.toml gxgeo/Cargo.toml gxcli/Cargo.toml; do
+for f in Cargo.toml sggeo/Cargo.toml sgcli/Cargo.toml; do
   sed -i -E "0,/^version = \"[^\"]*\"/s//version = \"$v\"/" "$f"
 done
-cargo update --offline --quiet -p gxpad -p gxgeo -p gxcli
+cargo update --offline --quiet -p sgpad -p sggeo -p sgcli
 
 sed -i -E \
   -e "s/^( *(FILE|PRODUCT)VERSION) [0-9]+,[0-9]+,[0-9]+,[0-9]+/\1 $commas/" \
   -e "s/(VALUE \"(File|Product)Version\", )\"[^\"]*\"/\1\"$v\"/" \
   -e "s/\"Version [0-9.]+\", IDC_VERSION/\"Version $v\", IDC_VERSION/" \
-  winxp/gxpad.rc
+  winxp/sgpad.rc
 
-grep -nE '^version = ' Cargo.toml gxgeo/Cargo.toml gxcli/Cargo.toml
-grep -nE '(FILE|PRODUCT)VERSION [0-9]|(File|Product)Version"|IDC_VERSION' winxp/gxpad.rc
+grep -nE '^version = ' Cargo.toml sggeo/Cargo.toml sgcli/Cargo.toml
+grep -nE '(FILE|PRODUCT)VERSION [0-9]|(File|Product)Version"|IDC_VERSION' winxp/sgpad.rc

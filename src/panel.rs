@@ -59,8 +59,8 @@ impl App {
             .show(ui, |ui| self.panel_ui(ui));
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(BG)).show(ui, |ui| self.canvas_ui(ui, cache));
         let title = match &self.path {
-            Some(p) => format!("gxpad — {}", p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()),
-            None => "gxpad".into(),
+            Some(p) => format!("sgpad — {}", p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()),
+            None => "sgpad".into(),
         };
         if self.title != title {
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));

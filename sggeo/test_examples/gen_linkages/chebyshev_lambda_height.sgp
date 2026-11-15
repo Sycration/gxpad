@@ -1,0 +1,30 @@
+sgp 2
+
+given
+  segment AC
+    d1: |AC| = 5
+  segment BD
+    d2: |BD| = 5
+  segment CD
+    d3: |CD| = 2
+  segment AB
+    CD ∥ AB
+
+construct
+  E = mid(C, D)
+
+find
+  y_E: y(E)
+  x_E: x(E)
+
+where
+  A (-2, 0) [fixed]
+  C (-0.9999999999999999, 4.898979485566356)
+  B (2, 0) [fixed]
+  D (1, 4.898979485566356)
+  E (5.551115123125783e-17, 4.898979485566356)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  y_E label (0.3, 0.3)
+  x_E label (0.3, 0.3)

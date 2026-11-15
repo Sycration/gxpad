@@ -1,0 +1,27 @@
+sgp 2
+
+given
+  a = 2
+  point A
+  p1 = parabola(A)
+    a1: a(p1) = a
+
+construct
+  B = focus(p1)
+  line BC
+    vert B C
+  D = meet(BC, p1)
+  E = meet(BC, p1)
+
+find
+  d1: dist(D, E)
+
+where
+  A (1, 1)
+  p1 a 2 angle 0° [fixed angle]
+  B (3, 1)
+  C (3, 3)
+  D (3, 5)
+  E (3, -3)
+  a1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

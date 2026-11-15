@@ -1,0 +1,26 @@
+sgp 2
+
+given
+  t = 1
+  g1 = curve(y = 1/x)
+
+construct
+  point A on g1
+    x_A: x(A) = t
+  point B on xaxis
+  point C on yaxis
+  line BC
+    A on BC
+    BC tan g1
+
+find
+  d1: dist(B, C)
+  x_B: x(B)
+
+where
+  A (1, 1)
+  B (2, 1.9193571345323785e-54)
+  C (1.9193571345323785e-54, 2)
+  x_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  x_B label (0.3, 0.3)

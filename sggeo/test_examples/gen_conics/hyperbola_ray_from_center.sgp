@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  point A
+  h1 = hyperbola(A)
+    a1: a(h1) = 2
+    b1: b(h1) = 4
+
+construct
+  point B on h1
+  segment AB
+    θ1: angle(xaxis, AB) = 55°
+
+find
+  d1: dist(A, B)
+
+where
+  A (2.0015718701408716, 0.9999932135673186)
+  h1 a 2 b 4 angle 0° [fixed angle]
+  B (4.85842812985913, 5.080006786432681)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

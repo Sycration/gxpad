@@ -1,0 +1,36 @@
+sgp 2
+
+given
+  r = 2.5
+  point A
+  k1 = circle(A)
+    r1: r(k1) = r
+  point B
+  k2 = circle(B)
+    k1 tan k2
+    r(k1) == r(k2)
+  point C
+  k3 = circle(C)
+    k1 tan k3
+    k2 tan k3
+    r(k2) == r(k3)
+  point D
+  k4 = circle(D)
+    k4 tan k1
+    k4 tan k2
+    k4 tan k3
+
+find
+  r2: r(k4)
+
+where
+  A (-1.4817018767338193, -0.8791022066005613)
+  k1 r 2.5
+  B (3.517904909920923, -0.8163967137323959)
+  k2 r 2.5
+  C (0.9637969668128964, 3.4820370260096145)
+  k3 r 2.5
+  D (1.0000000000000004, 0.5955127018922193)
+  k4 r 0.38675134594812904
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)

@@ -1,9 +1,9 @@
-# gxpad for Windows
+# sgpad for Windows
 
-A native Windows version of gxpad in the style of Windows XP programs: menus and toolbars, a tool
+A native Windows version of sgpad in the style of Windows XP programs: menus and toolbars, a tool
 box like Paint's, Properties dialogs, right-click menus, printing and a help window. It draws
 constructions with constraints and dimensions and shows the formula of the selected measured
-dimension, with the gxgeo library (`gxgeo.dll`) doing the geometry and typesetting the formulas.
+dimension, with the sggeo library (`sggeo.dll`) doing the geometry and typesetting the formulas.
 
 It runs on Windows XP (SP2 or later; the processor needs SSE2) and on later versions of Windows. It is
 a 32-bit program, so it also runs on Windows XP x64.
@@ -12,11 +12,11 @@ a 32-bit program, so it also runs on Windows XP x64.
 
 | File | |
 | --- | --- |
-| `bin/gxpad.exe` | the program |
-| `bin/gxgeo.dll` | the geometry library it uses; keep it next to `gxpad.exe` |
+| `bin/sgpad.exe` | the program |
+| `bin/sggeo.dll` | the geometry library it uses; keep it next to `sgpad.exe` |
 | `lib/` | the library for C programs (see `lib/README.md`) |
 
-Drawings are saved as `.gxp` files, the same format the other versions of gxpad open.
+Drawings are saved as `.sgp` files, the same format the other versions of sgpad open.
 
 ## Using it
 
@@ -38,24 +38,24 @@ builds with the Visual C++ 2008 compiler and its Windows SDK 6.0A, links the C r
 and needs no redistributable.
 
 1. Build the XP library with `./build.sh winxp` (see the top of `build.sh`). The project takes
-   `gxgeo.h` from `gxgeo/include` and `gxgeo.lib` and `gxgeo.dll` from `build/winxp/x86/lib`.
-2. On Windows with Visual Studio 2008, open `winxp/gxpad.sln` and build the Release
+   `sggeo.h` from `sggeo/include` and `sggeo.lib` and `sggeo.dll` from `build/winxp/x86/lib`.
+2. On Windows with Visual Studio 2008, open `winxp/sgpad.sln` and build the Release
    configuration, or run in a Visual Studio 2008 Command Prompt:
 
    ```bat
    cd winxp
-   vcbuild gxpad.sln "Release|Win32"
+   vcbuild sgpad.sln "Release|Win32"
    ```
 
-   The build writes `winxp/Release/gxpad.exe` and copies `gxgeo.dll` next to it.
+   The build writes `winxp/Release/sgpad.exe` and copies `sggeo.dll` next to it.
 3. For a release, both files go to `build/winxp/x86/bin`, where `./release.sh` packs them as
-   `gxpad-TAG-winxp-x86.zip`. `./build.sh winxp` does steps 1 to 3 itself, building the program on
+   `sgpad-TAG-winxp-x86.zip`. `./build.sh winxp` does steps 1 to 3 itself, building the program on
    the XP machine of `vm/`.
 
 `vm/` holds scripts that do these steps on a Windows XP virtual machine from the Linux machine that
 hosts it, and drive the program there to try it out; see [vm/README.md](vm/README.md).
 
-`res/toolbar.bmp` (the toolbar and tool box images) and `res/gxpad.ico` come from
+`res/toolbar.bmp` (the toolbar and tool box images) and `res/sgpad.ico` come from
 `res/make_icons.py`; run `python3 make_icons.py` in `res/` (requires Pillow) after changing the
 images.
 
@@ -69,6 +69,6 @@ The source files:
 | `src/commands.cpp` | the Constrain and Dimension commands |
 | `src/dialogs.cpp` | the dialog boxes and the help topics |
 | `src/util.cpp` | text conversion, reading the document, the selection, colors |
-| `gxpad.rc`, `resource.h` | menus, accelerators, dialogs and the status bar texts |
+| `sgpad.rc`, `resource.h` | menus, accelerators, dialogs and the status bar texts |
 
-Settings and the list of recent files are stored under `HKEY_CURRENT_USER\Software\gxpad`.
+Settings and the list of recent files are stored under `HKEY_CURRENT_USER\Software\sgpad`.

@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  segment AB
+    horiz A B
+    x_A: x(A) = -2.5
+    y_A: y(A) = -0.001
+
+find
+  y_B: y(B)
+
+where
+  A (-2.5, -0.001)
+  B (0.001, -0.001)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  y_B label (0.3, 0.3)

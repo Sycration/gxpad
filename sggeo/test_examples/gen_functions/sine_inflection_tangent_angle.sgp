@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  g1 = curve(y = sin(x))
+
+construct
+  point A on g1
+    x_A: x(A) = 0
+  segment AB
+    AB tan g1
+    d1: |AB| = 3
+
+find
+  d2: dx(A, B)
+  d3: dy(A, B)
+
+where
+  A (5.802987036550598e-25, 8.704985425805239e-25)
+  B (2.121320343559643, 2.121320343559643)
+  x_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

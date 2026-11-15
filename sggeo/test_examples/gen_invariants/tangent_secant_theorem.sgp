@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 3
+  point A
+    d1: dist(O, A) = 5
+
+construct
+  B = tangent(A, k1)
+  segment AB
+  point C on k1
+    d2: dist(A, C) = 2.5
+  point D on k1
+  segment AD
+    C on AD
+
+find
+  d3: |AB|
+  d4: |AD|
+
+where
+  k1 r 3
+  A (4.9842969347924235, 0.39595967701125173)
+  B (1.6042862515598715, 2.535008012424414)
+  C (2.676013807783137, 1.3560789433340512)
+  D (-0.9249078703513501, 2.8538649987976186)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)

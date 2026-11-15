@@ -1,0 +1,19 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    D1: diam(k1) = 2
+  k2 = circle(A)
+    D2: diam(k2) = 2*pi
+
+find
+  r1: r(k2)
+
+where
+  A (1, -2)
+  k1 r 1
+  k2 r 3.141592653589793
+  D1 label (0.3, 0.3)
+  D2 label (0.3, 0.3)
+  r1 label (0.3, 0.3)

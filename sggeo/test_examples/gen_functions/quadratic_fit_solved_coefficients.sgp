@@ -1,0 +1,47 @@
+sgp 2
+
+given
+  a ~ 2
+  b ~ -3
+  c ~ 1
+  g1 = curve(y = a*x^2 + b*x + c)
+
+construct
+  point A on g1
+    x_A: x(A) = 0
+    y_A: y(A) = 1
+  point B on g1
+    x_B: x(B) = 2
+    y_B: y(B) = 3
+  point C on g1
+    x_C: x(C) = -1
+    y_C: y(C) = 6
+  D = meet(g1, xaxis)
+  E = meet(g1, xaxis)
+  point F on g1
+  segment FG
+    horiz F G
+    FG tan g1
+
+find
+  d1: dist(D, E)
+  x_F: x(F)
+  y_F: y(F)
+
+where
+  A (1.4218231740477212e-27, 1)
+  B (2, 3)
+  C (-1, 6)
+  D (0.5, -3.697785493223493e-32)
+  E (1.0000000000000002, -4.1665497735798637e-32)
+  F (0.75, -0.12500000000000028)
+  G (1.5, -0.12500000000000028)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  x_F label (0.3, 0.3)
+  y_F label (0.3, 0.3)

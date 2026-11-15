@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  g1 = curve(y = x^3 - 3*x)
+  line OA
+    θ1: angle(xaxis, OA) = 45°
+
+construct
+  B = meet(OA, g1)
+  C = meet(OA, g1)
+
+find
+  d1: dist(B, C)
+
+where
+  A (1.0523791565173777, 1.0523791565173775)
+  B (2, 1.9999999999999998)
+  C (-2, -1.9999999999999996)
+  θ1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

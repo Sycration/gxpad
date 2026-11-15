@@ -1,0 +1,26 @@
+sgp 2
+
+given
+  g1 = curve(y = x^2)
+  k1 = circle(O)
+    r1: r(k1) = 5
+
+construct
+  A = meet(g1, k1)
+  B = meet(g1, k1)
+  point C on k1
+
+find
+  x_A: x(A)
+  d1: dist(A, B)
+  y_A: y(A)
+
+where
+  k1 r 5
+  A (2.1271901209248893, 4.524937810560445)
+  B (-2.1271901209248893, 4.524937810560445)
+  C (0, 5)
+  r1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  y_A label (0.3, 0.3)

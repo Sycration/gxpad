@@ -1,8 +1,8 @@
-// Resource and command identifiers of gxpad for Windows.
-#ifndef GXPAD_RESOURCE_H
-#define GXPAD_RESOURCE_H
+// Resource and command identifiers of sgpad for Windows.
+#ifndef SGPAD_RESOURCE_H
+#define SGPAD_RESOURCE_H
 
-#define IDI_GXPAD               1
+#define IDI_SGPAD               1
 #define IDB_TOOLBAR             2
 #define IDR_MENU                100
 #define IDR_ACCEL               101
@@ -92,7 +92,7 @@
 #define ID_EDIT_DELETE          40027
 #define ID_EDIT_SELECT_ALL      40028
 #define ID_EDIT_PROPERTIES      40029
-// the languages of Copy Formula as Code, in the order of GX_LANG_*
+// the languages of Copy Formula as Code, in the order of SG_LANG_*
 #define ID_EDIT_COPY_C          40031
 #define ID_EDIT_COPY_RUST       40032
 #define ID_EDIT_COPY_JS         40033
@@ -143,7 +143,7 @@
 #define ID_TOOL_ASYMPTOTES      40124
 #define ID_TOOL_LAST            40124
 
-// ID_CON_FIRST + each GX_CON_* kind that can be added
+// ID_CON_FIRST + each SG_CON_* kind that can be added
 #define ID_CON_FIRST            40200
 #define ID_CON_COINCIDENT       40200
 #define ID_CON_ON_CURVE         40201
@@ -162,7 +162,7 @@
 #define ID_CON_CONSTRUCTION     40221
 #define ID_CON_INFINITE         40222
 
-// ID_DIM_FIRST + each GX_DIM_* kind
+// ID_DIM_FIRST + each SG_DIM_* kind
 #define ID_DIM_FIRST            40300
 #define ID_DIM_DISTANCE         40300
 #define ID_DIM_HDIST            40301

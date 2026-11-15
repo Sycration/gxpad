@@ -1,0 +1,13 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    D1: diam(k1) = 2*sqrt(2)
+
+find
+  r1: r(k1)
+
+where
+  k1 r 1.4142135623730951
+  D1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)

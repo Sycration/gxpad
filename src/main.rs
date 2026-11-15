@@ -1,17 +1,17 @@
-// release builds on Windows use the GUI subsystem, so launching gxpad.exe opens no console window
+// release builds on Windows use the GUI subsystem, so launching sgpad.exe opens no console window
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
-use gxpad::app::*;
-use gxpad::ops;
+use sgpad::app::*;
+use sgpad::ops;
 use eframe::egui::{self, Color32, CornerRadius, Stroke, vec2};
 use std::collections::HashMap;
 
-struct GxApp {
+struct SgApp {
     app: App,
     cache: HashMap<usize, (u64, Vec<Vec<egui::Pos2>>)>,
 }
 
-impl eframe::App for GxApp {
+impl eframe::App for SgApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.app.frame_ui(ui, &mut self.cache);
     }
@@ -59,21 +59,21 @@ fn main() -> eframe::Result {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1440.0, 900.0])
             .with_min_inner_size([820.0, 520.0])
-            .with_title("gxpad"),
+            .with_title("sgpad"),
         // smooths the edges of the formula glyphs, which are drawn as
         // triangle meshes that egui's own anti-aliasing does not cover
         multisampling: 4,
         ..Default::default()
     };
     eframe::run_native(
-        "gxpad",
+        "sgpad",
         opts,
         Box::new(|cc| {
             style(&cc.egui_ctx);
             let mut app = App::new();
             if let Some(path) = std::env::args().nth(1) {
                 if let Ok(s) = std::fs::read_to_string(&path) {
-                    if let Ok(mut d) = ops::Document::from_gxp(&s) {
+                    if let Ok(mut d) = ops::Document::from_sgp(&s) {
                         ops::solve(&mut d);
                         app.geo = d;
                         app.path = Some(path.into());
@@ -86,7 +86,7 @@ fn main() -> eframe::Result {
                     }
                 }
             }
-            Ok(Box::new(GxApp { app, cache: HashMap::new() }))
+            Ok(Box::new(SgApp { app, cache: HashMap::new() }))
         }),
     )
 }

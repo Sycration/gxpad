@@ -7,10 +7,10 @@
 #   --publish  publishes the release immediately instead of creating a draft
 #   --dry-run  only writes the archives to build/dist, without creating a release
 #
-# Archives: gxpad-TAG-<platform>-<arch>.tar.gz (linux, macos), .zip (windows, and winxp x86 with the Windows XP
-# program), gxgeo-TAG-web.tar.gz, gxgeo-TAG-winxp-x64.zip (the gxgeo DLL and gx), plus SHA256SUMS. Each one
-# holds a top-level folder with bin/ and lib/ as in build/ and LICENSE; the gxpad archives also hold the gxpad
-# README.md, or for Windows XP the README.md of winxp/ (bin/ holds the gx README.md and lib/ the gxgeo
+# Archives: sgpad-TAG-<platform>-<arch>.tar.gz (linux, macos), .zip (windows, and winxp x86 with the Windows XP
+# program), sggeo-TAG-web.tar.gz, sggeo-TAG-winxp-x64.zip (the sggeo DLL and sg), plus SHA256SUMS. Each one
+# holds a top-level folder with bin/ and lib/ as in build/ and LICENSE; the sgpad archives also hold the sgpad
+# README.md, or for Windows XP the README.md of winxp/ (bin/ holds the sg README.md and lib/ the sggeo
 # README.md, from ./build.sh).
 # The release tag points at the current commit, which must be clean and pushed. ./set-version.sh X.Y.Z
 # sets the version beforehand (the crates, and the VERSIONINFO of the Windows XP program).
@@ -42,7 +42,7 @@ targets=(linux/x64 linux/arm64 macos/x64 macos/arm64 windows/x64 windows/arm64 w
 for t in "${targets[@]}"; do
   [ -d "$BUILD/$t" ] || die "build/$t is missing, run ./build.sh first"
 done
-[ -f "$BUILD/winxp/x86/bin/gxpad.exe" ] || die "build/winxp/x86/bin/gxpad.exe is missing, run ./build.sh winxp"
+[ -f "$BUILD/winxp/x86/bin/sgpad.exe" ] || die "build/winxp/x86/bin/sgpad.exe is missing, run ./build.sh winxp"
 
 commit=$(git rev-parse HEAD)
 if [ $dry -eq 0 ]; then
@@ -61,16 +61,16 @@ trap 'rm -rf "$stage"' EXIT
 for t in "${targets[@]}"; do
   platform=${t%/*} arch=${t#*/}
   case $platform in
-    web) name=gxgeo-$tag-web ;;
-    winxp) if [ -f "$BUILD/$t/bin/gxpad.exe" ]; then name=gxpad-$tag-winxp-$arch; else name=gxgeo-$tag-winxp-$arch; fi ;;
-    *) name=gxpad-$tag-$platform-$arch ;;
+    web) name=sggeo-$tag-web ;;
+    winxp) if [ -f "$BUILD/$t/bin/sgpad.exe" ]; then name=sgpad-$tag-winxp-$arch; else name=sggeo-$tag-winxp-$arch; fi ;;
+    *) name=sgpad-$tag-$platform-$arch ;;
   esac
   mkdir -p "$stage/$name"
   cp -r "$BUILD/$t/." "$stage/$name/"
   cp LICENSE "$stage/$name/"
   case $name in
-    gxgeo-*) ;;
-    gxpad-*-winxp-*) cp winxp/README.md "$stage/$name/" ;;
+    sggeo-*) ;;
+    sgpad-*-winxp-*) cp winxp/README.md "$stage/$name/" ;;
     *) cp README.md "$stage/$name/" ;;
   esac
   if [ "$platform" = windows ] || [ "$platform" = winxp ]; then

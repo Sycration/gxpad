@@ -511,12 +511,12 @@ impl App {
 
     pub fn save(&mut self, ask: bool) {
         let path = if ask || self.path.is_none() {
-            rfd::FileDialog::new().add_filter("gxpad", &["gxp"]).set_file_name("construction.gxp").save_file()
+            rfd::FileDialog::new().add_filter("sgpad", &["sgp"]).set_file_name("construction.sgp").save_file()
         } else {
             self.path.clone()
         };
         if let Some(p) = path {
-            if let Ok(s) = ops::to_gxp(&self.geo) {
+            if let Ok(s) = ops::to_sgp(&self.geo) {
                 if std::fs::write(&p, s).is_ok() {
                     self.path = Some(p);
                 }
@@ -525,9 +525,9 @@ impl App {
     }
 
     pub fn open(&mut self) {
-        if let Some(p) = rfd::FileDialog::new().add_filter("gxpad", &["gxp"]).pick_file() {
+        if let Some(p) = rfd::FileDialog::new().add_filter("sgpad", &["sgp"]).pick_file() {
             if let Ok(s) = std::fs::read_to_string(&p) {
-                if ops::load_gxp(&mut self.geo, &s).is_ok() {
+                if ops::load_sgp(&mut self.geo, &s).is_ok() {
                     self.path = Some(p);
                     self.sel.clear();
                     self.fitted = false;

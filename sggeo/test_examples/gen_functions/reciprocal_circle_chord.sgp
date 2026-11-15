@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  r = 3
+  g1 = curve(y = 1/x)
+  k1 = circle(O)
+    r1: r(k1) = r
+
+construct
+  A = meet(g1, k1)
+  B = meet(g1, k1)
+  point C on k1
+
+find
+  d1: dist(A, B)
+
+where
+  k1 r 3
+  A (2.9811880507099953, 0.3354367396454046)
+  B (0.3354367396454046, 2.9811880507099953)
+  C (-3, 0)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

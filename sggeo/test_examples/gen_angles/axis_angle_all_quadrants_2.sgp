@@ -1,0 +1,15 @@
+sgp 2
+
+given
+  segment OA
+    x_A: x(A) = -3
+    y_A: y(A) = 2
+
+find
+  θ1: angle(xaxis, OA)
+
+where
+  A (-3, 2)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  θ1 label (0.289784, 0.957092)

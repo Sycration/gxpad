@@ -1,7 +1,7 @@
-// Declarations shared by the source files of gxpad for Windows: the window
-// classes, the drawing state and the helpers around the gxgeo C interface.
-#ifndef GXPAD_COMMON_H
-#define GXPAD_COMMON_H
+// Declarations shared by the source files of sgpad for Windows: the window
+// classes, the drawing state and the helpers around the sggeo C interface.
+#ifndef SGPAD_COMMON_H
+#define SGPAD_COMMON_H
 
 #define WINVER 0x0501
 #define _WIN32_WINNT 0x0501
@@ -34,7 +34,7 @@
 #include <map>
 #include <set>
 
-#include "gxgeo.h"
+#include "sggeo.h"
 #include "../resource.h"
 
 typedef std::wstring wstr;
@@ -92,33 +92,33 @@ wstr window_text(HWND h);
 // Shorthands for reading the document. They return a neutral value (false,
 // NaN, NONE) when the index does not name a live item.
 namespace geo {
-bool live(GxDoc *d, size_t e);
-int kind(GxDoc *d, size_t e);
-bool is_point(GxDoc *d, size_t e);
-bool is_line(GxDoc *d, size_t e);
-bool is_round(GxDoc *d, size_t e);   // circle or arc
-bool is_conic(GxDoc *d, size_t e);
-bool is_function(GxDoc *d, size_t e);
-bool is_curve(GxDoc *d, size_t e);   // anything but a point
-bool is_fixed(GxDoc *d, size_t e);   // origin or an axis
-bool is_axis(GxDoc *d, size_t e);
-bool hidden(GxDoc *d, size_t e);
-bool segment(GxDoc *d, size_t e);
-V2 pos(GxDoc *d, size_t p);
-void line_pts(GxDoc *d, size_t l, size_t *a, size_t *b);
-void line_ends(GxDoc *d, size_t l, V2 *a, V2 *b);
-V2 line_dir(GxDoc *d, size_t l);
-bool circle(GxDoc *d, size_t e, V2 *c, double *r);
-bool conic(GxDoc *d, size_t e, GxConic *kind, V2 *c, double *a, double *b, double *t);
-V2 center(GxDoc *d, size_t e);
-std::vector<size_t> con_ents(GxDoc *d, size_t c);
-std::vector<size_t> dim_ents(GxDoc *d, size_t i);
-wstr ent_name(GxDoc *d, size_t e);
-wstr dim_name(GxDoc *d, size_t i);
-wstr var_name(GxDoc *d, size_t i);
-bool lines_parallel(GxDoc *d, size_t a, size_t b);
+bool live(SgDoc *d, size_t e);
+int kind(SgDoc *d, size_t e);
+bool is_point(SgDoc *d, size_t e);
+bool is_line(SgDoc *d, size_t e);
+bool is_round(SgDoc *d, size_t e);   // circle or arc
+bool is_conic(SgDoc *d, size_t e);
+bool is_function(SgDoc *d, size_t e);
+bool is_curve(SgDoc *d, size_t e);   // anything but a point
+bool is_fixed(SgDoc *d, size_t e);   // origin or an axis
+bool is_axis(SgDoc *d, size_t e);
+bool hidden(SgDoc *d, size_t e);
+bool segment(SgDoc *d, size_t e);
+V2 pos(SgDoc *d, size_t p);
+void line_pts(SgDoc *d, size_t l, size_t *a, size_t *b);
+void line_ends(SgDoc *d, size_t l, V2 *a, V2 *b);
+V2 line_dir(SgDoc *d, size_t l);
+bool circle(SgDoc *d, size_t e, V2 *c, double *r);
+bool conic(SgDoc *d, size_t e, SgConic *kind, V2 *c, double *a, double *b, double *t);
+V2 center(SgDoc *d, size_t e);
+std::vector<size_t> con_ents(SgDoc *d, size_t c);
+std::vector<size_t> dim_ents(SgDoc *d, size_t i);
+wstr ent_name(SgDoc *d, size_t e);
+wstr dim_name(SgDoc *d, size_t i);
+wstr var_name(SgDoc *d, size_t i);
+bool lines_parallel(SgDoc *d, size_t a, size_t b);
 // Index among the function curves, for picking a color.
-size_t function_index(GxDoc *d, size_t e);
+size_t function_index(SgDoc *d, size_t e);
 }
 
 // ------------------------------------------------------------ selection
@@ -147,7 +147,7 @@ struct Snap {
 
 // The point a snap names, adding a free point or a point on the curve when
 // it names none. NONE on failure.
-size_t realize(GxDoc *d, const Snap &s);
+size_t realize(SgDoc *d, const Snap &s);
 
 // ------------------------------------------------------------ the application
 
@@ -167,7 +167,7 @@ int tool_clicks(Tool t);
 
 // The document and everything the windows show of it.
 struct App {
-    GxDoc *doc;
+    SgDoc *doc;
     wstr path;
     std::vector<Sel> sel;
     Tool tool;
@@ -191,7 +191,7 @@ struct App {
     // it on the document and joins its undo steps into one. False when it fails.
     struct Change {
         virtual ~Change() {}
-        virtual bool run(GxDoc *d) = 0;
+        virtual bool run(SgDoc *d) = 0;
     };
     bool apply(Change &c);
 };
@@ -243,7 +243,7 @@ void canvas_print(HDC dc, RECT r);
 void canvas_copy_picture();
 // Places the label of a new dimension of kind `kind` on a and b, adds it and
 // opens its Properties when it sets a value.
-void add_dimension(GxDim kind, size_t a, size_t b, bool place_auto, V2 label);
+void add_dimension(SgDim kind, size_t a, size_t b, bool place_auto, V2 label);
 
 // pane.cpp
 HWND pane_create(HWND parent);
@@ -252,7 +252,7 @@ void pane_formula_update();     // starts the derivation for the selection
 void pane_search_longer();
 bool pane_has_formula();
 void pane_copy_formula(bool latex);
-void pane_copy_code(GxLang lang);
+void pane_copy_code(SgLang lang);
 void pane_copy_picture();
 void pane_save_picture();
 void pane_layout();

@@ -1,0 +1,17 @@
+sgp 2
+
+construct
+  point A on xaxis
+  point B on yaxis
+    d1: dist(A, B) = 5
+  C = mid(A, B)
+
+find
+  d2: dist(O, C)
+
+where
+  A (3, 9.95108931369775e-54)
+  B (9.95108931369775e-54, 4)
+  C (1.5, 2)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

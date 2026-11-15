@@ -1,0 +1,37 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 3
+  point A
+    d1: dist(O, A) = 1
+
+construct
+  point B on k1
+  point C on k1
+  segment BC
+    A on BC
+  point D on k1
+    d2: dist(A, D) = 2
+  point E on k1
+  segment DE
+    A on DE
+
+find
+  d3: dist(A, E)
+  d4: dist(A, B)
+  d5: dist(A, C)
+
+where
+  k1 r 2.9999999999958584
+  A (0.008201438765831928, 0.9999663676374095)
+  B (2.4752154473504726, 1.6950836230619781)
+  C (-2.996072002773079, 0.1534684142570648)
+  D (0.024595691797993285, 2.9998991736257956)
+  E (-0.024587067298369857, -2.9998992443246384)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)

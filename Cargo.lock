@@ -1405,39 +1405,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gxcli"
-version = "0.3.0"
-dependencies = [
- "gxgeo",
- "rustyline",
-]
-
-[[package]]
-name = "gxgeo"
-version = "0.3.0"
-dependencies = [
- "js-sys",
- "latex-rust",
- "num-bigint",
- "num-integer",
- "num-rational",
- "num-traits",
- "wasm-bindgen",
- "wasm-bindgen-test",
- "web-time",
-]
-
-[[package]]
-name = "gxpad"
-version = "0.3.0"
-dependencies = [
- "eframe",
- "gxgeo",
- "latex-rust",
- "rfd",
-]
-
-[[package]]
 name = "half"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3068,6 +3035,39 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.10",
+]
+
+[[package]]
+name = "sgcli"
+version = "0.3.0"
+dependencies = [
+ "rustyline",
+ "sggeo",
+]
+
+[[package]]
+name = "sggeo"
+version = "0.3.0"
+dependencies = [
+ "js-sys",
+ "latex-rust",
+ "num-bigint",
+ "num-integer",
+ "num-rational",
+ "num-traits",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "web-time",
+]
+
+[[package]]
+name = "sgpad"
+version = "0.3.0"
+dependencies = [
+ "eframe",
+ "latex-rust",
+ "rfd",
+ "sggeo",
 ]
 
 [[package]]

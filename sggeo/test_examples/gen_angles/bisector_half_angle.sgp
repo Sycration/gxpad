@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 4
+  segment OB
+    θ1: ∠AOB = 75°
+
+construct
+  l1 = bisect(OA, OB)
+
+find
+  θ2: angle(OA, l1)
+
+where
+  A (4, -7.587624035388684e-51)
+  B (0.9422437858599098, 3.516501681945233)
+  d1 label (0.3, 0.3)
+  θ1 label (0.798349, 0.602196)
+  θ2 label (0.94693, 0.321439)

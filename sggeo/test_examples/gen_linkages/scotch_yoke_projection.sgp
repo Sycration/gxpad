@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  segment OA
+    d1: |OA| = 1.8
+    θ1: angle(xaxis, AO) = 142°
+
+construct
+  point B on xaxis
+    vert B A
+  segment BA
+
+find
+  x_B: x(B)
+
+where
+  A (1.4184193564920995, 1.1081906555861851)
+  B (1.4184193564920995, 4.9622610120976315e-228)
+  d1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  x_B label (0.3, 0.3)

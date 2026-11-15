@@ -29,7 +29,7 @@ struct Formula {
     wstr name, plain, err;
     std::string latex;
     std::vector<std::string> rows;  // `name = formula` with u_k, then u_k = ...
-    wstr code[GX_LANG_MAXIMA + 1];  // the formula as code, by GX_LANG_*
+    wstr code[SG_LANG_MAXIMA + 1];  // the formula as code, by SG_LANG_*
     bool exact, is_angle;
     double value, actual;
     size_t size;
@@ -45,12 +45,12 @@ struct Formula {
 };
 
 struct Job {
-    GxDoc *doc;
-    GxCancel *cancel;
+    SgDoc *doc;
+    SgCancel *cancel;
     Sel target;
     uint64_t gen;
     unsigned level;
-    GxFormula *f;
+    SgFormula *f;
     std::string err;
     HANDLE thread;
 };
@@ -65,13 +65,13 @@ double image_pt;                // their size
 
 unsigned __stdcall job_thread(void *arg) {
     Job *j = (Job *)arg;
-    j->f = gx_derive(j->doc, j->target.kind == Sel::DIM ? GX_TARGET_DIM : GX_TARGET_VAR, j->target.i, j->level * LONGER_MS,
+    j->f = sg_derive(j->doc, j->target.kind == Sel::DIM ? SG_TARGET_DIM : SG_TARGET_VAR, j->target.i, j->level * LONGER_MS,
                      j->cancel);
     if (!j->f) {
-        const char *e = gx_last_error();
+        const char *e = sg_last_error();
         j->err = e ? e : "";
     }
-    gx_doc_free(j->doc);
+    sg_doc_free(j->doc);
     j->doc = 0;
     PostMessage(pane, WM_APP_FORMULA, 0, (LPARAM)j);
     return 0;
@@ -108,10 +108,10 @@ Bitmap *decode_png(const unsigned char *p, size_t n) {
 std::vector<unsigned char> typeset(const std::string &latex, double pt, double dpi) {
     std::vector<unsigned char> out;
     size_t n = 0;
-    uint8_t *p = gx_latex_png(latex.c_str(), pt, dpi, 0x000000, &n);
+    uint8_t *p = sg_latex_png(latex.c_str(), pt, dpi, 0x000000, &n);
     if (p) {
         out.assign(p, p + n);
-        gx_bytes_free(p, n);
+        sg_bytes_free(p, n);
     }
     return out;
 }
@@ -188,12 +188,12 @@ void show_state() {
     if (!has_target) {
         head = L"Select a dimension or variable to see its formula.";
     } else if (sets_itself(t)) {
-        GxDoc *d = app.doc;
+        SgDoc *d = app.doc;
         if (t.kind == Sel::DIM) {
-            head = geo::dim_name(d, t.i) + L" = " + fmt_dim(gx_doc_dim_value(d, t.i), gx_doc_dim_kind(d, t.i) == GX_DIM_ANGLE);
+            head = geo::dim_name(d, t.i) + L" = " + fmt_dim(sg_doc_dim_value(d, t.i), sg_doc_dim_kind(d, t.i) == SG_DIM_ANGLE);
             st = L"A driving dimension sets its value; it has no formula.";
         } else {
-            head = geo::var_name(d, t.i) + L" = " + fmt_val(gx_doc_var_value(d, t.i));
+            head = geo::var_name(d, t.i) + L" = " + fmt_val(sg_doc_var_value(d, t.i));
             st = L"A free variable has the value you give it.";
         }
     } else if (shown.valid) {
@@ -220,30 +220,30 @@ void show_state() {
 
 void cancel_job() {
     if (job) {
-        gx_cancel_set(job->cancel);
+        sg_cancel_set(job->cancel);
         job = 0;  // its result arrives later and is dropped
     }
 }
 
 unsigned level_of(Sel t) {
-    if (t == level_target && level_gen == gx_doc_generation(app.doc)) return level_for;
+    if (t == level_target && level_gen == sg_doc_generation(app.doc)) return level_for;
     return 0;
 }
 
 void start(Sel t, unsigned level) {
     cancel_job();
     Job *j = new Job;
-    j->doc = gx_doc_copy(app.doc);
-    j->cancel = gx_cancel_new();
+    j->doc = sg_doc_copy(app.doc);
+    j->cancel = sg_cancel_new();
     j->target = t;
-    j->gen = gx_doc_generation(app.doc);
+    j->gen = sg_doc_generation(app.doc);
     j->level = level;
     j->f = 0;
     unsigned id;
     j->thread = (HANDLE)_beginthreadex(0, 0, job_thread, j, 0, &id);
     if (!j->thread) {
-        gx_doc_free(j->doc);
-        gx_cancel_free(j->cancel);
+        sg_doc_free(j->doc);
+        sg_cancel_free(j->cancel);
         delete j;
         return;
     }
@@ -257,13 +257,13 @@ void take_result(Job *j) {
     f.gen = j->gen;
     f.level = j->level;
     if (j->f) {
-        GxFormula *g = j->f;
+        SgFormula *g = j->f;
         f.name = widen(g->name);
         f.plain = widen(g->plain);
         f.latex = g->latex;
         f.rows.push_back(g->latex_short);
         for (size_t k = 0; k < g->n_defs; k++) f.rows.push_back(std::string(g->defs[k].name) + " = " + g->defs[k].latex);
-        for (GxLang l = 0; l <= GX_LANG_MAXIMA; l++) f.code[l] = take(gx_formula_code(g, l));
+        for (SgLang l = 0; l <= SG_LANG_MAXIMA; l++) f.code[l] = take(sg_formula_code(g, l));
         f.exact = g->exact;
         f.is_angle = g->is_angle;
         f.value = g->value;
@@ -291,14 +291,14 @@ void take_result(Job *j) {
     }
 }
 
-// the languages of gx_formula_code, by GX_LANG_*
+// the languages of sg_formula_code, by SG_LANG_*
 const wchar_t *lang_names[] = {L"C", L"Rust", L"JavaScript", L"Python", L"Mathematica", L"Maxima"};
 const wchar_t *lang_labels[] = {L"&C", L"&Rust", L"&JavaScript", L"&Python", L"&Mathematica", L"Ma&xima"};
 
 // A menu of the languages, with the commands ID_EDIT_COPY_C to ID_EDIT_COPY_MAXIMA.
 HMENU code_menu() {
     HMENU m = CreatePopupMenu();
-    for (GxLang l = 0; l <= GX_LANG_MAXIMA; l++) AppendMenuW(m, MF_STRING, ID_EDIT_COPY_C + l, lang_labels[l]);
+    for (SgLang l = 0; l <= SG_LANG_MAXIMA; l++) AppendMenuW(m, MF_STRING, ID_EDIT_COPY_C + l, lang_labels[l]);
     return m;
 }
 
@@ -461,44 +461,44 @@ Sel row_sel(int row) {
 }
 
 void fill_list() {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     filling = true;
     int top = ListView_GetTopIndex(list);
     SendMessage(list, WM_SETREDRAW, FALSE, 0);
     ListView_DeleteAllItems(list);
     switch (current_tab()) {
     case TAB_DIMS:
-        for (size_t i = 0; i < gx_doc_dim_count(d); i++) {
-            int kind = gx_doc_dim_kind(d, i);
+        for (size_t i = 0; i < sg_doc_dim_count(d); i++) {
+            int kind = sg_doc_dim_kind(d, i);
             if (kind < 0) continue;
-            bool driving = gx_doc_dim_driving(d, i) == 1;
-            wstr expr = take(gx_doc_dim_expr(d, i));
+            bool driving = sg_doc_dim_driving(d, i) == 1;
+            wstr expr = take(sg_doc_dim_expr(d, i));
             wstr cells[4];
             cells[0] = geo::dim_name(d, i);
-            cells[1] = !expr.empty() ? expr : fmt_dim(driving ? gx_doc_dim_set_value(d, i) : gx_doc_dim_value(d, i), kind == GX_DIM_ANGLE);
+            cells[1] = !expr.empty() ? expr : fmt_dim(driving ? sg_doc_dim_set_value(d, i) : sg_doc_dim_value(d, i), kind == SG_DIM_ANGLE);
             cells[2] = driving ? L"Driving" : L"Measured";
-            cells[3] = gx_doc_dim_numeric(d, i) == 1 ? L"Number" : L"Symbol";
+            cells[3] = sg_doc_dim_numeric(d, i) == 1 ? L"Number" : L"Symbol";
             add_row(i, cells, 4, -1);
         }
         break;
     case TAB_VARS:
-        for (size_t i = 0; i < gx_doc_var_count(d); i++) {
-            int fr = gx_doc_var_free(d, i);
+        for (size_t i = 0; i < sg_doc_var_count(d); i++) {
+            int fr = sg_doc_var_free(d, i);
             if (fr < 0) continue;
-            wstr expr = take(gx_doc_var_expr(d, i));
+            wstr expr = take(sg_doc_var_expr(d, i));
             wstr cells[4];
             cells[0] = geo::var_name(d, i);
-            cells[1] = fmt_val(gx_doc_var_value(d, i));
+            cells[1] = fmt_val(sg_doc_var_value(d, i));
             cells[2] = !expr.empty() ? L"Defined" : fr == 1 ? L"Free" : L"Solved";
             cells[3] = expr;
             add_row(i, cells, 4, -1);
         }
         break;
     case TAB_FUNCS:
-        for (size_t e = 0; e < gx_doc_ent_count(d); e++) {
+        for (size_t e = 0; e < sg_doc_ent_count(d); e++) {
             if (!geo::is_function(d, e)) continue;
             wstr cells[1];
-            cells[0] = take(gx_doc_curve_src(d, e));
+            cells[0] = take(sg_doc_curve_src(d, e));
             add_row(e, cells, 1, (int)(geo::function_index(d, e) % 6));
         }
         break;
@@ -615,8 +615,8 @@ LRESULT CALLBACK pane_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             job = 0;
             take_result(j);
         }
-        gx_cancel_free(j->cancel);
-        gx_formula_free(j->f);
+        sg_cancel_free(j->cancel);
+        sg_formula_free(j->f);
         delete j;
         show_state();
         return 0;
@@ -648,19 +648,19 @@ HWND pane_create(HWND parent) {
     wc.hInstance = g_inst;
     wc.hCursor = LoadCursor(0, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
-    wc.lpszClassName = L"GxpadPane";
+    wc.lpszClassName = L"SgpadPane";
     RegisterClassExW(&wc);
     WNDCLASSEXW vc = {sizeof vc};
     vc.lpfnWndProc = view_proc;
     vc.hInstance = g_inst;
     vc.hCursor = LoadCursor(0, IDC_ARROW);
-    vc.lpszClassName = L"GxpadFormula";
+    vc.lpszClassName = L"SgpadFormula";
     RegisterClassExW(&vc);
     make_swatches();
 
     // no WS_CLIPCHILDREN: the pane erases the inside of the group box, which a
     // group box leaves to its parent
-    pane = CreateWindowExW(WS_EX_CONTROLPARENT, L"GxpadPane", L"", WS_CHILD | WS_VISIBLE, 0, 0, 300, 400, parent,
+    pane = CreateWindowExW(WS_EX_CONTROLPARENT, L"SgpadPane", L"", WS_CHILD | WS_VISIBLE, 0, 0, 300, 400, parent,
                            (HMENU)IDC_PANE, g_inst, 0);
     tabs = child(WC_TABCONTROLW, L"", WS_CLIPSIBLINGS | WS_TABSTOP, 0, IDC_TABS);
     const wchar_t *names[3] = {L"Dimensions", L"Variables", L"Functions"};
@@ -678,7 +678,7 @@ HWND pane_create(HWND parent) {
     btn_delete = child(L"BUTTON", L"&Delete", BS_PUSHBUTTON | WS_TABSTOP, 0, IDC_PANE_DELETE);
     box = child(L"BUTTON", L"Formula", BS_GROUPBOX | WS_CLIPSIBLINGS, 0, IDC_FORMULA_BOX);
     text = child(L"STATIC", L"", SS_LEFT | SS_ENDELLIPSIS | SS_NOPREFIX, 0, IDC_FORMULA_TEXT);
-    view = child(L"GxpadFormula", L"", WS_HSCROLL | WS_VSCROLL, WS_EX_CLIENTEDGE, IDC_FORMULA_VIEW);
+    view = child(L"SgpadFormula", L"", WS_HSCROLL | WS_VSCROLL, WS_EX_CLIENTEDGE, IDC_FORMULA_VIEW);
     btn_copy = child(L"BUTTON", L"&Copy", BS_PUSHBUTTON | WS_TABSTOP, 0, IDC_FORMULA_COPY);
     btn_copy_as = child(L"BUTTON", L"Copy &As >>", BS_PUSHBUTTON | WS_TABSTOP, 0, IDC_FORMULA_COPY_AS);
     btn_longer = child(L"BUTTON", L"&Search Longer", BS_PUSHBUTTON | WS_TABSTOP, 0, IDC_FORMULA_LONGER);
@@ -736,9 +736,9 @@ void pane_refresh() {
 // A driving dimension with a plain value, or a free variable, sets its own
 // value: its formula would only repeat its name.
 bool sets_itself(Sel t) {
-    GxDoc *d = app.doc;
-    if (t.kind == Sel::DIM) return gx_doc_dim_driving(d, t.i) == 1 && take(gx_doc_dim_expr(d, t.i)).empty();
-    return gx_doc_var_free(d, t.i) == 1 && take(gx_doc_var_expr(d, t.i)).empty();
+    SgDoc *d = app.doc;
+    if (t.kind == Sel::DIM) return sg_doc_dim_driving(d, t.i) == 1 && take(sg_doc_dim_expr(d, t.i)).empty();
+    return sg_doc_var_free(d, t.i) == 1 && take(sg_doc_var_expr(d, t.i)).empty();
 }
 
 void pane_formula_update() {
@@ -753,7 +753,7 @@ void pane_formula_update() {
         show_state();
         return;
     }
-    uint64_t gen = gx_doc_generation(app.doc);
+    uint64_t gen = sg_doc_generation(app.doc);
     unsigned level = level_of(t);
     bool same_shown = shown.valid && shown.target == t && shown.gen == gen;
     bool running = job && job->target == t && job->gen == gen && job->level == level;
@@ -774,7 +774,7 @@ bool pane_can_search_longer() { return shown.valid && !shown.settled() && job ==
 void pane_search_longer() {
     if (!pane_can_search_longer()) return;
     level_target = shown.target;
-    level_gen = gx_doc_generation(app.doc);
+    level_gen = sg_doc_generation(app.doc);
     level_for = level_of(shown.target) + 1;
     if (level_for <= shown.level) level_for = shown.level + 1;
     start(shown.target, level_for);
@@ -801,8 +801,8 @@ void pane_copy_formula(bool latex) {
     set_status(latex ? L"The formula was copied as LaTeX." : L"The formula was copied.");
 }
 
-void pane_copy_code(GxLang lang) {
-    if (!pane_has_formula() || lang > GX_LANG_MAXIMA || shown.code[lang].empty()) return;
+void pane_copy_code(SgLang lang) {
+    if (!pane_has_formula() || lang > SG_LANG_MAXIMA || shown.code[lang].empty()) return;
     // the Clipboard holds lines ending in CR LF
     wstr s;
     for (size_t k = 0; k < shown.code[lang].size(); k++) {
@@ -878,7 +878,7 @@ void pane_save_picture() {
 void pane_cancel_jobs() {
     if (job) {
         HANDLE t = job->thread;
-        gx_cancel_set(job->cancel);
+        sg_cancel_set(job->cancel);
         WaitForSingleObject(t, 3000);
         job = 0;
     }

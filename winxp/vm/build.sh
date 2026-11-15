@@ -2,20 +2,20 @@
 # Uploads the sources of the Windows program to the XP machine and builds them with Visual Studio 2008.
 #
 # Usage: winxp/vm/build.sh [all] [rebuild]
-#   all      also uploads the bitmaps and the gxgeo header, import library and DLL (after ./build.sh winxp)
+#   all      also uploads the bitmaps and the sggeo header, import library and DLL (after ./build.sh winxp)
 #   rebuild  rebuilds everything instead of what changed
 #
-# A running gxpad.exe keeps its file open, so the build first renames it out of the way. The `if` is in
+# A running sgpad.exe keeps its file open, so the build first renames it out of the way. The `if` is in
 # parentheses: cmd.exe would otherwise take the rest of the line as part of it and skip the build when
-# there is no gxpad.exe (after a failed build). A running copy
-# also keeps gxgeo.dll open; then the build fails at "Copying gxgeo.dll" when the DLL changed, although
-# gxpad.exe itself was built.
+# there is no sgpad.exe (after a failed build). A running copy
+# also keeps sggeo.dll open; then the build fails at "Copying sggeo.dll" when the DLL changed, although
+# sgpad.exe itself was built.
 # Settings come from the environment; see README.md.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
 cd "$here/../.."
-dir=${XP_DIR:-'C:\gxpad'}
+dir=${XP_DIR:-'C:\sgpad'}
 vs=${XP_VS:-'C:\Program Files\Microsoft Visual Studio 9.0'}
 remote=${dir#*:\\}  # the same directory, as the FTP server names it
 
@@ -28,11 +28,11 @@ for a in "$@"; do
   esac
 done
 
-files=(winxp/gxpad.sln winxp/gxpad.vcproj winxp/gxpad.rc winxp/resource.h winxp/src/*)
+files=(winxp/sgpad.sln winxp/sgpad.vcproj winxp/sgpad.rc winxp/resource.h winxp/src/*)
 if [ $all -eq 1 ]; then
-  files+=(winxp/res/gxpad.ico winxp/res/toolbar.bmp gxgeo/include/gxgeo.h
-          build/winxp/x86/lib/gxgeo.lib build/winxp/x86/lib/gxgeo.dll)
+  files+=(winxp/res/sgpad.ico winxp/res/toolbar.bmp sggeo/include/sggeo.h
+          build/winxp/x86/lib/sggeo.lib build/winxp/x86/lib/sggeo.dll)
 fi
 python3 "$here/vm.py" put . "$remote" "${files[@]}"
-python3 "$here/vm.py" run "call \"$vs\\Common7\\Tools\\vsvars32.bat\" >nul & cd /d $dir\\winxp & del Release\\gxpad-old-*.exe >nul 2>&1 & (if exist Release\\gxpad.exe ren Release\\gxpad.exe gxpad-old-%RANDOM%.exe) & vcbuild /nologo $action gxpad.sln \"Release|Win32\"" 600 |
+python3 "$here/vm.py" run "call \"$vs\\Common7\\Tools\\vsvars32.bat\" >nul & cd /d $dir\\winxp & del Release\\sgpad-old-*.exe >nul 2>&1 & (if exist Release\\sgpad.exe ren Release\\sgpad.exe sgpad-old-%RANDOM%.exe) & vcbuild /nologo $action sgpad.sln \"Release|Win32\"" 600 |
   grep -v '^\s*$' | tail -40

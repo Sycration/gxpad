@@ -1,0 +1,27 @@
+sgp 2
+
+given
+  e1 = ellipse(O)
+    a1: a(e1) = 5
+    b1: b(e1) = 3
+
+construct
+  point A on xaxis
+  B = tangent(A, e1)
+  segment AB
+  C = tangent(A, e1)
+  segment AC
+    θ1: ∠CAB = 90°
+
+find
+  x_A: x(A)
+
+where
+  e1 a 5 b 3 angle 0° [fixed angle]
+  A (5.830951894845301, -6.162975822039155e-33)
+  B (4.287464628562721, 1.5434872662825796)
+  C (4.287464628562721, -1.5434872662825796)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)

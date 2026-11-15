@@ -1,0 +1,12 @@
+sgp 2
+
+given
+  segment AB
+
+find
+  d1: |AB|
+
+where
+  A (0.37, 3.14159) [fixed]
+  B (1.41421, -2.71828) [fixed]
+  d1 label (0.3, 0.3)

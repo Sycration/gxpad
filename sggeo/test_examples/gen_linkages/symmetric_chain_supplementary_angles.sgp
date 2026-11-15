@@ -1,0 +1,40 @@
+sgp 2
+
+given
+  L = 3
+  U = 5
+  θL = 0.91
+  θU = 1
+  segment OA
+    θ1: angle(xaxis, OA) = θL
+    d1: |OA| = L
+  segment AB
+    d3: |AB| = U
+  segment BC
+    θ3: ∠ABC = θU
+    d4: |BC| = U
+
+construct
+  point D on xaxis
+  segment CD
+    θ2: angle(CD, -xaxis) = θL
+    d2: |CD| = L
+
+find
+  x_B: x(B)
+  y_B: y(B)
+
+where
+  A (1.8412372484664346, 2.3685112190698514)
+  B (4.238364941487449, 6.756424028521716)
+  C (6.635492634508464, 2.3685112190698514)
+  D (4.794255386042029, 8.188754849428609e-25)
+  θ1 label (0.454171, 0.209113)
+  d1 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  θ3 label (0.1, -0.7)
+  d4 label (0.3, 0.3)
+  θ2 label (0.5, 0.3)
+  d2 label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)

@@ -1,16 +1,16 @@
 [package]
-name = "gxpad"
+name = "sgpad"
 version = "0.3.0"
 edition = "2024"
 description = "2D constraint-based geometry pad that derives closed-form formulas for measured dimensions"
 license = "GPL-3.0-or-later"
 
 [workspace]
-members = ["gxcli", "gxgeo"]
+members = ["sgcli", "sggeo"]
 exclude = ["vendor"]
 
 [dependencies]
-gxgeo = { path = "gxgeo" }
+sggeo = { path = "sggeo" }
 eframe = "0.37"
 rfd = "0.17"
 latex-rust = { version = "3.0.3", default-features = false, features = ["std", "egui"] }

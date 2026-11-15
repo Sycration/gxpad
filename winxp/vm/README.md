@@ -8,9 +8,9 @@ machine; the environment variables below describe another one.
 | --- | --- |
 | `vm.py` | uploads and downloads files over FTP and runs `cmd.exe` command lines over telnet |
 | `build.sh` | uploads the sources and builds them with `vcbuild` (Visual Studio 2008) |
-| `launch.sh` | starts the built `gxpad.exe` on the screen of the XP machine and waits until it runs |
-| `wait.py` | waits until `gxpad.exe` runs (`launch.sh` uses it) |
-| `cycle.sh` | closes gxpad, builds it and starts it again |
+| `launch.sh` | starts the built `sgpad.exe` on the screen of the XP machine and waits until it runs |
+| `wait.py` | waits until `sgpad.exe` runs (`launch.sh` uses it) |
+| `cycle.sh` | closes sgpad, builds it and starts it again |
 | `ui.py` | moves the mouse, clicks and types on the XP screen and takes screenshots |
 | `v4proxy.py` | an IPv4-only proxy for downloading the MSVC libraries with `xwin` (see `build.sh`) |
 
@@ -18,15 +18,15 @@ machine; the environment variables below describe another one.
 
 ```sh
 ./build.sh winxp                       # the XP library, which the program links against
-winxp/vm/build.sh all                  # first time: sources, bitmaps and the gxgeo files
-winxp/vm/launch.sh 'C:\gxpad\some.gxp' # the program on the XP screen, with a drawing
+winxp/vm/build.sh all                  # first time: sources, bitmaps and the sggeo files
+winxp/vm/launch.sh 'C:\sgpad\some.sgp' # the program on the XP screen, with a drawing
 winxp/vm/ui.py click 40 170 drag 200 560 520 560 shot line   # draw a line, save target/xp-shots/line.png
 # change the sources, then
-winxp/vm/cycle.sh 'C:\gxpad\some.gxp'  # close, build, start again
+winxp/vm/cycle.sh 'C:\sgpad\some.sgp'  # close, build, start again
 ```
 
 For a release, `./build.sh winxp` builds the program here itself (with `build.sh all rebuild`) and puts it in
-`build/winxp/x86/bin`, next to the `gxgeo.dll` it just built.
+`build/winxp/x86/bin`, next to the `sggeo.dll` it just built.
 
 ## The XP machine
 
@@ -48,7 +48,7 @@ For a release, `./build.sh winxp` builds the program here itself (with `build.sh
 | `XP_HOST` | `192.168.122.112` | address of the XP machine |
 | `XP_USER`, `XP_PASS` | `user`, `user` | the account for telnet and FTP |
 | `XP_LOCAL_IP` | (none) | for active-mode FTP: address of this machine on the network of the XP machine |
-| `XP_DIR` | `C:\gxpad` | where the repository files go on the XP machine |
+| `XP_DIR` | `C:\sgpad` | where the repository files go on the XP machine |
 | `XP_VS` | `C:\Program Files\Microsoft Visual Studio 9.0` | the installation of Visual Studio 2008 |
 | `XP_DOMAIN` | `winxp` | the libvirt name of the virtual machine |
 | `XP_LIBVIRT` | `qemu:///system` | the libvirt connection |
@@ -58,10 +58,10 @@ For a release, `./build.sh winxp` builds the program here itself (with `build.sh
 ## Things to know
 
 - A program started over telnet runs on the invisible desktop of the telnet session, so `launch.sh`
-  starts gxpad with the task scheduler (`at /interactive`), which runs it as the SYSTEM account. Its
-  settings and recent files are then under `HKEY_USERS\S-1-5-18\Software\gxpad`, and a file saved
+  starts sgpad with the task scheduler (`at /interactive`), which runs it as the SYSTEM account. Its
+  settings and recent files are then under `HKEY_USERS\S-1-5-18\Software\sgpad`, and a file saved
   without a folder goes to `C:\Documents and Settings\NetworkService\My Documents`.
-- `at` takes whole minutes, so gxpad starts up to a minute and a quarter after `launch.sh`.
+- `at` takes whole minutes, so sgpad starts up to a minute and a quarter after `launch.sh`.
 - Keys typed by `ui.py` arrive faster than menus open; a `wait 0.5` after a key that opens a menu
   keeps the next key from going elsewhere.
 - Someone else may be using the screen of the XP machine: `ui.py` moves the real pointer.

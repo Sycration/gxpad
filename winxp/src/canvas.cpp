@@ -16,8 +16,8 @@ struct View {
     double ox, oy;     // top left corner on the device
     V2 to_s(V2 p) const { return V2(ox + w / 2 + (p.x - cx) * s, oy + h / 2 - (p.y - cy) * s); }
     V2 to_w(V2 p) const { return V2(cx + (p.x - ox - w / 2) / s, cy - (p.y - oy - h / 2) / s); }
-    GxWindow window() const {
-        GxWindow g;
+    SgWindow window() const {
+        SgWindow g;
         g.x0 = cx - w / 2 / s;
         g.x1 = cx + w / 2 / s;
         g.y0 = cy - h / 2 / s;
@@ -97,15 +97,15 @@ double nearest_on(const Polys &ps, V2 p, V2 *at) {
     return best;
 }
 
-Polys samples(GxDoc *d, const View &v, size_t e) {
+Polys samples(SgDoc *d, const View &v, size_t e) {
     Polys out;
-    GxWindow win = v.window();
+    SgWindow win = v.window();
     size_t n_polys = 0;
-    ptrdiff_t n = gx_doc_ent_samples(d, e, win, 0, 0, 0, 0, &n_polys);
+    ptrdiff_t n = sg_doc_ent_samples(d, e, win, 0, 0, 0, 0, &n_polys);
     if (n <= 0 || n_polys == 0) return out;
     std::vector<double> xy(2 * n);
     std::vector<size_t> starts(n_polys);
-    gx_doc_ent_samples(d, e, win, &xy[0], n, &starts[0], n_polys, &n_polys);
+    sg_doc_ent_samples(d, e, win, &xy[0], n, &starts[0], n_polys, &n_polys);
     for (size_t k = 0; k < n_polys; k++) {
         size_t a = starts[k], b = k + 1 < n_polys ? starts[k + 1] : (size_t)n;
         Poly pl;
@@ -119,12 +119,12 @@ Polys samples(GxDoc *d, const View &v, size_t e) {
 }
 
 void build_shapes() {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     double key[5] = {view.cx, view.cy, view.s, view.w, view.h};
-    uint64_t gen = gx_doc_generation(d);
+    uint64_t gen = sg_doc_generation(d);
     if (gen == shapes_gen && memcmp(key, shapes_key, sizeof key) == 0) return;
     shapes.clear();
-    size_t n = gx_doc_ent_count(d);
+    size_t n = sg_doc_ent_count(d);
     for (size_t e = 0; e < n; e++) {
         if (!geo::live(d, e) || geo::hidden(d, e)) continue;
         shapes[e] = samples(d, view, e);
@@ -175,7 +175,7 @@ void arrow(Graphics &g, V2 tip, V2 dir, const Color &c, double k) {
 
 Hover hit(V2 m) {
     Hover h;
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     for (size_t k = dim_rects.size(); k-- > 0;) {
         RECT r = dim_rects[k].first;
         InflateRect(&r, 2, 2);
@@ -212,7 +212,7 @@ int hit_handle(V2 m) {
 }
 
 // The curve (not a point) nearest to m within reach, or NONE; `pred` filters.
-size_t curve_at(V2 m, bool (*pred)(GxDoc *, size_t)) {
+size_t curve_at(V2 m, bool (*pred)(SgDoc *, size_t)) {
     double best = 1e300;
     size_t be = NONE;
     for (std::map<size_t, Polys>::iterator it = shapes.begin(); it != shapes.end(); ++it) {
@@ -224,7 +224,7 @@ size_t curve_at(V2 m, bool (*pred)(GxDoc *, size_t)) {
 }
 
 Snap snap_at(V2 m) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     double best = 1e300;
     size_t be = NONE;
     for (std::map<size_t, Polys>::iterator it = shapes.begin(); it != shapes.end(); ++it) {
@@ -276,7 +276,7 @@ bool same_point(const Snap &a, const Snap &b) { return a.kind == Snap::POINT && 
 
 // Adds the shape of drawing tool `t` from its clicks `s` to `d`. Returns the
 // new entity, or -1.
-ptrdiff_t build_shape(GxDoc *d, Tool t, const std::vector<Snap> &s) {
+ptrdiff_t build_shape(SgDoc *d, Tool t, const std::vector<Snap> &s) {
     for (size_t i = 0; i < s.size(); i++)
         for (size_t j = i + 1; j < s.size(); j++)
             if (same_point(s[i], s[j])) return -1;
@@ -289,40 +289,40 @@ ptrdiff_t build_shape(GxDoc *d, Tool t, const std::vector<Snap> &s) {
         int hv = hv_of(s[0], s[1]);
         Snap e = aligned(s[0], s[1], hv);
         if ((a = realize(d, s[0])) == NONE || (b = realize(d, e)) == NONE) return -1;
-        return hv < 0 ? gx_doc_add_line(d, a, b, false) : gx_doc_add_line_aligned(d, a, b, false, hv == 1);
+        return hv < 0 ? sg_doc_add_line(d, a, b, false) : sg_doc_add_line_aligned(d, a, b, false, hv == 1);
     }
     case T_CIRCLE:
         if ((c = realize(d, s[0])) == NONE) return -1;
         if (s[1].kind == Snap::FREE) {
             double r = dist(geo::pos(d, c), s[1].at);
-            return r > 1e-9 ? gx_doc_add_circle(d, c, r) : -1;
+            return r > 1e-9 ? sg_doc_add_circle(d, c, r) : -1;
         }
         if ((b = realize(d, s[1])) == NONE) return -1;
-        return gx_doc_add_circle_to(d, c, b);
+        return sg_doc_add_circle_to(d, c, b);
     case T_ARC:
         if ((c = realize(d, s[0])) == NONE || (a = realize(d, s[1])) == NONE) return -1;
-        if (s[2].kind == Snap::POINT) return gx_doc_add_arc(d, c, a, s[2].e);
-        return gx_doc_add_arc_toward(d, c, a, s[2].at.x, s[2].at.y);
+        if (s[2].kind == Snap::POINT) return sg_doc_add_arc(d, c, a, s[2].e);
+        return sg_doc_add_arc_toward(d, c, a, s[2].at.x, s[2].at.y);
     case T_ELLIPSE:
     case T_HYPERBOLA:
         if ((c = realize(d, s[0])) == NONE) return -1;
-        return gx_doc_add_conic_from(d, t == T_ELLIPSE ? GX_CONIC_ELLIPSE : GX_CONIC_HYPERBOLA, c, s[1].at.x, s[1].at.y,
+        return sg_doc_add_conic_from(d, t == T_ELLIPSE ? SG_CONIC_ELLIPSE : SG_CONIC_HYPERBOLA, c, s[1].at.x, s[1].at.y,
                                      s[2].at.x, s[2].at.y);
     case T_PARABOLA:
         if ((c = realize(d, s[0])) == NONE) return -1;
-        return gx_doc_add_parabola_toward(d, c, s[1].at.x, s[1].at.y);
+        return sg_doc_add_parabola_toward(d, c, s[1].at.x, s[1].at.y);
     case T_CIRCLE3:
     case T_ARC3:
     case T_ELLIPSE_FOCI:
     case T_HYPERBOLA_FOCI:
         if ((a = realize(d, s[0])) == NONE || (b = realize(d, s[1])) == NONE || (c = realize(d, s[2])) == NONE) return -1;
-        if (t == T_CIRCLE3) return gx_doc_add_circle_through(d, a, b, c, 0);
-        if (t == T_ARC3) return gx_doc_add_arc_through(d, a, b, c, 0);
-        return gx_doc_add_conic_by_foci(d, t == T_ELLIPSE_FOCI ? GX_CONIC_ELLIPSE : GX_CONIC_HYPERBOLA, a, b, c);
+        if (t == T_CIRCLE3) return sg_doc_add_circle_through(d, a, b, c, 0);
+        if (t == T_ARC3) return sg_doc_add_arc_through(d, a, b, c, 0);
+        return sg_doc_add_conic_by_foci(d, t == T_ELLIPSE_FOCI ? SG_CONIC_ELLIPSE : SG_CONIC_HYPERBOLA, a, b, c);
     case T_PARABOLA_FOCUS:
         if (s[1].kind != Snap::CURVE || !geo::is_line(d, s[1].e)) return -1;
         if ((a = realize(d, s[0])) == NONE) return -1;
-        return gx_doc_add_parabola_by_focus(d, a, s[1].e);
+        return sg_doc_add_parabola_by_focus(d, a, s[1].e);
     default:
         return -1;
     }
@@ -332,7 +332,7 @@ struct ShapeChange : App::Change {
     Tool t;
     std::vector<Snap> s;
     ptrdiff_t made;
-    bool run(GxDoc *d) { made = build_shape(d, t, s); return made >= 0; }
+    bool run(SgDoc *d) { made = build_shape(d, t, s); return made >= 0; }
 };
 
 // A construction from the tool's picks and clicks.
@@ -341,49 +341,49 @@ struct ConstructChange : App::Change {
     std::vector<size_t> picks;
     std::vector<Snap> s;
     V2 m;
-    bool run(GxDoc *d) {
+    bool run(SgDoc *d) {
         size_t a, b;
         size_t out[4];
         switch (t) {
         case T_MIDPOINT:
-            if (!picks.empty()) return gx_doc_add_line_midpoint(d, picks[0]) >= 0;
+            if (!picks.empty()) return sg_doc_add_line_midpoint(d, picks[0]) >= 0;
             if (same_point(s[0], s[1]) || (a = realize(d, s[0])) == NONE || (b = realize(d, s[1])) == NONE) return false;
-            return gx_doc_add_midpoint(d, a, b) >= 0;
-        case T_INTERSECT: return gx_doc_add_intersection_near(d, picks[0], picks[1], m.x, m.y) >= 0;
+            return sg_doc_add_midpoint(d, a, b) >= 0;
+        case T_INTERSECT: return sg_doc_add_intersection_near(d, picks[0], picks[1], m.x, m.y) >= 0;
         case T_PERP_LINE:
         case T_PAR_LINE:
             if ((a = realize(d, s[0])) == NONE) return false;
-            return (t == T_PERP_LINE ? gx_doc_add_perp_line(d, picks[0], a) : gx_doc_add_parallel_line(d, picks[0], a)) >= 0;
+            return (t == T_PERP_LINE ? sg_doc_add_perp_line(d, picks[0], a) : sg_doc_add_parallel_line(d, picks[0], a)) >= 0;
         case T_PERP_BISECTOR:
             if (!picks.empty()) {
                 geo::line_pts(d, picks[0], &a, &b);
-                return gx_doc_add_perp_bisector(d, a, b, 0) >= 0;
+                return sg_doc_add_perp_bisector(d, a, b, 0) >= 0;
             }
             if (same_point(s[0], s[1]) || (a = realize(d, s[0])) == NONE || (b = realize(d, s[1])) == NONE) return false;
-            return gx_doc_add_perp_bisector(d, a, b, 0) >= 0;
-        case T_ANGLE_BISECTOR: return gx_doc_add_angle_bisector(d, picks[0], picks[1], m.x, m.y, 0) >= 0;
+            return sg_doc_add_perp_bisector(d, a, b, 0) >= 0;
+        case T_ANGLE_BISECTOR: return sg_doc_add_angle_bisector(d, picks[0], picks[1], m.x, m.y, 0) >= 0;
         case T_TANGENT_LINE:
             if ((a = realize(d, s[0])) == NONE) return false;
-            return gx_doc_add_tangent_line_near(d, a, picks[0], m.x, m.y, 0) >= 0;
+            return sg_doc_add_tangent_line_near(d, a, picks[0], m.x, m.y, 0) >= 0;
         case T_REFLECT:
             if ((a = realize(d, s[0])) == NONE) return false;
-            return gx_doc_add_reflection(d, a, picks[0]) >= 0;
-        case T_FOCI: return gx_doc_add_foci(d, picks[0], out, 4) > 0;
-        case T_DIRECTRIX: return gx_doc_add_directrix(d, picks[0], m.x, m.y) >= 0;
-        case T_ASYMPTOTES: return gx_doc_add_asymptotes(d, picks[0], out, 4) > 0;
+            return sg_doc_add_reflection(d, a, picks[0]) >= 0;
+        case T_FOCI: return sg_doc_add_foci(d, picks[0], out, 4) > 0;
+        case T_DIRECTRIX: return sg_doc_add_directrix(d, picks[0], m.x, m.y) >= 0;
+        case T_ASYMPTOTES: return sg_doc_add_asymptotes(d, picks[0], out, 4) > 0;
         default: return false;
         }
     }
 };
 
-bool is_hyperbola(GxDoc *d, size_t e) {
-    GxConic k;
+bool is_hyperbola(SgDoc *d, size_t e) {
+    SgConic k;
     V2 c;
     double a, b, t;
-    return geo::conic(d, e, &k, &c, &a, &b, &t) && k == GX_CONIC_HYPERBOLA;
+    return geo::conic(d, e, &k, &c, &a, &b, &t) && k == SG_CONIC_HYPERBOLA;
 }
 
-bool round_or_conic_or_function(GxDoc *d, size_t e) { return geo::is_curve(d, e) && !geo::is_line(d, e); }
+bool round_or_conic_or_function(SgDoc *d, size_t e) { return geo::is_curve(d, e) && !geo::is_line(d, e); }
 
 std::vector<size_t> snap_ents(const std::vector<Snap> &s) {
     std::vector<size_t> v;
@@ -416,35 +416,35 @@ void finish(bool ok, const std::vector<size_t> &ents) {
 
 // The dimension the dimension tool would add for the picked entities, with
 // the mouse at world position m.
-bool dim_kind_for(const std::vector<size_t> &e, V2 m, GxDim *kind, size_t *a, size_t *b) {
-    GxDoc *d = app.doc;
+bool dim_kind_for(const std::vector<size_t> &e, V2 m, SgDim *kind, size_t *a, size_t *b) {
+    SgDoc *d = app.doc;
     *b = 0;
     if (e.size() == 1) {
         *a = e[0];
         if (geo::is_point(d, e[0])) {
             V2 q = geo::pos(d, e[0]);
-            *kind = fabs(m.y - q.y) > fabs(m.x - q.x) ? GX_DIM_X : GX_DIM_Y;
+            *kind = fabs(m.y - q.y) > fabs(m.x - q.x) ? SG_DIM_X : SG_DIM_Y;
             return true;
         }
-        if (geo::is_line(d, e[0])) { *kind = GX_DIM_LENGTH; return true; }
-        if (geo::is_round(d, e[0])) { *kind = GX_DIM_RADIUS; return true; }
-        if (geo::is_conic(d, e[0])) { *kind = GX_DIM_CONIC_A; return true; }
+        if (geo::is_line(d, e[0])) { *kind = SG_DIM_LENGTH; return true; }
+        if (geo::is_round(d, e[0])) { *kind = SG_DIM_RADIUS; return true; }
+        if (geo::is_conic(d, e[0])) { *kind = SG_DIM_CONIC_A; return true; }
         return false;
     }
     if (e.size() != 2) return false;
     size_t p = e[0], q = e[1];
-    if (geo::is_point(d, p) && geo::is_point(d, q)) { *kind = GX_DIM_DISTANCE; *a = p; *b = q; return true; }
+    if (geo::is_point(d, p) && geo::is_point(d, q)) { *kind = SG_DIM_DISTANCE; *a = p; *b = q; return true; }
     if (geo::is_line(d, p) && geo::is_point(d, q)) std::swap(p, q);
-    if (geo::is_point(d, p) && geo::is_line(d, q)) { *kind = GX_DIM_POINT_LINE; *a = p; *b = q; return true; }
+    if (geo::is_point(d, p) && geo::is_line(d, q)) { *kind = SG_DIM_POINT_LINE; *a = p; *b = q; return true; }
     if (geo::is_line(d, p) && geo::is_line(d, q)) {
         if (geo::lines_parallel(d, p, q)) {
             size_t pa, pb;
             geo::line_pts(d, q, &pa, &pb);
-            *kind = GX_DIM_POINT_LINE;
+            *kind = SG_DIM_POINT_LINE;
             *a = pa;
             *b = p;
         } else {
-            *kind = GX_DIM_ANGLE;
+            *kind = SG_DIM_ANGLE;
             *a = p;
             *b = q;
         }
@@ -454,7 +454,7 @@ bool dim_kind_for(const std::vector<size_t> &e, V2 m, GxDim *kind, size_t *a, si
 }
 
 void tool_click(V2 m, bool from_press) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     Snap s = snap_at(m);
     V2 mw = view.to_w(m);
     Tool t = app.tool;
@@ -591,7 +591,7 @@ void tool_click(V2 m, bool from_press) {
 }
 
 void dimension_click(V2 m) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     Hover h = hit(m);
     if (h.any && h.s.kind == Sel::DIM) {
         app.select_only(h.s);
@@ -610,7 +610,7 @@ void dimension_click(V2 m) {
         set_status(canvas_prompt());
         return;
     }
-    GxDim kind;
+    SgDim kind;
     size_t a, b;
     if (dim_kind_for(picks, view.to_w(m), &kind, &a, &b)) {
         reset_clicks();
@@ -654,7 +654,7 @@ struct Painter {
     }
 };
 
-Color ent_color(GxDoc *d, size_t e, const std::set<size_t> &conflicts, bool print) {
+Color ent_color(SgDoc *d, size_t e, const std::set<size_t> &conflicts, bool print) {
     if (!print && GetTickCount() < app.flash_until && std::find(app.flash.begin(), app.flash.end(), e) != app.flash.end())
         return col::conflict;
     if (!print && (app.selected(Sel(Sel::ENT, e)) || std::find(picks.begin(), picks.end(), e) != picks.end()))
@@ -662,24 +662,24 @@ Color ent_color(GxDoc *d, size_t e, const std::set<size_t> &conflicts, bool prin
     if (conflicts.count(e)) return col::conflict;
     if (geo::is_axis(d, e)) return col::axis;
     if (geo::is_function(d, e)) return col::functions[geo::function_index(d, e) % 6];
-    return gx_doc_ent_fixed(d, e) == 1 ? col::fixed_ent : col::free_ent;
+    return sg_doc_ent_fixed(d, e) == 1 ? col::fixed_ent : col::free_ent;
 }
 
-std::set<size_t> conflict_ents(GxDoc *d) {
+std::set<size_t> conflict_ents(SgDoc *d) {
     std::set<size_t> s;
-    if (gx_doc_conflict_count(d) == 0) return s;
-    for (size_t c = 0; c < gx_doc_con_count(d); c++)
-        if (gx_doc_con_conflict(d, c) == 1) {
+    if (sg_doc_conflict_count(d) == 0) return s;
+    for (size_t c = 0; c < sg_doc_con_count(d); c++)
+        if (sg_doc_con_conflict(d, c) == 1) {
             std::vector<size_t> v = geo::con_ents(d, c);
             s.insert(v.begin(), v.end());
         }
-    for (size_t i = 0; i < gx_doc_dim_count(d); i++)
-        if (gx_doc_dim_conflict(d, i) == 1) {
+    for (size_t i = 0; i < sg_doc_dim_count(d); i++)
+        if (sg_doc_dim_conflict(d, i) == 1) {
             std::vector<size_t> v = geo::dim_ents(d, i);
             s.insert(v.begin(), v.end());
         }
-    for (size_t e = 0; e < gx_doc_ent_count(d); e++)
-        if (gx_doc_ent_conflict(d, e) == 1) s.insert(e);
+    for (size_t e = 0; e < sg_doc_ent_count(d); e++)
+        if (sg_doc_ent_conflict(d, e) == 1) s.insert(e);
     return s;
 }
 
@@ -692,7 +692,7 @@ void paint_grid(Painter &p) {
     for (int i = 0; i < 3; i++)
         if (m[i] * base >= raw) { step = m[i] * base; break; }
     double major = step * 5;
-    GxWindow w = v.window();
+    SgWindow w = v.window();
     Pen minor(col::grid_minor, 1), maj(col::grid_major, 1);
     for (double x = floor(w.x0 / step) * step; x <= w.x1; x += step) {
         bool is_major = fabs(floor(x / major + 0.5) * major - x) < step * 0.01;
@@ -723,9 +723,9 @@ void paint_grid(Painter &p) {
 
 // The label of dimension i (or of the dimension kind/a/b about to be added
 // when i is NONE), drawn with its leaders; returns the label rectangle.
-RECT paint_dim(Painter &p, size_t i, GxDim kind, size_t a, size_t b, V2 anchor, V2 lw, bool supp, const Color &c,
+RECT paint_dim(Painter &p, size_t i, SgDim kind, size_t a, size_t b, V2 anchor, V2 lw, bool supp, const Color &c,
                const wstr &txt, const wstr &name) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     const View &v = p.v;
     double k = p.k;
     V2 lp = v.to_s(lw);
@@ -756,24 +756,24 @@ RECT paint_dim(Painter &p, size_t i, GxDim kind, size_t a, size_t b, V2 anchor, 
             if (t < 0 || t > len) p.g.DrawLine(&thin, pf(t < 0 ? sa : sb), pf(lp));
         }
     };
-    V2 origin = geo::pos(d, (size_t)gx_doc_origin(d));
+    V2 origin = geo::pos(d, (size_t)sg_doc_origin(d));
     switch (kind) {
-    case GX_DIM_DISTANCE: {
+    case SG_DIM_DISTANCE: {
         V2 pa = geo::pos(d, a), pb = geo::pos(d, b);
         L::linear(p, st, thin, c, pa, pb, pb - pa, lw, lp);
         break;
     }
-    case GX_DIM_LENGTH: {
+    case SG_DIM_LENGTH: {
         V2 pa, pb;
         geo::line_ends(d, a, &pa, &pb);
         L::linear(p, st, thin, c, pa, pb, pb - pa, lw, lp);
         break;
     }
-    case GX_DIM_HDIST: L::linear(p, st, thin, c, geo::pos(d, a), geo::pos(d, b), V2(1, 0), lw, lp); break;
-    case GX_DIM_VDIST: L::linear(p, st, thin, c, geo::pos(d, a), geo::pos(d, b), V2(0, 1), lw, lp); break;
-    case GX_DIM_X: L::linear(p, st, thin, c, origin, geo::pos(d, a), V2(1, 0), lw, lp); break;
-    case GX_DIM_Y: L::linear(p, st, thin, c, origin, geo::pos(d, a), V2(0, 1), lw, lp); break;
-    case GX_DIM_POINT_LINE: {
+    case SG_DIM_HDIST: L::linear(p, st, thin, c, geo::pos(d, a), geo::pos(d, b), V2(1, 0), lw, lp); break;
+    case SG_DIM_VDIST: L::linear(p, st, thin, c, geo::pos(d, a), geo::pos(d, b), V2(0, 1), lw, lp); break;
+    case SG_DIM_X: L::linear(p, st, thin, c, origin, geo::pos(d, a), V2(1, 0), lw, lp); break;
+    case SG_DIM_Y: L::linear(p, st, thin, c, origin, geo::pos(d, a), V2(0, 1), lw, lp); break;
+    case SG_DIM_POINT_LINE: {
         V2 pp = geo::pos(d, a), la, lb;
         geo::line_ends(d, b, &la, &lb);
         V2 f = foot(pp, la, lb);
@@ -788,8 +788,8 @@ RECT paint_dim(Painter &p, size_t i, GxDim kind, size_t a, size_t b, V2 anchor, 
         p.g.DrawLine(&thin, pf((sp + sf) * 0.5), pf(lp));
         break;
     }
-    case GX_DIM_RADIUS:
-    case GX_DIM_DIAMETER: {
+    case SG_DIM_RADIUS:
+    case SG_DIM_DIAMETER: {
         V2 cc;
         double r;
         if (!geo::circle(d, a, &cc, &r)) break;
@@ -797,14 +797,14 @@ RECT paint_dim(Painter &p, size_t i, GxDim kind, size_t a, size_t b, V2 anchor, 
         double l = dmax(dir.len(), 1e-12);
         V2 u = dir * (1 / l);
         V2 edge = v.to_s(cc + u * r);
-        V2 start = kind == GX_DIM_DIAMETER ? v.to_s(cc - u * r) : v.to_s(cc);
+        V2 start = kind == SG_DIM_DIAMETER ? v.to_s(cc - u * r) : v.to_s(cc);
         p.g.DrawLine(&st, pf(start), pf(edge));
         arrow(p.g, edge, edge - start, c, k);
-        if (kind == GX_DIM_DIAMETER) arrow(p.g, start, start - edge, c, k);
+        if (kind == SG_DIM_DIAMETER) arrow(p.g, start, start - edge, c, k);
         if (l > r) p.g.DrawLine(&thin, pf(edge), pf(lp));
         break;
     }
-    case GX_DIM_ANGLE: {
+    case SG_DIM_ANGLE: {
         V2 x = anchor;
         V2 d1 = geo::line_dir(d, a), d2 = geo::line_dir(d, b);
         double a0 = atan2(d1.y, d1.x), a1 = atan2(d2.y, d2.x);
@@ -830,13 +830,13 @@ RECT paint_dim(Painter &p, size_t i, GxDim kind, size_t a, size_t b, V2 anchor, 
         arrow(p.g, pts[48], pts[48] - pts[46], c, k);
         break;
     }
-    case GX_DIM_CONIC_A:
-    case GX_DIM_CONIC_B: {
-        GxConic ck;
+    case SG_DIM_CONIC_A:
+    case SG_DIM_CONIC_B: {
+        SgConic ck;
         V2 cc;
         double av, bv, tv;
         if (!geo::conic(d, a, &ck, &cc, &av, &bv, &tv)) break;
-        V2 tip = kind == GX_DIM_CONIC_A ? V2(cc.x + av * cos(tv), cc.y + av * sin(tv)) : V2(cc.x - bv * sin(tv), cc.y + bv * cos(tv));
+        V2 tip = kind == SG_DIM_CONIC_A ? V2(cc.x + av * cos(tv), cc.y + av * sin(tv)) : V2(cc.x - bv * sin(tv), cc.y + bv * cos(tv));
         V2 sc = v.to_s(cc), stp = v.to_s(tip);
         p.g.DrawLine(&st, pf(sc), pf(stp));
         arrow(p.g, stp, stp - sc, c, k);
@@ -874,45 +874,45 @@ RECT paint_dim(Painter &p, size_t i, GxDim kind, size_t a, size_t b, V2 anchor, 
 }
 
 void paint_dims(Painter &p) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     if (!p.print) dim_rects.clear();
-    for (size_t i = 0; i < gx_doc_dim_count(d); i++) {
-        int kind = gx_doc_dim_kind(d, i);
+    for (size_t i = 0; i < sg_doc_dim_count(d); i++) {
+        int kind = sg_doc_dim_kind(d, i);
         if (kind < 0) continue;
         std::vector<size_t> ents = geo::dim_ents(d, i);
         if (ents.empty()) continue;
-        bool driving = gx_doc_dim_driving(d, i) == 1;
+        bool driving = sg_doc_dim_driving(d, i) == 1;
         bool sel = !p.print && app.selected(Sel(Sel::DIM, i));
         bool hov = !p.print && hover.any && hover.s == Sel(Sel::DIM, i);
-        char *err = gx_doc_dim_error(d, i);
-        bool bad = gx_doc_dim_conflict(d, i) == 1 || err != 0;
-        gx_string_free(err);
+        char *err = sg_doc_dim_error(d, i);
+        bool bad = sg_doc_dim_conflict(d, i) == 1 || err != 0;
+        sg_string_free(err);
         Color c = sel ? col::selected : bad ? col::conflict : driving ? col::driving : col::measured;
         if (hov && !sel) c = col::hover;
-        double v = gx_doc_dim_value(d, i);
-        wstr txt = fmt_dim(v, kind == GX_DIM_ANGLE);
-        if (kind == GX_DIM_DIAMETER) txt = L"\x2300" + txt;
-        wstr expr = take(gx_doc_dim_expr(d, i));
+        double v = sg_doc_dim_value(d, i);
+        wstr txt = fmt_dim(v, kind == SG_DIM_ANGLE);
+        if (kind == SG_DIM_DIAMETER) txt = L"\x2300" + txt;
+        wstr expr = take(sg_doc_dim_expr(d, i));
         if (!driving) txt = L"(" + txt + L")";
         else if (!expr.empty()) txt = expr + L" = " + txt;
         V2 anchor, off;
-        if (gx_doc_dim_anchor(d, i, &anchor.x, &anchor.y) != 1 || gx_doc_dim_offset(d, i, &off.x, &off.y) != 1) continue;
-        RECT r = paint_dim(p, i, (GxDim)kind, ents[0], ents.size() > 1 ? ents[1] : 0, anchor, anchor + off,
-                           gx_doc_dim_supp(d, i) == 1, c, txt, geo::dim_name(d, i));
+        if (sg_doc_dim_anchor(d, i, &anchor.x, &anchor.y) != 1 || sg_doc_dim_offset(d, i, &off.x, &off.y) != 1) continue;
+        RECT r = paint_dim(p, i, (SgDim)kind, ents[0], ents.size() > 1 ? ents[1] : 0, anchor, anchor + off,
+                           sg_doc_dim_supp(d, i) == 1, c, txt, geo::dim_name(d, i));
         if (!p.print) dim_rects.push_back(std::make_pair(r, i));
     }
 }
 
 // Where the symbols of constraint c go: an anchor and an offset for each.
 std::vector<std::pair<V2, V2> > glyph_spots(size_t c) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     std::vector<std::pair<V2, V2> > out;
     std::vector<size_t> e = geo::con_ents(d, c);
-    int kind = gx_doc_con_kind(d, c);
+    int kind = sg_doc_con_kind(d, c);
     if (e.empty() || kind < 0) return out;
     struct S {
         static std::pair<V2, V2> top_of(size_t e) {
-            GxDoc *d = app.doc;
+            SgDoc *d = app.doc;
             if (geo::is_line(d, e)) {
                 V2 a, b;
                 geo::line_ends(d, e, &a, &b);
@@ -935,32 +935,32 @@ std::vector<std::pair<V2, V2> > glyph_spots(size_t c) {
     V2 p0 = view.to_s(geo::pos(d, e[0]));
     V2 p1 = e.size() > 1 ? view.to_s(geo::pos(d, e[1])) : p0;
     switch (kind) {
-    case GX_CON_COINCIDENT: out.push_back(std::make_pair(p0, V2(11, 11))); break;
-    case GX_CON_ON_CURVE: case GX_CON_FOCUS: out.push_back(std::make_pair(p0, V2(11, -11))); break;
-    case GX_CON_MIDPOINT: case GX_CON_MIDPOINT_OF: out.push_back(std::make_pair(p0, V2(-11, 11))); break;
-    case GX_CON_HORIZONTAL:
+    case SG_CON_COINCIDENT: out.push_back(std::make_pair(p0, V2(11, 11))); break;
+    case SG_CON_ON_CURVE: case SG_CON_FOCUS: out.push_back(std::make_pair(p0, V2(11, -11))); break;
+    case SG_CON_MIDPOINT: case SG_CON_MIDPOINT_OF: out.push_back(std::make_pair(p0, V2(-11, 11))); break;
+    case SG_CON_HORIZONTAL:
         if (geo::is_line(d, e[0])) out.push_back(S::top_of(e[0]));
         else out.push_back(std::make_pair((p0 + p1) * 0.5, V2(0, -14)));
         break;
-    case GX_CON_VERTICAL:
+    case SG_CON_VERTICAL:
         if (geo::is_line(d, e[0])) out.push_back(S::top_of(e[0]));
         else out.push_back(std::make_pair((p0 + p1) * 0.5, V2(14, 0)));
         break;
-    case GX_CON_PARALLEL: case GX_CON_PERPENDICULAR: case GX_CON_COLLINEAR: case GX_CON_EQUAL:
+    case SG_CON_PARALLEL: case SG_CON_PERPENDICULAR: case SG_CON_COLLINEAR: case SG_CON_EQUAL:
         out.push_back(S::top_of(e[0]));
         if (e.size() > 1) out.push_back(S::top_of(e[1]));
         break;
-    case GX_CON_CONCENTRIC: out.push_back(std::make_pair(view.to_s(geo::center(d, e[0])), V2(12, 12))); break;
-    case GX_CON_SYMMETRIC: out.push_back(std::make_pair((p0 + p1) * 0.5, V2(0, 14))); break;
-    case GX_CON_TANGENT_AT: out.push_back(std::make_pair(p1, V2(12, -12))); break;
-    case GX_CON_DIRECTRIX:
+    case SG_CON_CONCENTRIC: out.push_back(std::make_pair(view.to_s(geo::center(d, e[0])), V2(12, 12))); break;
+    case SG_CON_SYMMETRIC: out.push_back(std::make_pair((p0 + p1) * 0.5, V2(0, 14))); break;
+    case SG_CON_TANGENT_AT: out.push_back(std::make_pair(p1, V2(12, -12))); break;
+    case SG_CON_DIRECTRIX:
         if (e.size() == 4) out.push_back(std::make_pair(p0, V2(0, 0)));
         else out.push_back(S::top_of(e[0]));
         break;
-    case GX_CON_TANGENT: {
+    case SG_CON_TANGENT: {
         V2 at;
         bool solved;
-        if (gx_doc_con_contact(d, c, &at.x, &at.y, &solved) == 1) out.push_back(std::make_pair(view.to_s(at), V2(12, -12)));
+        if (sg_doc_con_contact(d, c, &at.x, &at.y, &solved) == 1) out.push_back(std::make_pair(view.to_s(at), V2(12, -12)));
         break;
     }
     default: out.push_back(std::make_pair(p0, V2(0, 0))); break;
@@ -969,36 +969,36 @@ std::vector<std::pair<V2, V2> > glyph_spots(size_t c) {
 }
 
 Icon con_icon(size_t c) {
-    switch (gx_doc_con_kind(app.doc, c)) {
-    case GX_CON_COINCIDENT: return I_COINCIDENT;
-    case GX_CON_ON_CURVE: return I_ON_CURVE;
-    case GX_CON_MIDPOINT: case GX_CON_MIDPOINT_OF: return I_MIDPOINT_CON;
-    case GX_CON_HORIZONTAL: return I_HORIZONTAL;
-    case GX_CON_VERTICAL: return I_VERTICAL;
-    case GX_CON_PARALLEL: return I_PARALLEL;
-    case GX_CON_PERPENDICULAR: return I_PERPENDICULAR;
-    case GX_CON_COLLINEAR: return I_COLLINEAR;
-    case GX_CON_EQUAL: return I_EQUAL;
-    case GX_CON_TANGENT: case GX_CON_TANGENT_AT: return I_TANGENT;
-    case GX_CON_CONCENTRIC: return I_CONCENTRIC;
-    case GX_CON_SYMMETRIC: return I_SYMMETRIC;
-    case GX_CON_OFFSET: return gx_doc_con_turned(app.doc, c) == 1 ? I_PERPENDICULAR : I_PARALLEL;
-    case GX_CON_BISECTOR: return I_ANGLE_BISECTOR;
-    case GX_CON_FOCUS: return I_FOCI;
-    case GX_CON_DIRECTRIX: return I_DIRECTRIX;
-    case GX_CON_ASYMPTOTE: return I_ASYMPTOTES;
+    switch (sg_doc_con_kind(app.doc, c)) {
+    case SG_CON_COINCIDENT: return I_COINCIDENT;
+    case SG_CON_ON_CURVE: return I_ON_CURVE;
+    case SG_CON_MIDPOINT: case SG_CON_MIDPOINT_OF: return I_MIDPOINT_CON;
+    case SG_CON_HORIZONTAL: return I_HORIZONTAL;
+    case SG_CON_VERTICAL: return I_VERTICAL;
+    case SG_CON_PARALLEL: return I_PARALLEL;
+    case SG_CON_PERPENDICULAR: return I_PERPENDICULAR;
+    case SG_CON_COLLINEAR: return I_COLLINEAR;
+    case SG_CON_EQUAL: return I_EQUAL;
+    case SG_CON_TANGENT: case SG_CON_TANGENT_AT: return I_TANGENT;
+    case SG_CON_CONCENTRIC: return I_CONCENTRIC;
+    case SG_CON_SYMMETRIC: return I_SYMMETRIC;
+    case SG_CON_OFFSET: return sg_doc_con_turned(app.doc, c) == 1 ? I_PERPENDICULAR : I_PARALLEL;
+    case SG_CON_BISECTOR: return I_ANGLE_BISECTOR;
+    case SG_CON_FOCUS: return I_FOCI;
+    case SG_CON_DIRECTRIX: return I_DIRECTRIX;
+    case SG_CON_ASYMPTOTE: return I_ASYMPTOTES;
     }
     return I_COINCIDENT;
 }
 
 // Constraint symbols: small framed images from the toolbar strip.
 void paint_glyphs(Graphics &g) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     glyph_rects.clear();
     std::map<std::pair<int, int>, int> used;
     HDC dc = g.GetHDC();
-    for (size_t c = 0; c < gx_doc_con_count(d); c++) {
-        if (gx_doc_con_kind(d, c) < 0) continue;
+    for (size_t c = 0; c < sg_doc_con_count(d); c++) {
+        if (sg_doc_con_kind(d, c) < 0) continue;
         std::vector<size_t> ents = geo::con_ents(d, c);
         bool skip = false;
         for (size_t k = 0; k < ents.size(); k++)
@@ -1007,7 +1007,7 @@ void paint_glyphs(Graphics &g) {
         bool sel = app.selected(Sel(Sel::CON, c));
         bool hov = hover.any && (hover.s == Sel(Sel::CON, c) ||
                                  (hover.s.kind == Sel::ENT && std::find(ents.begin(), ents.end(), hover.s.i) != ents.end()));
-        bool bad = gx_doc_con_conflict(d, c) == 1;
+        bool bad = sg_doc_con_conflict(d, c) == 1;
         std::vector<std::pair<V2, V2> > spots = glyph_spots(c);
         for (size_t k = 0; k < spots.size(); k++) {
             V2 q = spots[k].first + spots[k].second;
@@ -1031,11 +1031,11 @@ void paint_glyphs(Graphics &g) {
 }
 
 void paint_handles(Painter &p, const std::set<size_t> &conflicts) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     handles.clear();
     for (std::map<size_t, Polys>::iterator it = shapes.begin(); it != shapes.end(); ++it) {
         size_t e = it->first;
-        GxConic kind;
+        SgConic kind;
         V2 cc;
         double av, bv, tv;
         if (!geo::conic(d, e, &kind, &cc, &av, &bv, &tv)) continue;
@@ -1043,7 +1043,7 @@ void paint_handles(Painter &p, const std::set<size_t> &conflicts) {
         Handle h0 = {view.to_s(V2(cc.x + av * ct, cc.y + av * st)), e, 0};
         Handle h1 = {view.to_s(V2(cc.x - bv * st, cc.y + bv * ct)), e, 1};
         handles.push_back(h0);
-        if (kind != GX_CONIC_PARABOLA) handles.push_back(h1);
+        if (kind != SG_CONIC_PARABOLA) handles.push_back(h1);
         bool show = app.selected(Sel(Sel::ENT, e)) || (hover.any && hover.s == Sel(Sel::ENT, e)) ||
                     (drag == D_HANDLE && drag_e == e);
         if (!show) continue;
@@ -1051,11 +1051,11 @@ void paint_handles(Painter &p, const std::set<size_t> &conflicts) {
         Pen pen(c, 1);
         V2 cs = view.to_s(cc);
         p.g.DrawLine(&pen, pf(cs), pf(h0.at));
-        if (kind != GX_CONIC_PARABOLA) p.g.DrawLine(&pen, pf(cs), pf(h1.at));
+        if (kind != SG_CONIC_PARABOLA) p.g.DrawLine(&pen, pf(cs), pf(h1.at));
         Pen dash(with_alpha(c, 100), 1);
         dash.SetDashStyle(DashStyleDash);
         double ext = dhypot(view.w, view.h) / view.s * 2;
-        if (kind == GX_CONIC_HYPERBOLA) {
+        if (kind == SG_CONIC_HYPERBOLA) {
             for (int sg = -1; sg <= 1; sg += 2) {
                 V2 dd(av * ct - sg * bv * st, av * st + sg * bv * ct);
                 double l = dmax(dd.len(), 1e-12);
@@ -1063,11 +1063,11 @@ void paint_handles(Painter &p, const std::set<size_t> &conflicts) {
                 p.g.DrawLine(&dash, pf(view.to_s(cc - u)), pf(view.to_s(cc + u)));
             }
         }
-        if (kind == GX_CONIC_PARABOLA) {
+        if (kind == SG_CONIC_PARABOLA) {
             V2 q(cc.x - av * ct, cc.y - av * st);
             p.g.DrawLine(&dash, pf(view.to_s(V2(q.x - st * ext, q.y + ct * ext))), pf(view.to_s(V2(q.x + st * ext, q.y - ct * ext))));
         }
-        for (int i = 0; i < (kind == GX_CONIC_PARABOLA ? 1 : 2); i++) {
+        for (int i = 0; i < (kind == SG_CONIC_PARABOLA ? 1 : 2); i++) {
             V2 h = i == 0 ? h0.at : h1.at;
             bool hv = hover_handle >= 0 && handles[hover_handle].e == e && handles[hover_handle].which == i;
             double r = hv ? 5.5 : 4.0;
@@ -1085,7 +1085,7 @@ Polys ghost(V2 m) {
     Polys out;
     Tool t = app.tool;
     int need = tool_clicks(t);
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     std::vector<Snap> s = pending;
     Snap last = snap_at(m);
     if (t == T_PARABOLA_FOCUS && pending.size() == 1) {
@@ -1095,11 +1095,11 @@ Polys ghost(V2 m) {
     }
     if (t == T_LINE && pending.size() == 1) last = aligned(pending[0], last, hv_of(pending[0], last));
     s.push_back(last);
-    GxDoc *copy = 0;
+    SgDoc *copy = 0;
     ptrdiff_t made = -1;
     if (need > 0) {
         if ((int)s.size() != need) return out;
-        copy = gx_doc_copy(d);
+        copy = sg_doc_copy(d);
         made = build_shape(copy, t, s);
     } else {
         ConstructChange c;
@@ -1115,31 +1115,31 @@ Polys ghost(V2 m) {
         } else {
             return out;
         }
-        copy = gx_doc_copy(d);
-        size_t n0 = gx_doc_ent_count(copy);
+        copy = sg_doc_copy(d);
+        size_t n0 = sg_doc_ent_count(copy);
         if (c.run(copy))
-            for (size_t e = n0; e < gx_doc_ent_count(copy); e++) {
+            for (size_t e = n0; e < sg_doc_ent_count(copy); e++) {
                 Polys p = samples(copy, view, e);
                 out.insert(out.end(), p.begin(), p.end());
             }
-        gx_doc_free(copy);
+        sg_doc_free(copy);
         return out;
     }
     if (made >= 0) out = samples(copy, view, (size_t)made);
-    gx_doc_free(copy);
+    sg_doc_free(copy);
     return out;
 }
 
 void paint_preview(Painter &p) {
     if (!mouse_in || app.tool == T_SELECT || drag != D_NONE) return;
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     Graphics &g = p.g;
     Pen gp(col::ghost, 1.5f);
     if (app.tool == T_DIMENSION) {
-        GxDim kind;
+        SgDim kind;
         size_t a, b;
         V2 anchor;
-        if (dim_kind_for(picks, mouse_w, &kind, &a, &b) && gx_doc_dim_anchor_of(d, kind, a, b, &anchor.x, &anchor.y) == 1)
+        if (dim_kind_for(picks, mouse_w, &kind, &a, &b) && sg_doc_dim_anchor_of(d, kind, a, b, &anchor.x, &anchor.y) == 1)
             paint_dim(p, NONE, kind, a, b, anchor, mouse_w, false, col::ghost, L"", L"");
         return;
     }
@@ -1169,7 +1169,7 @@ void paint_preview(Painter &p) {
 }
 
 void paint_all(Graphics &g, const View &v, double k, bool print) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     Painter p(g, v, k, print);
     g.SetSmoothingMode(SmoothingModeAntiAlias);
     g.SetTextRenderingHint(TextRenderingHintSystemDefault);
@@ -1184,7 +1184,7 @@ void paint_all(Graphics &g, const View &v, double k, bool print) {
     std::map<size_t, Polys> printed;
     std::map<size_t, Polys> &sh = print ? printed : shapes;
     if (print)
-        for (size_t e = 0; e < gx_doc_ent_count(d); e++)
+        for (size_t e = 0; e < sg_doc_ent_count(d); e++)
             if (geo::live(d, e) && !geo::hidden(d, e)) printed[e] = samples(d, v, e);
     for (std::map<size_t, Polys>::iterator it = sh.begin(); it != sh.end(); ++it) {
         size_t e = it->first;
@@ -1203,15 +1203,15 @@ void paint_all(Graphics &g, const View &v, double k, bool print) {
         }
         Pen pen(c, (REAL)w);
         pen.SetLineJoin(LineJoinRound);
-        if (gx_doc_ent_construction(d, e) == 1 && !axis) pen.SetDashStyle(DashStyleDash);
+        if (sg_doc_ent_construction(d, e) == 1 && !axis) pen.SetDashStyle(DashStyleDash);
         for (size_t i = 0; i < it->second.size(); i++) draw_poly(g, it->second[i], pen);
     }
     if (!print) paint_handles(p, conflicts);
     // contact points of tangencies that the solver finds
-    for (size_t c = 0; c < gx_doc_con_count(d); c++) {
+    for (size_t c = 0; c < sg_doc_con_count(d); c++) {
         V2 at;
         bool solved = false;
-        if (gx_doc_con_contact(d, c, &at.x, &at.y, &solved) == 1 && solved) ring(g, v.to_s(at), 2.5 * k, col::measured, k);
+        if (sg_doc_con_contact(d, c, &at.x, &at.y, &solved) == 1 && solved) ring(g, v.to_s(at), 2.5 * k, col::measured, k);
     }
     paint_dims(p);
     if (!print) {
@@ -1219,7 +1219,7 @@ void paint_all(Graphics &g, const View &v, double k, bool print) {
         else glyph_rects.clear();
     }
     // points on top
-    size_t origin = (size_t)gx_doc_origin(d);
+    size_t origin = (size_t)sg_doc_origin(d);
     for (std::map<size_t, Polys>::iterator it = sh.begin(); it != sh.end(); ++it) {
         size_t e = it->first;
         if (!geo::is_point(d, e) || it->second.empty() || it->second[0].empty()) continue;
@@ -1237,7 +1237,7 @@ void paint_all(Graphics &g, const View &v, double k, bool print) {
         double r = (hov || sel ? 4.2 : 3.4) * k;
         if (hov) dot(g, q, r + 4 * k, with_alpha(col::hover, 80));
         SolidBrush white(col::paper), fill(c);
-        if (gx_doc_point_locked(d, e) == 1) {
+        if (sg_doc_point_locked(d, e) == 1) {
             g.FillRectangle(&white, (REAL)(q.x - r - 1.5 * k), (REAL)(q.y - r - 1.5 * k), (REAL)(2 * r + 3 * k), (REAL)(2 * r + 3 * k));
             g.FillRectangle(&fill, (REAL)(q.x - r), (REAL)(q.y - r), (REAL)(2 * r), (REAL)(2 * r));
         } else {
@@ -1272,26 +1272,26 @@ void paint_all(Graphics &g, const View &v, double k, bool print) {
 
 // Lower-left and upper-right corners of what the document shows.
 bool bounds(V2 *lo, V2 *hi) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     *lo = V2(1e300, 1e300);
     *hi = V2(-1e300, -1e300);
     bool any = false;
     // the origin counts when a shape, constraint or dimension uses it
-    size_t origin = (size_t)gx_doc_origin(d);
+    size_t origin = (size_t)sg_doc_origin(d);
     bool origin_used = false;
-    for (size_t e = 0; e < gx_doc_ent_count(d) && !origin_used; e++) {
+    for (size_t e = 0; e < sg_doc_ent_count(d) && !origin_used; e++) {
         size_t p[3] = {NONE, NONE, NONE};
         double r;
         if (geo::is_line(d, e) && !geo::is_axis(d, e)) geo::line_pts(d, e, &p[0], &p[1]);
-        else if (geo::kind(d, e) == GX_ENT_ARC) gx_doc_arc_pts(d, e, &p[0], &p[1], &p[2]);
-        else if (geo::kind(d, e) == GX_ENT_CIRCLE) gx_doc_circle_vals(d, e, &p[0], &r);
+        else if (geo::kind(d, e) == SG_ENT_ARC) sg_doc_arc_pts(d, e, &p[0], &p[1], &p[2]);
+        else if (geo::kind(d, e) == SG_ENT_CIRCLE) sg_doc_circle_vals(d, e, &p[0], &r);
         origin_used = p[0] == origin || p[1] == origin || p[2] == origin;
     }
-    for (size_t c = 0; c < gx_doc_con_count(d) && !origin_used; c++) {
+    for (size_t c = 0; c < sg_doc_con_count(d) && !origin_used; c++) {
         std::vector<size_t> v = geo::con_ents(d, c);
         origin_used = std::find(v.begin(), v.end(), origin) != v.end();
     }
-    for (size_t i = 0; i < gx_doc_dim_count(d) && !origin_used; i++) {
+    for (size_t i = 0; i < sg_doc_dim_count(d) && !origin_used; i++) {
         std::vector<size_t> v = geo::dim_ents(d, i);
         origin_used = std::find(v.begin(), v.end(), origin) != v.end();
     }
@@ -1299,20 +1299,20 @@ bool bounds(V2 *lo, V2 *hi) {
     if (origin_used) extra.push_back(V2(0, 0));
     // the labels of the dimensions, and the ends of the lines of linear ones,
     // which run beside the shapes at the distance of the label
-    for (size_t i = 0; i < gx_doc_dim_count(d); i++) {
+    for (size_t i = 0; i < sg_doc_dim_count(d); i++) {
         V2 a, off;
-        if (gx_doc_dim_anchor(d, i, &a.x, &a.y) != 1 || gx_doc_dim_offset(d, i, &off.x, &off.y) != 1) continue;
+        if (sg_doc_dim_anchor(d, i, &a.x, &a.y) != 1 || sg_doc_dim_offset(d, i, &off.x, &off.y) != 1) continue;
         extra.push_back(a + off);
         std::vector<size_t> e = geo::dim_ents(d, i);
         V2 p, q;
-        switch (gx_doc_dim_kind(d, i)) {
-        case GX_DIM_DISTANCE: case GX_DIM_HDIST: case GX_DIM_VDIST:
+        switch (sg_doc_dim_kind(d, i)) {
+        case SG_DIM_DISTANCE: case SG_DIM_HDIST: case SG_DIM_VDIST:
             if (e.size() < 2) continue;
             p = geo::pos(d, e[0]);
             q = geo::pos(d, e[1]);
             break;
-        case GX_DIM_LENGTH: geo::line_ends(d, e[0], &p, &q); break;
-        case GX_DIM_X: case GX_DIM_Y: p = V2(0, 0); q = geo::pos(d, e[0]); break;
+        case SG_DIM_LENGTH: geo::line_ends(d, e[0], &p, &q); break;
+        case SG_DIM_X: case SG_DIM_Y: p = V2(0, 0); q = geo::pos(d, e[0]); break;
         default: continue;
         }
         V2 c = a + off - (p + q) * 0.5;
@@ -1327,19 +1327,19 @@ bool bounds(V2 *lo, V2 *hi) {
         hi->y = dmax(hi->y, extra[k].y);
         any = true;
     }
-    for (size_t e = 0; e < gx_doc_ent_count(d); e++) {
+    for (size_t e = 0; e < sg_doc_ent_count(d); e++) {
         if (!geo::live(d, e) || geo::hidden(d, e) || geo::is_fixed(d, e)) continue;
         std::vector<V2> pts;
         V2 c;
         double r, a, b, t;
-        GxConic k;
+        SgConic k;
         switch (geo::kind(d, e)) {
-        case GX_ENT_POINT: pts.push_back(geo::pos(d, e)); break;
-        case GX_ENT_CIRCLE:
-        case GX_ENT_ARC:
+        case SG_ENT_POINT: pts.push_back(geo::pos(d, e)); break;
+        case SG_ENT_CIRCLE:
+        case SG_ENT_ARC:
             if (geo::circle(d, e, &c, &r)) { pts.push_back(c - V2(r, r)); pts.push_back(c + V2(r, r)); }
             break;
-        case GX_ENT_CONIC:
+        case SG_ENT_CONIC:
             if (geo::conic(d, e, &k, &c, &a, &b, &t)) {
                 double m = dmax(fabs(a), fabs(b));
                 pts.push_back(c - V2(m, m));
@@ -1361,7 +1361,7 @@ bool bounds(V2 *lo, V2 *hi) {
 
 void update_scrollbars() {
     V2 lo, hi;
-    GxWindow w = view.window();
+    SgWindow w = view.window();
     if (!bounds(&lo, &hi)) {
         lo = V2(-5, -5);
         hi = V2(5, 5);
@@ -1444,7 +1444,7 @@ void set_hover(V2 m) {
 }
 
 void begin_drag(V2 p) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     V2 pw = view.to_w(p);
     drag = D_NONE;
     int hh = hit_handle(p);
@@ -1454,7 +1454,7 @@ void begin_drag(V2 p) {
         drag_which = handles[hh].which;
     } else if (press_hit && press_sel.kind == Sel::DIM) {
         V2 a, off;
-        if (gx_doc_dim_anchor(d, press_sel.i, &a.x, &a.y) == 1 && gx_doc_dim_offset(d, press_sel.i, &off.x, &off.y) == 1) {
+        if (sg_doc_dim_anchor(d, press_sel.i, &a.x, &a.y) == 1 && sg_doc_dim_offset(d, press_sel.i, &off.x, &off.y) == 1) {
             drag = D_DIM_LABEL;
             drag_e = press_sel.i;
             grab = pw - (a + off);
@@ -1468,27 +1468,27 @@ void begin_drag(V2 p) {
         size_t pts[3];
         size_t n = 0;
         switch (geo::kind(d, e)) {
-        case GX_ENT_POINT:
-            if (gx_doc_point_locked(d, e) == 0) {
+        case SG_ENT_POINT:
+            if (sg_doc_point_locked(d, e) == 0) {
                 drag = D_POINT;
                 grab = pw - geo::pos(d, e);
             }
             break;
-        case GX_ENT_LINE: geo::line_pts(d, e, &pts[0], &pts[1]); n = 2; drag = D_TRANSLATE; break;
-        case GX_ENT_CIRCLE: drag = D_CIRCLE_EDGE; break;
-        case GX_ENT_ARC:
-            if (gx_doc_arc_pts(d, e, &pts[0], &pts[1], &pts[2]) == 1) { n = 3; drag = D_TRANSLATE; }
+        case SG_ENT_LINE: geo::line_pts(d, e, &pts[0], &pts[1]); n = 2; drag = D_TRANSLATE; break;
+        case SG_ENT_CIRCLE: drag = D_CIRCLE_EDGE; break;
+        case SG_ENT_ARC:
+            if (sg_doc_arc_pts(d, e, &pts[0], &pts[1], &pts[2]) == 1) { n = 3; drag = D_TRANSLATE; }
             break;
-        case GX_ENT_CONIC: {
-            GxConic k;
+        case SG_ENT_CONIC: {
+            SgConic k;
             double a, b, t;
-            if (gx_doc_conic_vals(d, e, &k, &pts[0], &a, &b, &t) == 1) { n = 1; drag = D_TRANSLATE; }
+            if (sg_doc_conic_vals(d, e, &k, &pts[0], &a, &b, &t) == 1) { n = 1; drag = D_TRANSLATE; }
             break;
         }
-        case GX_ENT_CURVE: drag = D_CURVE; break;
+        case SG_ENT_CURVE: drag = D_CURVE; break;
         }
         for (size_t i = 0; i < n; i++)
-            if (gx_doc_point_locked(d, pts[i]) == 0) {
+            if (sg_doc_point_locked(d, pts[i]) == 0) {
                 drag_pts.push_back(pts[i]);
                 drag_from.push_back(geo::pos(d, pts[i]));
             }
@@ -1497,30 +1497,30 @@ void begin_drag(V2 p) {
     } else if (!press_hit) {
         drag = D_BOX;
     }
-    if (drag != D_NONE && drag != D_BOX) gx_doc_checkpoint(d);
+    if (drag != D_NONE && drag != D_BOX) sg_doc_checkpoint(d);
     moved_doc = false;
 }
 
 void drag_to(V2 m) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     V2 w = view.to_w(m);
     switch (drag) {
-    case D_POINT: gx_doc_drag_point(d, drag_e, w.x - grab.x, w.y - grab.y); break;
+    case D_POINT: sg_doc_drag_point(d, drag_e, w.x - grab.x, w.y - grab.y); break;
     case D_TRANSLATE: {
         std::vector<double> xy;
         for (size_t i = 0; i < drag_pts.size(); i++) {
             xy.push_back(drag_from[i].x + w.x - drag_start_w.x);
             xy.push_back(drag_from[i].y + w.y - drag_start_w.y);
         }
-        gx_doc_drag_points(d, &drag_pts[0], &xy[0], drag_pts.size());
+        sg_doc_drag_points(d, &drag_pts[0], &xy[0], drag_pts.size());
         break;
     }
-    case D_CIRCLE_EDGE: gx_doc_drag_circle(d, drag_e, w.x, w.y); break;
-    case D_HANDLE: gx_doc_drag_conic_handle(d, drag_e, (uint8_t)drag_which, w.x, w.y); break;
-    case D_CURVE: gx_doc_drag_curve(d, drag_e, w.x, w.y); break;
+    case D_CIRCLE_EDGE: sg_doc_drag_circle(d, drag_e, w.x, w.y); break;
+    case D_HANDLE: sg_doc_drag_conic_handle(d, drag_e, (uint8_t)drag_which, w.x, w.y); break;
+    case D_CURVE: sg_doc_drag_curve(d, drag_e, w.x, w.y); break;
     case D_DIM_LABEL: {
         V2 a;
-        if (gx_doc_dim_anchor(d, drag_e, &a.x, &a.y) == 1) gx_doc_drag_dim_offset(d, drag_e, w.x - grab.x - a.x, w.y - grab.y - a.y);
+        if (sg_doc_dim_anchor(d, drag_e, &a.x, &a.y) == 1) sg_doc_drag_dim_offset(d, drag_e, w.x - grab.x - a.x, w.y - grab.y - a.y);
         break;
     }
     default: return;
@@ -1530,7 +1530,7 @@ void drag_to(V2 m) {
 }
 
 void end_box(V2 a, V2 b, bool add) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     RECT r = {(LONG)dmin(a.x, b.x), (LONG)dmin(a.y, b.y), (LONG)dmax(a.x, b.x) + 1, (LONG)dmax(a.y, b.y) + 1};
     if (!add) app.sel.clear();
     for (std::map<size_t, Polys>::iterator it = shapes.begin(); it != shapes.end(); ++it) {
@@ -1740,7 +1740,7 @@ LRESULT CALLBACK canvas_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (dragging) {
                 if (drag == D_BOX) end_box(V2(press_at.x, press_at.y), m, add);
                 else if (moved_doc) {
-                    gx_doc_solve(app.doc, 0);
+                    sg_doc_solve(app.doc, 0);
                     doc_changed();
                 }
             } else if (press_hit) {
@@ -1859,7 +1859,7 @@ HWND canvas_create(HWND parent) {
     wc.lpfnWndProc = canvas_proc;
     wc.hInstance = g_inst;
     wc.hCursor = LoadCursor(0, IDC_ARROW);
-    wc.lpszClassName = L"GxpadCanvas";
+    wc.lpszClassName = L"SgpadCanvas";
     RegisterClassExW(&wc);
     HDC dc = GetDC(0);
     base_s = GetDeviceCaps(dc, LOGPIXELSX) / UNITS_PER_INCH;
@@ -1870,7 +1870,7 @@ HWND canvas_create(HWND parent) {
     view.ox = view.oy = 0;
     view.w = 400;
     view.h = 300;
-    return CreateWindowExW(WS_EX_CLIENTEDGE, L"GxpadCanvas", L"", WS_CHILD | WS_VISIBLE | WS_HSCROLL | WS_VSCROLL | WS_TABSTOP,
+    return CreateWindowExW(WS_EX_CLIENTEDGE, L"SgpadCanvas", L"", WS_CHILD | WS_VISIBLE | WS_HSCROLL | WS_VSCROLL | WS_TABSTOP,
                            0, 0, 400, 300, parent, (HMENU)IDC_CANVAS, g_inst, 0);
 }
 
@@ -1996,40 +1996,40 @@ void canvas_copy_picture() {
     }
 }
 
-void add_dimension(GxDim kind, size_t a, size_t b, bool place_auto, V2 label) {
-    GxDoc *d = app.doc;
+void add_dimension(SgDim kind, size_t a, size_t b, bool place_auto, V2 label) {
+    SgDoc *d = app.doc;
     V2 anchor;
-    if (gx_doc_dim_anchor_of(d, kind, a, b, &anchor.x, &anchor.y) != 1) {
+    if (sg_doc_dim_anchor_of(d, kind, a, b, &anchor.x, &anchor.y) != 1) {
         set_status(L"Could not add the dimension: " + last_error());
         return;
     }
     if (place_auto) {
         double off = 40 / view.s;
         switch (kind) {
-        case GX_DIM_HDIST: label = V2(anchor.x, anchor.y + off * 1.2); break;
-        case GX_DIM_VDIST: label = V2(anchor.x + off * 1.2, anchor.y); break;
-        case GX_DIM_X: {
+        case SG_DIM_HDIST: label = V2(anchor.x, anchor.y + off * 1.2); break;
+        case SG_DIM_VDIST: label = V2(anchor.x + off * 1.2, anchor.y); break;
+        case SG_DIM_X: {
             V2 q = geo::pos(d, a);
             label = V2(anchor.x, q.y >= 0 ? -off * 0.6 : off * 0.6);
             break;
         }
-        case GX_DIM_Y: {
+        case SG_DIM_Y: {
             V2 q = geo::pos(d, a);
             label = V2(q.x >= 0 ? -off * 0.9 : off * 0.9, anchor.y);
             break;
         }
-        case GX_DIM_RADIUS:
-        case GX_DIM_DIAMETER: {
+        case SG_DIM_RADIUS:
+        case SG_DIM_DIAMETER: {
             V2 cc;
             double r;
             if (geo::circle(d, a, &cc, &r)) label = cc + V2((r + off) * 0.7071, (r + off) * 0.7071);
             break;
         }
-        case GX_DIM_ANGLE: label = anchor + V2(off * 1.5, off * 0.6); break;
+        case SG_DIM_ANGLE: label = anchor + V2(off * 1.5, off * 0.6); break;
         default: label = anchor + V2(off * 0.5, off); break;
         }
     }
-    ptrdiff_t i = gx_doc_add_dim(d, kind, a, b, label.x - anchor.x, label.y - anchor.y);
+    ptrdiff_t i = sg_doc_add_dim(d, kind, a, b, label.x - anchor.x, label.y - anchor.y);
     if (i < 0) {
         set_status(L"Could not add the dimension: " + last_error());
         std::vector<size_t> ents(1, a);
@@ -2040,5 +2040,5 @@ void add_dimension(GxDim kind, size_t a, size_t b, bool place_auto, V2 label) {
     }
     app.select_only(Sel(Sel::DIM, (size_t)i));
     doc_changed();
-    if (gx_doc_dim_driving(d, (size_t)i) == 1) dlg_dimension(g_frame, (size_t)i, true);
+    if (sg_doc_dim_driving(d, (size_t)i) == 1) dlg_dimension(g_frame, (size_t)i, true);
 }

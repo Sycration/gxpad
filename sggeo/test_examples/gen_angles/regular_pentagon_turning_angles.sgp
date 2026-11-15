@@ -1,0 +1,31 @@
+sgp 2
+
+given
+  t = 90
+  segment OA
+    d1: |OA| = 2
+  segment AB
+    |OA| == |AB|
+    θ1: angle(OA, AB) = t * deg
+  segment BC
+    |OA| == |BC|
+    θ2: angle(AB, BC) = t * deg
+  segment CD
+    |OA| == |CD|
+    θ3: angle(BC, CD) = t * deg
+
+find
+  d2: dist(D, O)
+  d3: dist(O, B)
+
+where
+  A (1.9766530578737291, -0.30470098260169165)
+  B (2.2813540404754207, 1.6719520752720374)
+  C (0.30470098260169176, 1.9766530578737291)
+  D (-2.2426308026089337e-16, 2.697768446619453e-16)
+  d1 label (0.3, 0.3)
+  θ1 label (0.777146, 0.62932)
+  θ2 label (-0.358368, 0.93358)
+  θ3 label (-0.99863, -0.052336)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

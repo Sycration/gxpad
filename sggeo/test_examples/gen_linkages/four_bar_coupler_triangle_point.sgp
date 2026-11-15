@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  segment OB
+    d1: |OB| = 2
+    θ1: angle(xaxis, OB) = 50°
+  segment BC
+    d2: |BC| = 4
+  segment CA
+    d3: |CA| = 3
+  segment BD
+    d4: |BD| = 2
+  segment CD
+    d5: |CD| = 3
+
+find
+  x_D: x(D)
+  y_D: y(D)
+
+where
+  B (1.2855752193730787, 1.532088886237956)
+  C (5.006496827654543, 2.999992965196823)
+  A (5, 0) [fixed]
+  D (2.0316575173788043, 3.3877184841379506)
+  d1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
+  x_D label (0.3, 0.3)
+  y_D label (0.3, 0.3)

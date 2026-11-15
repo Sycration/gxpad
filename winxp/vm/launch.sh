@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Starts the gxpad.exe built by build.sh on the screen of the XP machine, at the next whole minute, and
+# Starts the sgpad.exe built by build.sh on the screen of the XP machine, at the next whole minute, and
 # waits until it runs.
 #
-# Usage: winxp/vm/launch.sh [ARGUMENT...]    (the arguments of gxpad.exe, such as a .gxp file on the XP machine)
+# Usage: winxp/vm/launch.sh [ARGUMENT...]    (the arguments of sgpad.exe, such as a .sgp file on the XP machine)
 #
 # A program started over telnet runs on the invisible desktop of the telnet session. The task scheduler of
 # XP (`at /interactive`, which needs an administrator) starts it on the screen instead, as the SYSTEM
@@ -11,13 +11,13 @@
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
-dir=${XP_DIR:-'C:\gxpad'}
+dir=${XP_DIR:-'C:\sgpad'}
 remote=${dir#*:\\}
 
-# the batch file the scheduler runs: it starts gxpad.exe with the arguments and returns
+# the batch file the scheduler runs: it starts sgpad.exe with the arguments and returns
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-printf '%s\r\n' '@echo off' "cd /d $dir\\winxp\\Release" 'start "" gxpad.exe %*' > "$tmp/launch.bat"
+printf '%s\r\n' '@echo off' "cd /d $dir\\winxp\\Release" 'start "" sgpad.exe %*' > "$tmp/launch.bat"
 python3 "$here/vm.py" put "$tmp" "$remote" launch.bat
 
 # `at` takes whole minutes and moves a time that has passed to the next day, so the job goes at least
@@ -33,5 +33,5 @@ for id in $(python3 "$here/vm.py" run at 30 | awk '/launch\.bat/ { for (i = 1; i
   python3 "$here/vm.py" run "at $id /delete" 30 >/dev/null
 done
 python3 "$here/vm.py" run "at $at /interactive $dir\\launch.bat $*" 30 >/dev/null
-echo "gxpad starts at $at (the time of the XP machine is $t)"
+echo "sgpad starts at $at (the time of the XP machine is $t)"
 python3 "$here/wait.py"

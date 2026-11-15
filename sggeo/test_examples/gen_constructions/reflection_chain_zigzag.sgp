@@ -1,0 +1,33 @@
+sgp 2
+
+given
+  point C
+    x_C: x(C) = 3
+    y_C: y(C) = 1
+  line OA
+    θ1: angle(xaxis, AO) = 0°
+  line OB
+    θ2: angle(xaxis, OB) = 60°
+
+construct
+  D = reflect(C, OA)
+  E = reflect(D, OB)
+  F = reflect(E, OA)
+
+find
+  x_F: x(F)
+  y_F: y(F)
+
+where
+  C (3, 1)
+  A (-33.560531467438835, 6.107267362560667e-49)
+  B (1.8065106000728612, 3.1289681437379353)
+  D (2.999999999999999, -1)
+  E (-2.3660254037844375, 2.098076211353316)
+  F (-2.3660254037844375, -2.098076211353316)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  θ2 label (0.3, 0.3)
+  x_F label (0.3, 0.3)
+  y_F label (0.3, 0.3)

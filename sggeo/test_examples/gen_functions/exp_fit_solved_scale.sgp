@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  k ~ 1.103638323514327
+  g1 = curve(y = k*exp(x))
+
+construct
+  point A on g1
+    x_A: x(A) = 1
+    y_A: y(A) = 3
+  B = meet(g1, yaxis)
+
+find
+  y_B: y(B)
+
+where
+  A (1, 3)
+  B (3.201126211903612e-41, 1.103638323514327)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  y_B label (0.3, 0.3)

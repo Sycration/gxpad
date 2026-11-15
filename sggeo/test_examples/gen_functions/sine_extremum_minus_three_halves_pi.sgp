@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  g1 = curve(y = sin(x))
+
+construct
+  point A on g1
+  segment AB
+    horiz A B
+    AB tan g1
+
+find
+  x_A: x(A)
+  y_A: y(A)
+
+where
+  A (-4.71238898038469, 1)
+  B (-3, 1)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 2
+  point A
+    d1: dist(O, A) = 5
+
+construct
+  B = tangent(A, k1)
+  segment AB
+
+find
+  d2: |AB|
+
+where
+  k1 r 2
+  A (4.99642418643904, 0.18906440481214531)
+  B (0.7301157141283722, 1.8619696678471476)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

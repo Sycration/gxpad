@@ -17,13 +17,13 @@ void error_box(HWND dlg, const wstr &what) {
 // Changes made by one dialog are one undo step.
 struct Step {
     ptrdiff_t len;
-    Step() : len(gx_doc_undo_len(app.doc)) {}
+    Step() : len(sg_doc_undo_len(app.doc)) {}
     void done() {
-        if (len >= 0) gx_doc_join_undo(app.doc, (size_t)len);
+        if (len >= 0) sg_doc_join_undo(app.doc, (size_t)len);
     }
     // takes back what was done so far
     void undo() {
-        while (len >= 0 && gx_doc_undo_len(app.doc) > len && gx_doc_undo(app.doc) == 1) {
+        while (len >= 0 && sg_doc_undo_len(app.doc) > len && sg_doc_undo(app.doc) == 1) {
         }
     }
 };
@@ -31,7 +31,7 @@ struct Step {
 bool rename(HWND dlg, const wstr &old, int id) {
     wstr nn = item_text(dlg, id);
     if (nn == old) return true;
-    if (gx_doc_rename(app.doc, narrow(old).c_str(), narrow(nn).c_str()) == 1) return true;
+    if (sg_doc_rename(app.doc, narrow(old).c_str(), narrow(nn).c_str()) == 1) return true;
     error_box(dlg, L"The name \"" + nn + L"\" cannot be used. A name is a letter followed by letters, digits or _, and no other "
                    L"point, dimension or variable may have it");
     SetFocus(GetDlgItem(dlg, id));
@@ -50,18 +50,18 @@ void center_on_owner(HWND dlg) {
 
 const wchar_t *dim_kind_text(int kind) {
     switch (kind) {
-    case GX_DIM_DISTANCE: return L"Distance between two points";
-    case GX_DIM_HDIST: return L"Horizontal distance between two points";
-    case GX_DIM_VDIST: return L"Vertical distance between two points";
-    case GX_DIM_POINT_LINE: return L"Distance from a point to a line";
-    case GX_DIM_LENGTH: return L"Length of a line";
-    case GX_DIM_RADIUS: return L"Radius of a circle";
-    case GX_DIM_DIAMETER: return L"Diameter of a circle";
-    case GX_DIM_ANGLE: return L"Angle between two lines";
-    case GX_DIM_CONIC_A: return L"First semi-axis of a conic";
-    case GX_DIM_CONIC_B: return L"Second semi-axis of a conic";
-    case GX_DIM_X: return L"X coordinate of a point";
-    case GX_DIM_Y: return L"Y coordinate of a point";
+    case SG_DIM_DISTANCE: return L"Distance between two points";
+    case SG_DIM_HDIST: return L"Horizontal distance between two points";
+    case SG_DIM_VDIST: return L"Vertical distance between two points";
+    case SG_DIM_POINT_LINE: return L"Distance from a point to a line";
+    case SG_DIM_LENGTH: return L"Length of a line";
+    case SG_DIM_RADIUS: return L"Radius of a circle";
+    case SG_DIM_DIAMETER: return L"Diameter of a circle";
+    case SG_DIM_ANGLE: return L"Angle between two lines";
+    case SG_DIM_CONIC_A: return L"First semi-axis of a conic";
+    case SG_DIM_CONIC_B: return L"Second semi-axis of a conic";
+    case SG_DIM_X: return L"X coordinate of a point";
+    case SG_DIM_Y: return L"Y coordinate of a point";
     }
     return L"Dimension";
 }
@@ -76,23 +76,23 @@ void dim_enable(HWND dlg) {
 
 INT_PTR CALLBACK dim_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
     static DimArgs *a;
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     switch (msg) {
     case WM_INITDIALOG: {
         a = (DimArgs *)lp;
         size_t i = a->i;
-        int kind = gx_doc_dim_kind(d, i);
-        bool angle = kind == GX_DIM_ANGLE;
+        int kind = sg_doc_dim_kind(d, i);
+        bool angle = kind == SG_DIM_ANGLE;
         set_item(dlg, IDC_NAME, geo::dim_name(d, i));
         set_item(dlg, IDC_KIND_TEXT, dim_kind_text(kind));
-        wstr expr = take(gx_doc_dim_expr(d, i));
-        bool driving = gx_doc_dim_driving(d, i) == 1;
-        wstr v = !expr.empty() ? expr : fmt_val(driving ? gx_doc_dim_set_value(d, i) : gx_doc_dim_value(d, i));
-        if (angle && expr.empty()) v = fmt_val((driving ? gx_doc_dim_set_value(d, i) : gx_doc_dim_value(d, i)) * 180 / PI);
+        wstr expr = take(sg_doc_dim_expr(d, i));
+        bool driving = sg_doc_dim_driving(d, i) == 1;
+        wstr v = !expr.empty() ? expr : fmt_val(driving ? sg_doc_dim_set_value(d, i) : sg_doc_dim_value(d, i));
+        if (angle && expr.empty()) v = fmt_val((driving ? sg_doc_dim_set_value(d, i) : sg_doc_dim_value(d, i)) * 180 / PI);
         set_item(dlg, IDC_VALUE, v);
         check(dlg, driving ? IDC_DRIVING : IDC_MEASURED, true);
-        check(dlg, IDC_NUMERIC, gx_doc_dim_numeric(d, i) == 1);
-        check(dlg, IDC_SUPP, gx_doc_dim_supp(d, i) == 1);
+        check(dlg, IDC_NUMERIC, sg_doc_dim_numeric(d, i) == 1);
+        check(dlg, IDC_SUPP, sg_doc_dim_supp(d, i) == 1);
         ShowWindow(GetDlgItem(dlg, IDC_SUPP), angle ? SW_SHOW : SW_HIDE);
         set_item(dlg, IDC_HINT, angle ? L"Angles are in degrees. The value can also be an expression of variables and other "
                                         L"dimensions, such as 90 - a."
@@ -116,34 +116,34 @@ INT_PTR CALLBACK dim_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             size_t i = a->i;
             Step step;
             if (!rename(dlg, geo::dim_name(d, i), IDC_NAME)) { step.undo(); return TRUE; }
-            bool was = gx_doc_dim_driving(d, i) == 1;
-            wstr expr = take(gx_doc_dim_expr(d, i));
+            bool was = sg_doc_dim_driving(d, i) == 1;
+            wstr expr = take(sg_doc_dim_expr(d, i));
             if (checked(dlg, IDC_DRIVING)) {
                 wstr v = item_text(dlg, IDC_VALUE);
                 bool changed = !was || v != (expr.empty() ? wstr() : expr);
                 // an unchanged number is left alone: it may show fewer digits than it has
                 if (changed && expr.empty() && was) {
-                    int kind = gx_doc_dim_kind(d, i);
-                    double cur = gx_doc_dim_set_value(d, i);
-                    wstr shown = fmt_val(kind == GX_DIM_ANGLE ? cur * 180 / PI : cur);
+                    int kind = sg_doc_dim_kind(d, i);
+                    double cur = sg_doc_dim_set_value(d, i);
+                    wstr shown = fmt_val(kind == SG_DIM_ANGLE ? cur * 180 / PI : cur);
                     changed = v != shown;
                 }
-                if (changed && gx_doc_set_dim(d, i, narrow(v).c_str()) != 1) {
+                if (changed && sg_doc_set_dim(d, i, narrow(v).c_str()) != 1) {
                     error_box(dlg, L"The dimension cannot have the value \"" + v + L"\"");
                     step.undo();
                     SetFocus(GetDlgItem(dlg, IDC_VALUE));
                     SendDlgItemMessage(dlg, IDC_VALUE, EM_SETSEL, 0, -1);
                     return TRUE;
                 }
-            } else if (was && gx_doc_set_dim_driving(d, i, false) != 1) {
+            } else if (was && sg_doc_set_dim_driving(d, i, false) != 1) {
                 error_box(dlg, L"The dimension cannot be made a measurement");
                 step.undo();
                 return TRUE;
             }
             bool num = checked(dlg, IDC_NUMERIC);
-            if (num != (gx_doc_dim_numeric(d, i) == 1)) gx_doc_set_dim_numeric(d, i, num);
-            if (gx_doc_dim_kind(d, i) == GX_DIM_ANGLE && checked(dlg, IDC_SUPP) != (gx_doc_dim_supp(d, i) == 1) &&
-                gx_doc_toggle_supp(d, i) != 1) {
+            if (num != (sg_doc_dim_numeric(d, i) == 1)) sg_doc_set_dim_numeric(d, i, num);
+            if (sg_doc_dim_kind(d, i) == SG_DIM_ANGLE && checked(dlg, IDC_SUPP) != (sg_doc_dim_supp(d, i) == 1) &&
+                sg_doc_toggle_supp(d, i) != 1) {
                 error_box(dlg, L"The supplementary angle cannot be measured");
                 step.undo();
                 return TRUE;
@@ -171,7 +171,7 @@ void var_enable(HWND dlg) {
 
 INT_PTR CALLBACK var_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
     static size_t i;
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     switch (msg) {
     case WM_INITDIALOG: {
         i = (size_t)lp;
@@ -180,13 +180,13 @@ INT_PTR CALLBACK var_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             set_item(dlg, IDC_VALUE, L"1");
             check(dlg, IDC_FREE, true);
         } else {
-            wstr expr = take(gx_doc_var_expr(d, i));
+            wstr expr = take(sg_doc_var_expr(d, i));
             set_item(dlg, IDC_NAME, geo::var_name(d, i));
-            set_item(dlg, IDC_VALUE, fmt_val(gx_doc_var_value(d, i)));
+            set_item(dlg, IDC_VALUE, fmt_val(sg_doc_var_value(d, i)));
             set_item(dlg, IDC_EXPR, expr);
             bool def = !expr.empty();
-            check(dlg, def ? IDC_DEFINED : gx_doc_var_free(d, i) == 1 ? IDC_FREE : IDC_SOLVED, true);
-            check(dlg, IDC_NUMERIC, gx_doc_var_numeric(d, i) == 1);
+            check(dlg, def ? IDC_DEFINED : sg_doc_var_free(d, i) == 1 ? IDC_FREE : IDC_SOLVED, true);
+            check(dlg, IDC_NUMERIC, sg_doc_var_numeric(d, i) == 1);
             // a variable keeps being a value or being defined
             EnableWindow(GetDlgItem(dlg, IDC_DEFINED), def);
             EnableWindow(GetDlgItem(dlg, IDC_FREE), !def);
@@ -218,8 +218,8 @@ INT_PTR CALLBACK var_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             Step step;
             size_t j = i;
             if (i == NONE) {
-                ptrdiff_t r = def ? gx_doc_add_defvar(d, name.empty() ? 0 : n8.c_str(), narrow(et).c_str())
-                                  : gx_doc_add_var(d, name.empty() ? 0 : n8.c_str(), v, checked(dlg, IDC_FREE));
+                ptrdiff_t r = def ? sg_doc_add_defvar(d, name.empty() ? 0 : n8.c_str(), narrow(et).c_str())
+                                  : sg_doc_add_var(d, name.empty() ? 0 : n8.c_str(), v, checked(dlg, IDC_FREE));
                 if (r < 0) {
                     error_box(dlg, L"The variable cannot be added");
                     return TRUE;
@@ -228,19 +228,19 @@ INT_PTR CALLBACK var_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             } else {
                 if (!rename(dlg, geo::var_name(d, i), IDC_NAME)) { step.undo(); return TRUE; }
                 if (def) {
-                    if (et != take(gx_doc_var_expr(d, i)) && gx_doc_set_var_expr(d, i, narrow(et).c_str()) != 1) {
+                    if (et != take(sg_doc_var_expr(d, i)) && sg_doc_set_var_expr(d, i, narrow(et).c_str()) != 1) {
                         error_box(dlg, L"The expression \"" + et + L"\" cannot be used");
                         step.undo();
                         return TRUE;
                     }
                 } else {
                     bool fr = checked(dlg, IDC_FREE);
-                    if (fr != (gx_doc_var_free(d, i) == 1) && gx_doc_set_var_free(d, i, fr) != 1) {
+                    if (fr != (sg_doc_var_free(d, i) == 1) && sg_doc_set_var_free(d, i, fr) != 1) {
                         error_box(dlg, L"The variable cannot be changed");
                         step.undo();
                         return TRUE;
                     }
-                    if (fr && vt != fmt_val(gx_doc_var_value(d, i)) && gx_doc_set_var(d, i, v) != 1) {
+                    if (fr && vt != fmt_val(sg_doc_var_value(d, i)) && sg_doc_set_var(d, i, v) != 1) {
                         error_box(dlg, L"The variable cannot have that value");
                         step.undo();
                         return TRUE;
@@ -248,7 +248,7 @@ INT_PTR CALLBACK var_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
                 }
             }
             bool num = checked(dlg, IDC_NUMERIC);
-            if (num != (gx_doc_var_numeric(d, j) == 1)) gx_doc_set_var_numeric(d, j, num);
+            if (num != (sg_doc_var_numeric(d, j) == 1)) sg_doc_set_var_numeric(d, j, num);
             step.done();
             app.select_only(Sel(Sel::VAR, j));
             EndDialog(dlg, IDOK);
@@ -267,7 +267,7 @@ INT_PTR CALLBACK var_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
 
 INT_PTR CALLBACK func_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
     static size_t e;
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     switch (msg) {
     case WM_INITDIALOG:
         e = (size_t)lp;
@@ -275,7 +275,7 @@ INT_PTR CALLBACK func_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             SetWindowTextW(dlg, L"New Function");
             set_item(dlg, IDC_EQUATION, L"y = ");
         } else {
-            set_item(dlg, IDC_EQUATION, take(gx_doc_curve_src(d, e)));
+            set_item(dlg, IDC_EQUATION, take(sg_doc_curve_src(d, e)));
         }
         center_on_owner(dlg);
         SetFocus(GetDlgItem(dlg, IDC_EQUATION));
@@ -286,19 +286,19 @@ INT_PTR CALLBACK func_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         case IDOK: {
             wstr src = item_text(dlg, IDC_EQUATION);
             std::string s8 = narrow(src);
-            if (gx_doc_check_curve(d, s8.c_str()) != 1) {
+            if (sg_doc_check_curve(d, s8.c_str()) != 1) {
                 error_box(dlg, L"The equation \"" + src + L"\" cannot be drawn");
                 SetFocus(GetDlgItem(dlg, IDC_EQUATION));
                 return TRUE;
             }
             if (e == NONE) {
-                ptrdiff_t r = gx_doc_add_curve(d, s8.c_str());
+                ptrdiff_t r = sg_doc_add_curve(d, s8.c_str());
                 if (r < 0) {
                     error_box(dlg, L"The function cannot be added");
                     return TRUE;
                 }
                 app.select_only(Sel(Sel::ENT, (size_t)r));
-            } else if (src != take(gx_doc_curve_src(d, e)) && gx_doc_set_curve(d, e, s8.c_str()) != 1) {
+            } else if (src != take(sg_doc_curve_src(d, e)) && sg_doc_set_curve(d, e, s8.c_str()) != 1) {
                 error_box(dlg, L"The function cannot be changed to that equation");
                 return TRUE;
             }
@@ -318,7 +318,7 @@ INT_PTR CALLBACK func_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
 
 INT_PTR CALLBACK point_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
     static size_t e;
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     switch (msg) {
     case WM_INITDIALOG: {
         e = (size_t)lp;
@@ -326,7 +326,7 @@ INT_PTR CALLBACK point_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         set_item(dlg, IDC_NAME, geo::ent_name(d, e));
         set_item(dlg, IDC_X, fmt_val(p.x));
         set_item(dlg, IDC_Y, fmt_val(p.y));
-        check(dlg, IDC_LOCKED, gx_doc_point_locked(d, e) == 1);
+        check(dlg, IDC_LOCKED, sg_doc_point_locked(d, e) == 1);
         if (geo::is_fixed(d, e)) {
             EnableWindow(GetDlgItem(dlg, IDC_LOCKED), FALSE);
             EnableWindow(GetDlgItem(dlg, IDC_NAME), FALSE);
@@ -341,7 +341,7 @@ INT_PTR CALLBACK point_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             if (!geo::is_fixed(d, e)) {
                 if (!rename(dlg, geo::ent_name(d, e), IDC_NAME)) { step.undo(); return TRUE; }
                 bool lk = checked(dlg, IDC_LOCKED);
-                if (lk != (gx_doc_point_locked(d, e) == 1) && gx_doc_lock_point(d, e, lk) != 1) {
+                if (lk != (sg_doc_point_locked(d, e) == 1) && sg_doc_lock_point(d, e, lk) != 1) {
                     error_box(dlg, L"The point cannot be locked");
                     step.undo();
                     return TRUE;
@@ -360,16 +360,16 @@ INT_PTR CALLBACK point_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
     return FALSE;
 }
 
-const wchar_t *shape_name(GxDoc *d, size_t e) {
+const wchar_t *shape_name(SgDoc *d, size_t e) {
     switch (geo::kind(d, e)) {
-    case GX_ENT_LINE: return geo::segment(d, e) ? L"Line segment" : L"Infinite line";
-    case GX_ENT_CIRCLE: return L"Circle";
-    case GX_ENT_ARC: return L"Arc";
-    case GX_ENT_CONIC: {
-        GxConic k;
+    case SG_ENT_LINE: return geo::segment(d, e) ? L"Line segment" : L"Infinite line";
+    case SG_ENT_CIRCLE: return L"Circle";
+    case SG_ENT_ARC: return L"Arc";
+    case SG_ENT_CONIC: {
+        SgConic k;
         V2 c;
         double a, b, t;
-        if (geo::conic(d, e, &k, &c, &a, &b, &t)) return k == GX_CONIC_ELLIPSE ? L"Ellipse" : k == GX_CONIC_HYPERBOLA ? L"Hyperbola" : L"Parabola";
+        if (geo::conic(d, e, &k, &c, &a, &b, &t)) return k == SG_CONIC_ELLIPSE ? L"Ellipse" : k == SG_CONIC_HYPERBOLA ? L"Hyperbola" : L"Parabola";
         return L"Conic";
     }
     }
@@ -378,15 +378,15 @@ const wchar_t *shape_name(GxDoc *d, size_t e) {
 
 INT_PTR CALLBACK shape_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
     static size_t e;
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     switch (msg) {
     case WM_INITDIALOG: {
         e = (size_t)lp;
         wstr title = wstr(shape_name(d, e)) + L" Properties";
         SetWindowTextW(dlg, title.c_str());
         set_item(dlg, IDC_KIND_TEXT, shape_name(d, e));
-        check(dlg, IDC_CONSTRUCTION, gx_doc_ent_construction(d, e) == 1);
-        check(dlg, IDC_INFINITE, gx_doc_ent_infinite(d, e) == 1);
+        check(dlg, IDC_CONSTRUCTION, sg_doc_ent_construction(d, e) == 1);
+        check(dlg, IDC_INFINITE, sg_doc_ent_infinite(d, e) == 1);
         bool line = geo::is_line(d, e);
         ShowWindow(GetDlgItem(dlg, IDC_INFINITE), line ? SW_SHOW : SW_HIDE);
         if (geo::is_fixed(d, e)) {
@@ -401,9 +401,9 @@ INT_PTR CALLBACK shape_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         case IDOK: {
             Step step;
             bool c = checked(dlg, IDC_CONSTRUCTION);
-            if (c != (gx_doc_ent_construction(d, e) == 1)) gx_doc_set_construction(d, e, c);
+            if (c != (sg_doc_ent_construction(d, e) == 1)) sg_doc_set_construction(d, e, c);
             bool inf = checked(dlg, IDC_INFINITE);
-            if (geo::is_line(d, e) && inf != (gx_doc_ent_infinite(d, e) == 1) && gx_doc_set_infinite(d, e, inf) != 1) {
+            if (geo::is_line(d, e) && inf != (sg_doc_ent_infinite(d, e) == 1) && sg_doc_set_infinite(d, e, inf) != 1) {
                 error_box(dlg, L"The line cannot be changed");
                 step.undo();
                 return TRUE;
@@ -426,8 +426,8 @@ INT_PTR CALLBACK shape_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
 INT_PTR CALLBACK about_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM) {
     switch (msg) {
     case WM_INITDIALOG:
-        set_item(dlg, IDC_LIBVERSION, L"Geometry library gxgeo " + widen(gx_version()));
-        SendDlgItemMessage(dlg, IDC_ABOUT_ICON, STM_SETICON, (WPARAM)LoadImageW(g_inst, MAKEINTRESOURCEW(IDI_GXPAD), IMAGE_ICON, 32, 32, 0), 0);
+        set_item(dlg, IDC_LIBVERSION, L"Geometry library sggeo " + widen(sg_version()));
+        SendDlgItemMessage(dlg, IDC_ABOUT_ICON, STM_SETICON, (WPARAM)LoadImageW(g_inst, MAKEINTRESOURCEW(IDI_SGPAD), IMAGE_ICON, 32, 32, 0), 0);
         center_on_owner(dlg);
         return TRUE;
     case WM_COMMAND:
@@ -444,14 +444,14 @@ struct Topic { const wchar_t *title, *text; };
 
 const Topic TOPICS[] = {
     {L"Getting started",
-     L"gxpad draws geometric constructions and finds formulas for what you measure.\r\n\r\n"
+     L"sgpad draws geometric constructions and finds formulas for what you measure.\r\n\r\n"
      L"1. Draw shapes with the tools in the tool box at the left, or from the Insert and Construct menus.\r\n"
      L"2. Select shapes and add constraints from the Constrain menu, such as Parallel or Tangent.\r\n"
      L"3. Add dimensions from the Dimension menu or with the Dimension tool, and type their values.\r\n"
      L"4. Select a dimension that measures something. The Formula box at the right shows a formula for it in terms of "
      L"the dimensions you set.\r\n\r\n"
      L"For example, draw a triangle with the Line tool, give its three sides lengths, and measure one of its angles: "
-     L"gxpad shows the law of cosines."},
+     L"sgpad shows the law of cosines."},
     {L"Drawing shapes",
      L"Pick a tool in the tool box, then click in the drawing. The status bar at the bottom says what to click next.\r\n\r\n"
      L"Lines and circles can also be drawn by dragging, as in Paint. A click on an existing point uses that point; a "
@@ -460,7 +460,7 @@ const Topic TOPICS[] = {
     {L"Selecting and moving",
      L"With the Select tool, click a shape to select it. Hold down Shift or Ctrl to select more than one. Drag across "
      L"empty paper to select everything inside a rectangle.\r\n\r\n"
-     L"Drag a point or shape to move it. gxpad keeps the constraints while it moves.\r\n\r\n"
+     L"Drag a point or shape to move it. sgpad keeps the constraints while it moves.\r\n\r\n"
      L"Right-click a shape for the commands that apply to it. Double-click it, or press Alt+Enter, to see its "
      L"properties."},
     {L"Constraints",
@@ -480,7 +480,7 @@ const Topic TOPICS[] = {
     {L"Formulas",
      L"Select a measured dimension, or a variable, to see its formula in the Formula box. The formula is in terms of the "
      L"driving dimensions and variables, so it holds for any values you give them.\r\n\r\n"
-     L"Finding a formula can take a few seconds; a moving bar shows that gxpad is still looking. When the formula is "
+     L"Finding a formula can take a few seconds; a moving bar shows that sgpad is still looking. When the formula is "
      L"approximate or long, Search Longer looks for a better one with ten more seconds each time.\r\n\r\n"
      L"Copy puts the formula on the Clipboard as text. Copy As puts it there as LaTeX for documents, or as code in C, "
      L"Rust, JavaScript, Python, Mathematica or Maxima: the repeated parts of the formula go into variables u_1, u_2, "
@@ -516,7 +516,7 @@ INT_PTR CALLBACK help_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         for (size_t k = 0; k < sizeof TOPICS / sizeof TOPICS[0]; k++) SendMessageW(lb, LB_ADDSTRING, 0, (LPARAM)TOPICS[k].title);
         SendMessage(lb, LB_SETCURSEL, 0, 0);
         set_item(dlg, IDC_TOPIC_TEXT, TOPICS[0].text);
-        HICON ic = (HICON)LoadImageW(g_inst, MAKEINTRESOURCEW(IDI_GXPAD), IMAGE_ICON, 16, 16, 0);
+        HICON ic = (HICON)LoadImageW(g_inst, MAKEINTRESOURCEW(IDI_SGPAD), IMAGE_ICON, 16, 16, 0);
         SendMessage(dlg, WM_SETICON, ICON_SMALL, (LPARAM)ic);
         center_on_owner(dlg);
         return TRUE;
@@ -567,7 +567,7 @@ void dlg_about(HWND owner) { DialogBoxParamW(g_inst, MAKEINTRESOURCEW(IDD_ABOUT)
 void dlg_help(HWND owner) { DialogBoxParamW(g_inst, MAKEINTRESOURCEW(IDD_HELP), owner, help_proc, 0); }
 
 bool dlg_properties(HWND owner) {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     if (app.sel.size() != 1) {
         MessageBeep(MB_OK);
         return false;
@@ -581,8 +581,8 @@ bool dlg_properties(HWND owner) {
         if (geo::is_function(d, s.i)) return dlg_function(owner, s.i);
         return dlg_shape(owner, s.i);
     case Sel::CON: {
-        wstr e = take(gx_doc_con_error(d, s.i));
-        wstr msg = gx_doc_con_conflict(d, s.i) == 1 ? L"This constraint cannot be met together with the others."
+        wstr e = take(sg_doc_con_error(d, s.i));
+        wstr msg = sg_doc_con_conflict(d, s.i) == 1 ? L"This constraint cannot be met together with the others."
                                                     : L"This constraint is met.";
         if (!e.empty()) msg += L"\n\n" + e;
         msg += L"\n\nTo remove it, select it and press Delete.";

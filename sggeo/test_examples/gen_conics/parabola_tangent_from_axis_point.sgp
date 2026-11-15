@@ -1,0 +1,28 @@
+sgp 2
+
+given
+  point A
+  p1 = parabola(A)
+    a1: a(p1) = 1
+  point B
+    d1: dx(A, B) = 1
+    d2: dy(A, B) = 0
+
+construct
+  C = tangent(B, p1)
+  segment BC
+
+find
+  d3: |BC|
+  d4: dy(A, C)
+
+where
+  A (1.0333333333333334, 1.0333333333333334)
+  p1 a 1 angle 0° [fixed angle]
+  B (0.03333333333333348, 1.0333333333333334)
+  C (2.033333333333333, 3.0333333333333337)
+  a1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)

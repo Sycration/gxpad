@@ -1,0 +1,30 @@
+sgp 2
+
+given
+  segment AC
+    d1: |AC| = 4
+  segment BD
+    horiz A B
+    d2: |BD| = 4
+  segment AB
+    d3: |AB| = 3
+
+construct
+  E = mid(AC)
+    E == mid(BD)
+
+find
+  d4: dy(B, C)
+  d5: dist(C, D)
+
+where
+  A (0.03000000000000002, 0.04499999999999999)
+  C (3.03, 2.69075131106459)
+  B (3.03, 0.04499999999999999)
+  D (0.029999999999999784, 2.69075131106459)
+  E (1.53, 1.367875655532295)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)

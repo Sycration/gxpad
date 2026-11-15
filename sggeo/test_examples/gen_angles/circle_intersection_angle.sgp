@@ -1,0 +1,29 @@
+sgp 2
+
+given
+  point A
+    x_A: x(A) = 4
+    y_A: y(A) = 0
+  k1 = circle(O)
+    r1: r(k1) = 3
+  k2 = circle(A)
+    r2: r(k2) = 2.5
+
+construct
+  B = meet(k1, k2)
+  segment BO
+  segment BA
+
+find
+  θ1: ∠OBA
+
+where
+  A (4, 2.4200548067529785e-47)
+  k1 r 3
+  k2 r 2.5
+  B (2.34375, 1.8726547833223293)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  θ1 label (-0.0861503, -0.996282)

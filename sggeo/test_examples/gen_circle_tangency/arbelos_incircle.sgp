@@ -1,0 +1,37 @@
+sgp 2
+
+given
+  point D
+  k4 = circle(D)
+
+construct
+  point A on xaxis
+  k1 = circle(A)
+    k4 tan k1 inside
+  point B on xaxis
+  point C on xaxis
+  k2 = circle(B)
+    k1 tan k2 inside
+    k4 tan k2
+    r1: r(k2) = 3
+  k3 = circle(C)
+    k1 tan k3 inside
+    k2 tan k3
+    k4 tan k3
+    r2: r(k3) = 2
+
+find
+  r3: r(k4)
+
+where
+  D (1.311842105263158, 3.1578947368421053)
+  k4 r 1.5789473684210527
+  A (-0.003947368421052961, 4.5596012761644375e-23)
+  k1 r 5
+  B (-2.003947368421053, 2.4506176211948285e-24)
+  C (2.996052631578947, 4.0448640140976884e-23)
+  k2 r 3
+  k3 r 2
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  r3 label (0.3, 0.3)

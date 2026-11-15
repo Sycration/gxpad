@@ -1,0 +1,16 @@
+sgp 2
+
+construct
+  point A on yaxis
+  k1 = circle(A)
+    xaxis tan k1
+    D1: diam(k1) = 0.002
+
+find
+  y_A: y(A)
+
+where
+  A (0, 0.001)
+  k1 r 0.001
+  D1 label (0.3, 0.3)
+  y_A label (0.3, 0.3)

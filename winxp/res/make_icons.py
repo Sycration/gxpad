@@ -1,8 +1,8 @@
-"""Writes the bitmaps of gxpad for Windows:
+"""Writes the bitmaps of sgpad for Windows:
 
   toolbar.bmp  the 16 x 16 toolbar and tool box images in one strip, 32-bit with
                alpha, in the order of the Icon enumeration of src/common.h
-  gxpad.ico    the program icon at 16, 32 and 48 pixels, in the BMP format that
+  sgpad.ico    the program icon at 16, 32 and 48 pixels, in the BMP format that
                Windows XP reads
 
 Requires Pillow. Run from this directory: python3 make_icons.py
@@ -22,7 +22,7 @@ BLUE = (40, 90, 200, 255)
 
 class Pen:
     """Draws an icon in a square of `size` pixels with coordinates from -1 to 1
-    (y downwards), like the vector icons of gxpad."""
+    (y downwards), like the vector icons of sgpad."""
 
     def __init__(self, size):
         self.n = size * SS
@@ -446,7 +446,7 @@ def main():
         strip.paste(icon(n), (16 * i, 0))
     with open("toolbar.bmp", "wb") as f:
         f.write(bmp32(strip))
-    with open("gxpad.ico", "wb") as f:
+    with open("sgpad.ico", "wb") as f:
         f.write(ico([app_icon(s) for s in (16, 32, 48)]))
     print(len(NAMES), "icons")
 

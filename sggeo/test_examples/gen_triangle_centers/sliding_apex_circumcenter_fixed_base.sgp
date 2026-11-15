@@ -1,0 +1,25 @@
+sgp 2
+
+given
+  hh = 6
+  point A B
+  line OC
+    vert O C
+    y_C: y(C) = hh
+  point D
+  k1 = circle(D)
+    C on k1
+    A on k1
+    B on k1
+
+find
+  r1: r(k1)
+
+where
+  A (-3, 0) [fixed]
+  B (3, 0) [fixed]
+  C (3.588100569867477e-64, 6)
+  D (-5.724587470724095e-17, 2.25)
+  k1 r 3.75
+  y_C label (0.3, 0.3)
+  r1 label (0.3, 0.3)

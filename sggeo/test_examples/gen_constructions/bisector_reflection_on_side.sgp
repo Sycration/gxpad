@@ -1,0 +1,28 @@
+sgp 2
+
+given
+  triangle ABC
+    d1: |AB| = 6.020797289396148
+    d2: |BC| = 5.656854249492381
+    d3: |CA| = 4.924428900898052
+
+construct
+  l1 = bisect(AB, AC)
+  D = reflect(B, l1)
+
+find
+  d4: dist(D, C)
+  d5: dist(A, D)
+  d6: dist(D, CA)
+
+where
+  A (0, 0)
+  B (6, 0.5)
+  C (2, 4.5)
+  D (2.445277375534104, 5.50187409495174)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
+  d6 label (0.3, 0.3)

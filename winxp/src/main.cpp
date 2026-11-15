@@ -8,7 +8,7 @@
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "advapi32.lib")
 #pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "gxgeo.lib")
+#pragma comment(lib, "sggeo.lib")
 // the common controls of Windows XP, with visual styles
 #pragma comment(linker, "\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' " \
                         "processorArchitecture='x86' publicKeyToken='6595b64144ccf1df' language='*'\"")
@@ -21,7 +21,7 @@ HIMAGELIST g_icons;
 
 namespace {
 
-const wchar_t *REG_KEY = L"Software\\gxpad";
+const wchar_t *REG_KEY = L"Software\\sgpad";
 const int MRU_MAX = 4;
 
 HWND rebar, toolbar, conbar, toolbox_box, toolbox, statusbar, canvas, pane, zoom_box;
@@ -108,9 +108,9 @@ void status_part(int part, const wstr &s) { SendMessageW(statusbar, SB_SETTEXTW,
 
 void update_status_info() {
     if (!statusbar) return;
-    GxDoc *d = app.doc;
-    size_t conflicts = gx_doc_conflict_count(d);
-    ptrdiff_t dof = gx_doc_dof(d);
+    SgDoc *d = app.doc;
+    size_t conflicts = sg_doc_conflict_count(d);
+    ptrdiff_t dof = sg_doc_dof(d);
     wchar_t buf[128];
     if (conflicts > 0) swprintf(buf, 128, conflicts == 1 ? L"%u conflict" : L"%u conflicts", (unsigned)conflicts);
     else if (dof == 0) swprintf(buf, 128, L"Fully constrained");
@@ -137,7 +137,7 @@ void layout_status() {
 
 bool cmd_state(UINT id, bool *checked) {
     *checked = false;
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     int t = cmd_tool(id);
     if (t >= 0) {
         *checked = app.tool == (Tool)t;
@@ -147,7 +147,7 @@ bool cmd_state(UINT id, bool *checked) {
     if (id >= ID_EDIT_COPY_C && id <= ID_EDIT_COPY_MAXIMA) return pane_has_formula();
     switch (id) {
     case ID_FILE_EXPORT: return pane_has_formula();
-    case ID_EDIT_UNDO: return gx_doc_undo_len(d) > 0;
+    case ID_EDIT_UNDO: return sg_doc_undo_len(d) > 0;
     case ID_EDIT_REDO: return app.redo_steps > 0;
     case ID_EDIT_COPY_FORMULA:
     case ID_EDIT_COPY_LATEX:
@@ -245,18 +245,18 @@ bool write_file(const wstr &path, const std::string &s) {
     return ok;
 }
 
-void replace_doc(GxDoc *d, const wstr &path) {
+void replace_doc(SgDoc *d, const wstr &path) {
     pane_cancel_jobs();
-    GxDoc *old = app.doc;
+    SgDoc *old = app.doc;
     app.doc = d;
-    gx_doc_free(old);
+    sg_doc_free(old);
     app.path = path;
     app.sel.clear();
     app.redo_steps = 0;
     app.undo_seen = 0;
     canvas_cancel();
-    gx_doc_solve(d, 0);
-    app.saved_gen = gx_doc_generation(d);
+    sg_doc_solve(d, 0);
+    app.saved_gen = sg_doc_generation(d);
     update_title();
     doc_changed();
     canvas_fit();
@@ -266,14 +266,14 @@ bool save_as();
 
 bool save() {
     if (app.path.empty()) return save_as();
-    char *text = gx_doc_to_gxp(app.doc);
+    char *text = sg_doc_to_sgp(app.doc);
     bool ok = text && write_file(app.path, text);
-    gx_string_free(text);
+    sg_string_free(text);
     if (!ok) {
         MessageBoxW(g_frame, (load_str(IDS_SAVE_FAILED) + L"\n\n" + app.path).c_str(), load_str(IDS_APP).c_str(), MB_ICONERROR);
         return false;
     }
-    app.saved_gen = gx_doc_generation(app.doc);
+    app.saved_gen = sg_doc_generation(app.doc);
     add_mru(app.path);
     update_title();
     return true;
@@ -288,7 +288,7 @@ wstr filter_of(UINT id) {
 
 bool save_as() {
     wchar_t file[MAX_PATH];
-    lstrcpynW(file, app.path.empty() ? L"Untitled.gxp" : app.path.c_str(), MAX_PATH);
+    lstrcpynW(file, app.path.empty() ? L"Untitled.sgp" : app.path.c_str(), MAX_PATH);
     wstr filter = filter_of(IDS_FILTER);
     OPENFILENAMEW of;
     memset(&of, 0, sizeof of);
@@ -297,7 +297,7 @@ bool save_as() {
     of.lpstrFilter = filter.c_str();
     of.lpstrFile = file;
     of.nMaxFile = MAX_PATH;
-    of.lpstrDefExt = L"gxp";
+    of.lpstrDefExt = L"sgp";
     of.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
     if (!GetSaveFileNameW(&of)) return false;
     app.path = file;
@@ -318,8 +318,8 @@ bool ask_save() {
 
 void open_path(const wstr &path) {
     std::string text;
-    GxDoc *d = 0;
-    if (read_file(path, &text)) d = gx_doc_from_gxp(text.c_str());
+    SgDoc *d = 0;
+    if (read_file(path, &text)) d = sg_doc_from_sgp(text.c_str());
     if (!d) {
         wstr e = last_error();
         MessageBoxW(g_frame, (load_str(IDS_OPEN_FAILED) + L"\n\n" + path + (e.empty() ? L"" : L"\n\n" + e)).c_str(),
@@ -347,7 +347,7 @@ void open_dialog() {
     of.lpstrFilter = filter.c_str();
     of.lpstrFile = file;
     of.nMaxFile = MAX_PATH;
-    of.lpstrDefExt = L"gxp";
+    of.lpstrDefExt = L"sgp";
     of.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
     if (GetOpenFileNameW(&of)) open_path(file);
 }
@@ -491,7 +491,7 @@ void make_bars() {
     int nt = sizeof tools / sizeof tools[0];
     for (int i = 1; i < nt; i += 2) tools[i].fsState |= TBSTATE_WRAP;
     tools[nt - 1].fsState |= TBSTATE_WRAP;
-    toolbox_box = CreateWindowExW(0, L"GxpadToolbox", L"", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN, 0, 0, 10, 10, g_frame, 0, g_inst, 0);
+    toolbox_box = CreateWindowExW(0, L"SgpadToolbox", L"", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN, 0, 0, 10, 10, g_frame, 0, g_inst, 0);
     toolbox = make_toolbar(toolbox_box, IDC_TOOLBOX, tools, nt, TBSTYLE_WRAPABLE);
     SendMessage(toolbox, TB_CHECKBUTTON, ID_TOOL_SELECT, TRUE);
 
@@ -600,7 +600,7 @@ void command(UINT id) {
     }
     switch (id) {
     case ID_FILE_NEW:
-        if (ask_save()) replace_doc(gx_doc_new(), L"");
+        if (ask_save()) replace_doc(sg_doc_new(), L"");
         break;
     case ID_FILE_OPEN: open_dialog(); break;
     case ID_FILE_SAVE: save(); break;
@@ -610,17 +610,17 @@ void command(UINT id) {
     case ID_FILE_EXIT: SendMessage(g_frame, WM_CLOSE, 0, 0); break;
     case ID_EDIT_UNDO:
         canvas_cancel();
-        if (gx_doc_undo(app.doc) == 1) {
+        if (sg_doc_undo(app.doc) == 1) {
             app.redo_steps++;
-            app.undo_seen = (size_t)gx_doc_undo_len(app.doc);
+            app.undo_seen = (size_t)sg_doc_undo_len(app.doc);
             doc_changed();
         }
         break;
     case ID_EDIT_REDO:
         canvas_cancel();
-        if (app.redo_steps > 0 && gx_doc_redo(app.doc) == 1) {
+        if (app.redo_steps > 0 && sg_doc_redo(app.doc) == 1) {
             app.redo_steps--;
-            app.undo_seen = (size_t)gx_doc_undo_len(app.doc);
+            app.undo_seen = (size_t)sg_doc_undo_len(app.doc);
             doc_changed();
         }
         break;
@@ -825,10 +825,10 @@ void set_status(const wstr &text) {
 }
 
 void doc_changed() {
-    GxDoc *d = app.doc;
+    SgDoc *d = app.doc;
     app.prune_selection();
     // a new undo step means redo has nothing left to take back
-    ptrdiff_t len = gx_doc_undo_len(d);
+    ptrdiff_t len = sg_doc_undo_len(d);
     if (len >= 0 && (size_t)len > app.undo_seen) app.redo_steps = 0;
     if (len >= 0) app.undo_seen = (size_t)len;
     canvas_refresh();
@@ -871,33 +871,33 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
     ImageList_Add(g_icons, strip, 0);
     DeleteObject(strip);
 
-    app.doc = gx_doc_new();
-    app.saved_gen = gx_doc_generation(app.doc);
+    app.doc = sg_doc_new();
+    app.saved_gen = sg_doc_generation(app.doc);
     load_settings();
     load_mru();
 
     WNDCLASSEXW wc = {sizeof wc};
     wc.lpfnWndProc = frame_proc;
     wc.hInstance = inst;
-    wc.hIcon = LoadIconW(inst, MAKEINTRESOURCEW(IDI_GXPAD));
-    wc.hIconSm = (HICON)LoadImageW(inst, MAKEINTRESOURCEW(IDI_GXPAD), IMAGE_ICON, 16, 16, 0);
+    wc.hIcon = LoadIconW(inst, MAKEINTRESOURCEW(IDI_SGPAD));
+    wc.hIconSm = (HICON)LoadImageW(inst, MAKEINTRESOURCEW(IDI_SGPAD), IMAGE_ICON, 16, 16, 0);
     wc.hCursor = LoadCursor(0, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
     wc.lpszMenuName = MAKEINTRESOURCEW(IDR_MENU);
-    wc.lpszClassName = L"GxpadFrame";
+    wc.lpszClassName = L"SgpadFrame";
     RegisterClassExW(&wc);
     WNDCLASSEXW tc = {sizeof tc};
     tc.lpfnWndProc = toolbox_proc;
     tc.hInstance = inst;
     tc.hCursor = LoadCursor(0, IDC_ARROW);
     tc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
-    tc.lpszClassName = L"GxpadToolbox";
+    tc.lpszClassName = L"SgpadToolbox";
     RegisterClassExW(&tc);
 
     int x = (int)reg_get(L"Left", CW_USEDEFAULT), y = (int)reg_get(L"Top", CW_USEDEFAULT);
     int r = (int)reg_get(L"Right", 0), b = (int)reg_get(L"Bottom", 0);
     int w = r > x && x != (int)CW_USEDEFAULT ? r - x : 1000, hh = b > y && y != (int)CW_USEDEFAULT ? b - y : 700;
-    HWND frame = CreateWindowExW(0, L"GxpadFrame", L"gxpad", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, x, y, w, hh, 0, 0, inst, 0);
+    HWND frame = CreateWindowExW(0, L"SgpadFrame", L"sgpad", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, x, y, w, hh, 0, 0, inst, 0);
     accel = LoadAcceleratorsW(inst, MAKEINTRESOURCEW(IDR_ACCEL));
     update_title();
     ShowWindow(frame, reg_get(L"Maximized", 0) ? SW_SHOWMAXIMIZED : show);
@@ -912,7 +912,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
     if (argv && argc > 1) {
         open_path(argv[1]);
         if (argc > 2) {
-            for (size_t i = 0; i < gx_doc_dim_count(app.doc); i++)
+            for (size_t i = 0; i < sg_doc_dim_count(app.doc); i++)
                 if (geo::dim_name(app.doc, i) == argv[2]) {
                     app.select_only(Sel(Sel::DIM, i));
                     sel_changed();
@@ -937,7 +937,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
         TranslateMessage(&m);
         DispatchMessageW(&m);
     }
-    gx_doc_free(app.doc);
+    sg_doc_free(app.doc);
     Gdiplus::GdiplusShutdown(gtoken);
     OleUninitialize();
     return 0;

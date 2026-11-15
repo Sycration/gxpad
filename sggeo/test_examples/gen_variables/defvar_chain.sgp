@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  a = 3
+  segment OA
+    horiz O A
+    d1: |OA| = c
+
+find
+  x_A: x(A)
+  b = a + 1
+  c = b^2 - a
+
+where
+  A (13, 1.2848756788105186e-182)
+  d1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)

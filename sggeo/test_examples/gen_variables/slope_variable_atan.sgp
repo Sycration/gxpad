@@ -1,0 +1,18 @@
+sgp 2
+
+given
+  m = 2
+  segment OA
+    θ1: angle(xaxis, OA) = atan(m)
+    x_A: x(A) = 4
+
+find
+  y_A: y(A)
+  d1: |OA|
+
+where
+  A (4, 8)
+  θ1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)

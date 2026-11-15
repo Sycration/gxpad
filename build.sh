@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Release builds of gxpad (desktop program), gx (command line) and gxgeo (C library / Wasm module), collected
+# Release builds of sgpad (desktop program), sg (command line) and sggeo (C library / Wasm module), collected
 # under build/:
 #
-#   build/<platform>/<arch>/bin   gxpad and gx executables and the gx README.md
-#   build/<platform>/<arch>/lib   gxgeo shared library, import library, gxgeo.h and the gxgeo README.md
-#   build/web/wasm32/lib          gxgeo Wasm module, its wasm-bindgen JS glue and the gxgeo README.md
-#   build/winxp/<arch>/bin        gx executable for Windows XP and the gx README.md; for x86 also gxpad.exe, the
-#                                 Windows XP program (winxp/), and the gxgeo DLL it runs with
-#   build/winxp/<arch>/lib        gxgeo DLL for Windows XP, its import library, gxgeo.h and the gxgeo README.md
+#   build/<platform>/<arch>/bin   sgpad and sg executables and the sg README.md
+#   build/<platform>/<arch>/lib   sggeo shared library, import library, sggeo.h and the sggeo README.md
+#   build/web/wasm32/lib          sggeo Wasm module, its wasm-bindgen JS glue and the sggeo README.md
+#   build/winxp/<arch>/bin        sg executable for Windows XP and the sg README.md; for x86 also sgpad.exe, the
+#                                 Windows XP program (winxp/), and the sggeo DLL it runs with
+#   build/winxp/<arch>/lib        sggeo DLL for Windows XP, its import library, sggeo.h and the sggeo README.md
 #
 # Usage: ./build.sh [linux] [windows] [macos] [web] [winxp]    (no arguments builds everything)
 #
@@ -31,9 +31,9 @@ cd "$(dirname "$0")"
 ROOT=$PWD
 OUT=$ROOT/build
 TARGET_DIR=${CARGO_TARGET_DIR:-$ROOT/target}
-HEADER=$ROOT/gxgeo/include/gxgeo.h
-LIB_README=$ROOT/gxgeo/README.md
-GX_README=$ROOT/gxcli/README.md
+HEADER=$ROOT/sggeo/include/sggeo.h
+LIB_README=$ROOT/sggeo/README.md
+SG_README=$ROOT/sgcli/README.md
 
 # Linux binaries link against this glibc version so that they load on older distributions.
 GLIBC=2.17
@@ -47,14 +47,14 @@ need() {
   command -v "$1" >/dev/null || { echo "error: $1 is not installed ($2)" >&2; exit 1; }
 }
 
-# collect PLATFORM ARCH TRIPLE EXE_SUFFIX LIB...: copies the executables (gxpad, gx) and the library files of
+# collect PLATFORM ARCH TRIPLE EXE_SUFFIX LIB...: copies the executables (sgpad, sg) and the library files of
 # one target into build/
 collect() {
   local platform=$1 arch=$2 triple=$3 ext=$4
   shift 4
   local rel=$TARGET_DIR/$triple/release dest=$OUT/$platform/$arch
   mkdir -p "$dest/bin" "$dest/lib"
-  cp "$rel/gxpad$ext" "$rel/gx$ext" "$GX_README" "$dest/bin/"
+  cp "$rel/sgpad$ext" "$rel/sg$ext" "$SG_README" "$dest/bin/"
   for f in "$@"; do cp "$rel/$f" "$dest/lib/"; done
   cp "$HEADER" "$LIB_README" "$dest/lib/"
 }
@@ -65,7 +65,7 @@ build_linux() {
     local arch=${pair%%:*} triple=${pair#*:}-unknown-linux-gnu
     echo "==> linux $arch"
     cargo zigbuild --release --workspace --target "$triple.$GLIBC"
-    collect linux "$arch" "$triple" "" libgxgeo.so
+    collect linux "$arch" "$triple" "" libsggeo.so
   done
 }
 
@@ -78,7 +78,7 @@ build_windows() {
     local arch=${pair%%:*} triple=${pair#*:}
     echo "==> windows $arch"
     cargo zigbuild --release --workspace --target "$triple"
-    collect windows "$arch" "$triple" .exe gxgeo.dll libgxgeo.dll.a
+    collect windows "$arch" "$triple" .exe sggeo.dll libsggeo.dll.a
   done
 }
 
@@ -100,22 +100,22 @@ build_macos() {
     local up=${cpu^^}
     echo "==> macos $arch"
     export "CARGO_TARGET_${up}_APPLE_DARWIN_LINKER=$clang" "CC_${cpu}_apple_darwin=$clang"
-    cargo build --release -p gxpad -p gxcli --target "$triple"
-    # The gxgeo cdylib is linked last and separately so that its install name is @rpath/libgxgeo.dylib
+    cargo build --release -p sgpad -p sgcli --target "$triple"
+    # The sggeo cdylib is linked last and separately so that its install name is @rpath/libsggeo.dylib
     # instead of the absolute path in target/. Setting it at link time keeps the ld64 ad-hoc signature valid.
-    cargo rustc --release -p gxgeo --lib --target "$triple" -- \
-      -C link-arg=-Wl,-install_name,@rpath/libgxgeo.dylib
-    collect macos "$arch" "$triple" "" libgxgeo.dylib
+    cargo rustc --release -p sggeo --lib --target "$triple" -- \
+      -C link-arg=-Wl,-install_name,@rpath/libsggeo.dylib
+    collect macos "$arch" "$triple" "" libsggeo.dylib
   done
 }
 
 build_web() {
   need wasm-bindgen "cargo install wasm-bindgen-cli --version <the wasm-bindgen version in Cargo.lock>"
   echo "==> web wasm32"
-  cargo build --release -p gxgeo --target wasm32-unknown-unknown
+  cargo build --release -p sggeo --target wasm32-unknown-unknown
   local dest=$OUT/web/wasm32/lib
   mkdir -p "$dest"
-  wasm-bindgen --target web --out-dir "$dest" "$TARGET_DIR/wasm32-unknown-unknown/release/gxgeo.wasm"
+  wasm-bindgen --target web --out-dir "$dest" "$TARGET_DIR/wasm32-unknown-unknown/release/sggeo.wasm"
   cp "$LIB_README" "$dest/"
 }
 
@@ -195,38 +195,38 @@ build_winxp() {
       [ -f "$rel/$file" ] || { echo "error: the winxp $arch build of $file failed" >&2; exit 1; }
       check_xp_imports "$rel/$file" "$work/yy-thunks/Config/$yy_arch/$exports.txt"
     }
-    xp_thunk gxgeo.dll --lib -- --release -p gxgeo --lib
-    xp_thunk gx.exe -- --release -p gxcli --bin gx
+    xp_thunk sggeo.dll --lib -- --release -p sggeo --lib
+    xp_thunk sg.exe -- --release -p sgcli --bin sg
 
     # The imports in the x86 import library from lld-link have the name type "export as", which the
     # linkers of Visual C++ 2008 and older reject, so llvm-dlltool writes the import library from the
     # exports of the DLL instead. The last field of the spec (which contains a ':') is the llvm-dlltool
-    # machine. The file name gxgeo.lib follows the MSVC convention for import libraries.
-    local def=$work/gxgeo-$arch.def
-    { echo "LIBRARY gxgeo.dll"; echo EXPORTS
-      llvm-readobj --coff-exports "$rel/gxgeo.dll" | awk '/^ *Name:/ { print "  " $2 }'; } > "$def"
+    # machine. The file name sggeo.lib follows the MSVC convention for import libraries.
+    local def=$work/sggeo-$arch.def
+    { echo "LIBRARY sggeo.dll"; echo EXPORTS
+      llvm-readobj --coff-exports "$rel/sggeo.dll" | awk '/^ *Name:/ { print "  " $2 }'; } > "$def"
     rm -rf "$dest"
     mkdir -p "$dest"
-    llvm-dlltool -m "$machine" -d "$def" -l "$dest/gxgeo.lib"
-    cp "$rel/gxgeo.dll" "$HEADER" "$LIB_README" "$dest/"
+    llvm-dlltool -m "$machine" -d "$def" -l "$dest/sggeo.lib"
+    cp "$rel/sggeo.dll" "$HEADER" "$LIB_README" "$dest/"
     mkdir -p "$OUT/winxp/$arch/bin"
-    cp "$rel/gx.exe" "$GX_README" "$OUT/winxp/$arch/bin/"
+    cp "$rel/sg.exe" "$SG_README" "$OUT/winxp/$arch/bin/"
   done
 
   # The Windows XP program, built with Visual Studio 2008 on the XP machine against the DLL just built.
-  # A running copy keeps gxgeo.dll open, which fails the build, so it is closed first.
-  echo "==> winxp gxpad (Visual Studio 2008 on the XP machine)"
-  local vm=$ROOT/winxp/vm remote=${XP_DIR:-'C:\gxpad'} out
+  # A running copy keeps sggeo.dll open, which fails the build, so it is closed first.
+  echo "==> winxp sgpad (Visual Studio 2008 on the XP machine)"
+  local vm=$ROOT/winxp/vm remote=${XP_DIR:-'C:\sgpad'} out
   remote=${remote#*:\\}
-  python3 "$vm/vm.py" run 'taskkill /f /im gxpad.exe >nul 2>&1 & echo closed' 30 >/dev/null \
+  python3 "$vm/vm.py" run 'taskkill /f /im sgpad.exe >nul 2>&1 & echo closed' 30 >/dev/null \
     || { echo "error: the Windows XP machine does not answer (see winxp/vm/README.md)" >&2; exit 1; }
   out=$("$vm/build.sh" all rebuild 2>&1) || true
   echo "$out" | grep -qE '\b1 Projects succeeded' \
     || { echo "$out" | tail -20 >&2; echo "error: the Windows XP program did not build" >&2; exit 1; }
   local bin=$OUT/winxp/x86/bin
-  rm -f "$bin/gxpad.exe"
-  python3 "$vm/vm.py" get "$remote/winxp/Release/gxpad.exe" "$bin/gxpad.exe"
-  cp "$OUT/winxp/x86/lib/gxgeo.dll" "$bin/"
+  rm -f "$bin/sgpad.exe"
+  python3 "$vm/vm.py" get "$remote/winxp/Release/sgpad.exe" "$bin/sgpad.exe"
+  cp "$OUT/winxp/x86/lib/sggeo.dll" "$bin/"
 }
 
 for p in "${platforms[@]}"; do

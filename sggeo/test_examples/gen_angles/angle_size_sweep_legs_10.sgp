@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  segment OA
+    d1: |OA| = 10
+    θ1: angle(xaxis, OA) = 175°
+
+find
+  x_A: x(A)
+  y_A: y(A)
+
+where
+  A (-9.961946980917455, 0.8715574274765819)
+  d1 label (0.3, 0.3)
+  θ1 label (0.973249, 0.229753)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

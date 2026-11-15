@@ -1,0 +1,30 @@
+sgp 2
+
+given
+  triangle ABC
+    d1: |AB| = 4
+    d2: |BC| = 3
+    d3: |CA| = 5
+  triangle DEF
+    DE ⟂ EF
+    d4: |DE| = 4
+    θ1: ∠EDF = asin(ratio)
+
+find
+  d5: |EF|
+  P = d1+d2+d3
+  ratio = d2/P
+
+where
+  A (0, 0)
+  B (4, 0)
+  C (4, 3)
+  D (10.205325136256683, 0.5843416229258042)
+  E (14.042968059956246, 1.7123916174644593)
+  F (13.751706803787075, 2.703266759609736)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
