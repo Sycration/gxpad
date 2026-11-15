@@ -23,11 +23,10 @@ winxp/vm/launch.sh 'C:\gxpad\some.gxp' # the program on the XP screen, with a dr
 winxp/vm/ui.py click 40 170 drag 200 560 520 560 shot line   # draw a line, save target/xp-shots/line.png
 # change the sources, then
 winxp/vm/cycle.sh 'C:\gxpad\some.gxp'  # close, build, start again
-winxp/vm/vm.py get gxpad/winxp/Release/gxpad.exe build/winxp/x86/bin/gxpad.exe   # for a release
 ```
 
-`./build.sh` deletes `build/winxp`, so for a release the program goes into `build/winxp/x86/bin` after it,
-next to a copy of `build/winxp/x86/lib/gxgeo.dll` (see `winxp/README.md`).
+For a release, `./build.sh winxp` builds the program here itself (with `build.sh all rebuild`) and puts it in
+`build/winxp/x86/bin`, next to the `gxgeo.dll` it just built.
 
 ## The XP machine
 

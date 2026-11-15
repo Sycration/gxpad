@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Release builds of gxpad (desktop program) and gxgeo (C library / Wasm module), collected under build/:
+# Release builds of gxpad (desktop program), gx (command line) and gxgeo (C library / Wasm module), collected
+# under build/:
 #
-#   build/<platform>/<arch>/bin   gxpad executable
+#   build/<platform>/<arch>/bin   gxpad and gx executables and the gx README.md
 #   build/<platform>/<arch>/lib   gxgeo shared library, import library, gxgeo.h and the gxgeo README.md
 #   build/web/wasm32/lib          gxgeo Wasm module, its wasm-bindgen JS glue and the gxgeo README.md
+#   build/winxp/<arch>/bin        gx executable for Windows XP and the gx README.md; for x86 also gxpad.exe, the
+#                                 Windows XP program (winxp/), and the gxgeo DLL it runs with
 #   build/winxp/<arch>/lib        gxgeo DLL for Windows XP, its import library, gxgeo.h and the gxgeo README.md
 #
 # Usage: ./build.sh [linux] [windows] [macos] [web] [winxp]    (no arguments builds everything)
@@ -20,6 +23,8 @@
 #         (VC-LTL-*Binary.7z) and the YY-Thunks obj release (YY-Thunks-*Objs.zip)
 #       - XWIN_DIR (default ~/.xwin): the MSVC CRT and Windows SDK libraries for x86 and x86_64, as written by
 #         `xwin --accept-license --arch x86,x86_64 splat --output ~/.xwin` (cargo install xwin)
+#       - the Windows XP machine with Visual Studio 2008 that winxp/vm/ works with (see winxp/vm/README.md),
+#         running: the Windows XP program is built there
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -28,6 +33,7 @@ OUT=$ROOT/build
 TARGET_DIR=${CARGO_TARGET_DIR:-$ROOT/target}
 HEADER=$ROOT/gxgeo/include/gxgeo.h
 LIB_README=$ROOT/gxgeo/README.md
+GX_README=$ROOT/gxcli/README.md
 
 # Linux binaries link against this glibc version so that they load on older distributions.
 GLIBC=2.17
@@ -41,13 +47,14 @@ need() {
   command -v "$1" >/dev/null || { echo "error: $1 is not installed ($2)" >&2; exit 1; }
 }
 
-# collect PLATFORM ARCH TRIPLE EXE LIB...: copies the executable and library files of one target into build/
+# collect PLATFORM ARCH TRIPLE EXE_SUFFIX LIB...: copies the executables (gxpad, gx) and the library files of
+# one target into build/
 collect() {
-  local platform=$1 arch=$2 triple=$3 exe=$4
+  local platform=$1 arch=$2 triple=$3 ext=$4
   shift 4
   local rel=$TARGET_DIR/$triple/release dest=$OUT/$platform/$arch
   mkdir -p "$dest/bin" "$dest/lib"
-  cp "$rel/$exe" "$dest/bin/"
+  cp "$rel/gxpad$ext" "$rel/gx$ext" "$GX_README" "$dest/bin/"
   for f in "$@"; do cp "$rel/$f" "$dest/lib/"; done
   cp "$HEADER" "$LIB_README" "$dest/lib/"
 }
@@ -58,7 +65,7 @@ build_linux() {
     local arch=${pair%%:*} triple=${pair#*:}-unknown-linux-gnu
     echo "==> linux $arch"
     cargo zigbuild --release --workspace --target "$triple.$GLIBC"
-    collect linux "$arch" "$triple" gxpad libgxgeo.so
+    collect linux "$arch" "$triple" "" libgxgeo.so
   done
 }
 
@@ -71,7 +78,7 @@ build_windows() {
     local arch=${pair%%:*} triple=${pair#*:}
     echo "==> windows $arch"
     cargo zigbuild --release --workspace --target "$triple"
-    collect windows "$arch" "$triple" gxpad.exe gxgeo.dll libgxgeo.dll.a
+    collect windows "$arch" "$triple" .exe gxgeo.dll libgxgeo.dll.a
   done
 }
 
@@ -93,12 +100,12 @@ build_macos() {
     local up=${cpu^^}
     echo "==> macos $arch"
     export "CARGO_TARGET_${up}_APPLE_DARWIN_LINKER=$clang" "CC_${cpu}_apple_darwin=$clang"
-    cargo build --release -p gxpad --target "$triple"
+    cargo build --release -p gxpad -p gxcli --target "$triple"
     # The gxgeo cdylib is linked last and separately so that its install name is @rpath/libgxgeo.dylib
     # instead of the absolute path in target/. Setting it at link time keeps the ld64 ad-hoc signature valid.
     cargo rustc --release -p gxgeo --lib --target "$triple" -- \
       -C link-arg=-Wl,-install_name,@rpath/libgxgeo.dylib
-    collect macos "$arch" "$triple" gxpad libgxgeo.dylib
+    collect macos "$arch" "$triple" "" libgxgeo.dylib
   done
 }
 
@@ -170,21 +177,26 @@ build_winxp() {
     done
 
     # thunk always builds into ./target/winxp_build. thunk 0.3.3 exits with 0 also when cargo fails, so the
-    # DLL of the previous build is deleted first and a missing DLL marks a failed build.
+    # file of the previous build is deleted first and a missing file marks a failed build.
     local rel=$ROOT/target/winxp_build/$triple/release dest=$OUT/winxp/$arch/lib
-    rm -f "$rel/gxgeo.dll"
+    # xp_thunk FILE THUNK_ARGS...: builds FILE with thunk and checks that XP has every function it imports.
     # thunk 0.3.3 reads the architecture from --target among the cargo arguments; without it, thunk asks
     # rustup for the host architecture and rejects any host that is not Windows.
-    local linker_var=CARGO_TARGET_${triple^^}_LINKER
-    (
-      export VC_LTL=$work/vc-ltl YY_THUNKS=$work/yy-thunks WINXP_ARCH=$arch
-      export LIB="$case_dir;$xwin/crt/lib/$xwin_arch;$xwin/sdk/lib/um/$xwin_arch"
-      export "${linker_var//-/_}=$ROOT/winxp-link.sh"
-      thunk --os xp --lib -- --release -p gxgeo --lib --target "$triple"
-    )
-    [ -f "$rel/gxgeo.dll" ] || { echo "error: the winxp $arch build failed" >&2; exit 1; }
-
-    check_xp_imports "$rel/gxgeo.dll" "$work/yy-thunks/Config/$yy_arch/$exports.txt"
+    xp_thunk() {
+      local file=$1 linker_var=CARGO_TARGET_${triple^^}_LINKER
+      shift
+      rm -f "$rel/$file"
+      (
+        export VC_LTL=$work/vc-ltl YY_THUNKS=$work/yy-thunks WINXP_ARCH=$arch
+        export LIB="$case_dir;$xwin/crt/lib/$xwin_arch;$xwin/sdk/lib/um/$xwin_arch"
+        export "${linker_var//-/_}=$ROOT/winxp-link.sh"
+        thunk --os xp "$@" --target "$triple"
+      )
+      [ -f "$rel/$file" ] || { echo "error: the winxp $arch build of $file failed" >&2; exit 1; }
+      check_xp_imports "$rel/$file" "$work/yy-thunks/Config/$yy_arch/$exports.txt"
+    }
+    xp_thunk gxgeo.dll --lib -- --release -p gxgeo --lib
+    xp_thunk gx.exe -- --release -p gxcli --bin gx
 
     # The imports in the x86 import library from lld-link have the name type "export as", which the
     # linkers of Visual C++ 2008 and older reject, so llvm-dlltool writes the import library from the
@@ -197,7 +209,24 @@ build_winxp() {
     mkdir -p "$dest"
     llvm-dlltool -m "$machine" -d "$def" -l "$dest/gxgeo.lib"
     cp "$rel/gxgeo.dll" "$HEADER" "$LIB_README" "$dest/"
+    mkdir -p "$OUT/winxp/$arch/bin"
+    cp "$rel/gx.exe" "$GX_README" "$OUT/winxp/$arch/bin/"
   done
+
+  # The Windows XP program, built with Visual Studio 2008 on the XP machine against the DLL just built.
+  # A running copy keeps gxgeo.dll open, which fails the build, so it is closed first.
+  echo "==> winxp gxpad (Visual Studio 2008 on the XP machine)"
+  local vm=$ROOT/winxp/vm remote=${XP_DIR:-'C:\gxpad'} out
+  remote=${remote#*:\\}
+  python3 "$vm/vm.py" run 'taskkill /f /im gxpad.exe >nul 2>&1 & echo closed' 30 >/dev/null \
+    || { echo "error: the Windows XP machine does not answer (see winxp/vm/README.md)" >&2; exit 1; }
+  out=$("$vm/build.sh" all rebuild 2>&1) || true
+  echo "$out" | grep -qE '\b1 Projects succeeded' \
+    || { echo "$out" | tail -20 >&2; echo "error: the Windows XP program did not build" >&2; exit 1; }
+  local bin=$OUT/winxp/x86/bin
+  rm -f "$bin/gxpad.exe"
+  python3 "$vm/vm.py" get "$remote/winxp/Release/gxpad.exe" "$bin/gxpad.exe"
+  cp "$OUT/winxp/x86/lib/gxgeo.dll" "$bin/"
 }
 
 for p in "${platforms[@]}"; do

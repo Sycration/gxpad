@@ -48,8 +48,9 @@ and needs no redistributable.
    ```
 
    The build writes `winxp/Release/gxpad.exe` and copies `gxgeo.dll` next to it.
-3. For a release, copy both files to `build/winxp/x86/bin`; `./release.sh` then packs them as
-   `gxpad-TAG-winxp-x86.zip`.
+3. For a release, both files go to `build/winxp/x86/bin`, where `./release.sh` packs them as
+   `gxpad-TAG-winxp-x86.zip`. `./build.sh winxp` does steps 1 to 3 itself, building the program on
+   the XP machine of `vm/`.
 
 `vm/` holds scripts that do these steps on a Windows XP virtual machine from the Linux machine that
 hosts it, and drive the program there to try it out; see [vm/README.md](vm/README.md).

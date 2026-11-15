@@ -7,11 +7,11 @@
 #   --publish  publishes the release immediately instead of creating a draft
 #   --dry-run  only writes the archives to build/dist, without creating a release
 #
-# Archives: gxpad-TAG-<platform>-<arch>.tar.gz (linux, macos), .zip (windows), gxgeo-TAG-web.tar.gz,
-# gxgeo-TAG-winxp-<arch>.zip, plus SHA256SUMS. Each one holds a top-level folder with bin/ and lib/ as in
-# build/ and LICENSE; the gxpad archives also hold the gxpad README.md (lib/ holds the gxgeo README.md, from
-# ./build.sh). When build/winxp/x86/bin holds gxpad.exe (built with Visual Studio 2008, see
-# winxp/README.md), its archive is gxpad-TAG-winxp-x86.zip with the README.md of winxp/.
+# Archives: gxpad-TAG-<platform>-<arch>.tar.gz (linux, macos), .zip (windows, and winxp x86 with the Windows XP
+# program), gxgeo-TAG-web.tar.gz, gxgeo-TAG-winxp-x64.zip (the gxgeo DLL and gx), plus SHA256SUMS. Each one
+# holds a top-level folder with bin/ and lib/ as in build/ and LICENSE; the gxpad archives also hold the gxpad
+# README.md, or for Windows XP the README.md of winxp/ (bin/ holds the gx README.md and lib/ the gxgeo
+# README.md, from ./build.sh).
 # The release tag points at the current commit, which must be clean and pushed. ./set-version.sh X.Y.Z
 # sets the version beforehand (the crates, and the VERSIONINFO of the Windows XP program).
 set -euo pipefail
@@ -42,6 +42,7 @@ targets=(linux/x64 linux/arm64 macos/x64 macos/arm64 windows/x64 windows/arm64 w
 for t in "${targets[@]}"; do
   [ -d "$BUILD/$t" ] || die "build/$t is missing, run ./build.sh first"
 done
+[ -f "$BUILD/winxp/x86/bin/gxpad.exe" ] || die "build/winxp/x86/bin/gxpad.exe is missing, run ./build.sh winxp"
 
 commit=$(git rev-parse HEAD)
 if [ $dry -eq 0 ]; then
