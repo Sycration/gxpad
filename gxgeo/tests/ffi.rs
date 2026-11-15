@@ -99,17 +99,7 @@ fn build_law_of_cosines_through_c_interface() {
         assert_eq!(gx_doc_solve(doc, std::ptr::null_mut()), 1);
 
         // the same document as the one the test wrote
-        let built: serde_json::Value = serde_json::from_str(&text(gx_doc_to_gxp(doc))).unwrap();
-        let file: serde_json::Value = serde_json::from_str(include_str!("law_of_cosines.gxp")).unwrap();
-        fn same(a: &serde_json::Value, b: &serde_json::Value) -> bool {
-            match (a, b) {
-                (serde_json::Value::Number(x), serde_json::Value::Number(y)) => (x.as_f64().unwrap() - y.as_f64().unwrap()).abs() < 1e-9,
-                (serde_json::Value::Array(x), serde_json::Value::Array(y)) => x.len() == y.len() && x.iter().zip(y).all(|(p, q)| same(p, q)),
-                (serde_json::Value::Object(x), serde_json::Value::Object(y)) => x.len() == y.len() && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| same(v, w))),
-                _ => a == b,
-            }
-        }
-        assert!(same(&built, &file));
+        assert_eq!(text(gx_doc_to_gxp(doc)), include_str!("law_of_cosines.gxp"));
 
         let f = gx_derive(doc, GX_TARGET_DIM, ang, 0, std::ptr::null());
         assert_eq!(text((*f).plain), "θ1 = acos((d1^2 + d3^2 - d2^2)/(2d1*d3))");
@@ -452,7 +442,10 @@ fn numeric_flags_through_c_interface() {
         let out = gx_doc_to_gxp(doc);
         let again = gx_doc_from_gxp(out);
         gx_string_free(out);
-        assert_eq!(gx_doc_dim_numeric(again, d), 1);
+        // (dimensions come back in the order of the file: found by name)
+        let name = text(gx_doc_dim_name(doc, d));
+        let d2 = (0..gx_doc_dim_count(again)).find(|&i| text(gx_doc_dim_name(again, i)) == name).unwrap();
+        assert_eq!(gx_doc_dim_numeric(again, d2), 1);
         gx_doc_free(again);
 
         // errors

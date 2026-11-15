@@ -31,7 +31,7 @@ mod demo {
 
     fn save(sk: &Sketch, name: &str) {
         if let Ok(dir) = std::env::var("GXGEO_DEMO_DIR") {
-            std::fs::write(format!("{dir}/{name}.gxp"), gxgeo::gxp::to_string(&sk.doc).unwrap()).unwrap();
+            std::fs::write(format!("{dir}/{name}.gxp"), gxgeo::gxp::to_string(&sk.doc)).unwrap();
         }
     }
 

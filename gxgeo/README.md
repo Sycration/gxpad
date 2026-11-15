@@ -160,9 +160,35 @@ internals; `Document::sketch` hands them to Rust code that needs them.
 
 ## Documents
 
-Documents are saved and loaded as `.gxp` text, a JSON encoding of the document:
-`gx_doc_to_gxp` / `gx_doc_from_gxp` in C, `toGxp` / `Doc.fromGxp` in JavaScript and
-`gxgeo::gxp` in Rust. A loaded document is solved before its values are read.
+Documents are saved and loaded as `.gxp` text: `gx_doc_to_gxp` / `gx_doc_from_gxp` in C,
+`toGxp` / `Doc.fromGxp` in JavaScript and `gxgeo::gxp` in Rust. A loaded document is solved
+before its values are read. The text states the construction one step per line, in an order it can
+be built in, and then the solved positions ([the format](../docs/gxp-format.md)):
+
+```
+gxp 2
+
+given
+  triangle ABC
+    d1: |AB| = 4
+    d2: |BC| = 3
+    d3: |CA| = 5
+
+construct
+  l1 = bisect(AB, AC)
+  l2 = bisect(BA, BC)
+  I = meet(l1, l2)
+
+find
+  r: dist(I, AB)
+
+where
+  A (0, 0)
+  ...
+```
+
+A document reads back as the same construction, with its entities, constraints and dimensions
+numbered in the order of the file.
 
 Every change is one undo step. A change made with several calls, such as adding two points and
 then a line between them, becomes one step by reading the length of the undo history before the

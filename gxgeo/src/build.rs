@@ -188,21 +188,10 @@ impl Doc {
         out
     }
 
-    /// The foci of conic c as points (two for an ellipse or hyperbola, one
-    /// for a parabola), creating them when missing.
-    pub fn build_foci(&mut self, c: usize) -> Vec<usize> {
-        let have = self.foci_of(c);
-        let want = match self.kind(c) {
-            Some(Ent::Conic { kind: ConicKind::Parabola, .. }) => 1,
-            Some(Ent::Conic { .. }) => 2,
-            _ => return vec![],
-        };
-        if have.len() >= want {
-            return have;
-        }
-        let Some((o, e1, e2, a, b, kind)) = self.conic_val(c) else { return vec![] };
-        let Some(Ent::Conic { c: ctr, .. }) = self.kind(c) else { return vec![] };
-        let ctr = *ctr;
+    /// Position of the first focus of conic c: on the major axis, on the
+    /// positive side of the center (the vertex of a parabola).
+    pub fn focus_pos(&self, c: usize) -> Option<[f64; 2]> {
+        let (o, e1, e2, a, b, kind) = self.conic_val(c)?;
         // focus offset from the center
         let off = match kind {
             ConicKind::Ellipse if a >= b => {
@@ -219,12 +208,30 @@ impl Doc {
             }
             ConicKind::Parabola => [a * e1[0], a * e1[1]],
         };
+        Some([o[0] + off[0], o[1] + off[1]])
+    }
+
+    /// The foci of conic c as points (two for an ellipse or hyperbola, one
+    /// for a parabola), creating them when missing.
+    pub fn build_foci(&mut self, c: usize) -> Vec<usize> {
+        let have = self.foci_of(c);
+        let want = match self.kind(c) {
+            Some(Ent::Conic { kind: ConicKind::Parabola, .. }) => 1,
+            Some(Ent::Conic { .. }) => 2,
+            _ => return vec![],
+        };
+        if have.len() >= want {
+            return have;
+        }
+        let Some(Ent::Conic { c: ctr, .. }) = self.kind(c) else { return vec![] };
+        let ctr = *ctr;
+        let (Some(o), Some(pf)) = (self.conic_val(c).map(|v| v.0), self.focus_pos(c)) else { return vec![] };
         let f1 = match have.first() {
             Some(&f) => f,
             None => {
-                let f = self.add_point(o[0] + off[0], o[1] + off[1]);
-                self.cons.push(Some(Con::Focus { p: f, c }));
-                f
+                let p = self.add_point(pf[0], pf[1]);
+                self.cons.push(Some(Con::Focus { p, c }));
+                p
             }
         };
         if want == 1 {
@@ -250,6 +257,17 @@ impl Doc {
         if let Some(l) = self.directrix_of(c, f) {
             return Some(l);
         }
+        let [p, q] = self.directrix_pts(c, f)?;
+        let p = self.add_helper(p[0], p[1]);
+        let q = self.add_helper(q[0], q[1]);
+        self.cons.push(Some(Con::Directrix { a: p, b: q, f, c }));
+        Some(self.add_ent(Ent::Line { a: p, b: q, infinite: true }))
+    }
+
+    /// Positions of the two points a directrix line of conic c runs through
+    /// (see [`Con::Directrix`]): its foot on the focal axis of focus f, and
+    /// the foot moved by f − center turned 90°.
+    pub fn directrix_pts(&self, c: usize, f: usize) -> Option<[[f64; 2]; 2]> {
         let (o, e1, e2, a, b, kind) = self.conic_val(c)?;
         let pf = self.pval(f);
         let df = [pf[0] - o[0], pf[1] - o[1]];
@@ -264,10 +282,7 @@ impl Doc {
             return None;
         }
         let foot = [o[0] + s * df[0], o[1] + s * df[1]];
-        let p = self.add_helper(foot[0], foot[1]);
-        let q = self.add_helper(foot[0] - df[1], foot[1] + df[0]);
-        self.cons.push(Some(Con::Directrix { a: p, b: q, f, c }));
-        Some(self.add_ent(Ent::Line { a: p, b: q, infinite: true }))
+        Some([foot, [foot[0] - df[1], foot[1] + df[0]]])
     }
 
     /// The directrix line of conic c belonging to focus f, when there is one.
