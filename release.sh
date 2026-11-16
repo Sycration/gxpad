@@ -7,11 +7,11 @@
 #   --publish  publishes the release immediately instead of creating a draft
 #   --dry-run  only writes the archives to build/dist, without creating a release
 #
-# Archives: sgpad-TAG-<platform>-<arch>.tar.gz (linux, macos), .zip (windows, and winxp x86 with the Windows XP
-# program), sggeo-TAG-web.tar.gz, sggeo-TAG-winxp-x64.zip (the sggeo DLL and sgcli), plus SHA256SUMS. Each one
-# holds a top-level folder with bin/ and lib/ as in build/ and LICENSE; the sgpad archives also hold the sgpad
-# README.md, or for Windows XP the README.md of sgpad/winxp/ (bin/ holds the sgcli README.md and lib/ the sggeo
-# README.md, from ./build.sh).
+# Archives: sg-TAG-<platform>-<arch>.tar.gz (linux, macos, web) or .zip (windows, winxp), one for each
+# directory of build/, plus SHA256SUMS. web-wasm32 holds only the sggeo Wasm module, winxp-x64 the sggeo DLL and
+# sgcli, and winxp-x86 the Windows XP program besides. Each one holds a top-level folder with bin/ and lib/ as in
+# build/ and LICENSE; the archives with sgpad also hold the README.md of the project, or for Windows XP the
+# README.md of sgpad/winxp/ (bin/ holds the sgcli README.md and lib/ the sggeo README.md, from ./build.sh).
 # The release tag points at the current commit, which must be clean and pushed. ./set-version.sh X.Y.Z
 # sets the version beforehand (the crates, and the VERSIONINFO of the Windows XP program).
 set -euo pipefail
@@ -60,19 +60,15 @@ trap 'rm -rf "$stage"' EXIT
 
 for t in "${targets[@]}"; do
   platform=${t%/*} arch=${t#*/}
-  case $platform in
-    web) name=sggeo-$tag-web ;;
-    winxp) if [ -f "$BUILD/$t/bin/sgpad.exe" ]; then name=sgpad-$tag-winxp-$arch; else name=sggeo-$tag-winxp-$arch; fi ;;
-    *) name=sgpad-$tag-$platform-$arch ;;
-  esac
+  name=sg-$tag-$platform-$arch
   mkdir -p "$stage/$name"
   cp -r "$BUILD/$t/." "$stage/$name/"
   cp LICENSE "$stage/$name/"
-  case $name in
-    sggeo-*) ;;
-    sgpad-*-winxp-*) cp sgpad/winxp/README.md "$stage/$name/" ;;
-    *) cp README.md "$stage/$name/" ;;
-  esac
+  if [ "$platform" = winxp ]; then
+    [ ! -f "$BUILD/$t/bin/sgpad.exe" ] || cp sgpad/winxp/README.md "$stage/$name/"
+  elif [ -d "$BUILD/$t/bin" ]; then
+    cp README.md "$stage/$name/"
+  fi
   if [ "$platform" = windows ] || [ "$platform" = winxp ]; then
     (cd "$stage" && bsdtar -a -cf "$DIST/$name.zip" "$name")
   else

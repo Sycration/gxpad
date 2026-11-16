@@ -49,7 +49,7 @@ and needs no redistributable.
 
    The build writes `sgpad/winxp/Release/sgpad.exe` and copies `sggeo.dll` next to it.
 3. For a release, both files go to `build/winxp/x86/bin`, where `./release.sh` packs them as
-   `sgpad-TAG-winxp-x86.zip`. `./build.sh winxp` does steps 1 to 3 itself, building the program on
+   `sg-TAG-winxp-x86.zip`. `./build.sh winxp` does steps 1 to 3 itself, building the program on
    the XP machine of `vm/`.
 
 `vm/` holds scripts that do these steps on a Windows XP virtual machine from the Linux machine that
