@@ -69,11 +69,80 @@ pub fn to_bx(e: &Expr, names: Names) -> Bx {
 }
 
 fn bx(e: &Expr, prec: u8, names: Names) -> Bx {
+    let e = &display_signs(e);
     if e.is_negative_form() {
         let inner = bx_pos(&neg(e.clone()), P_MUL, names);
         return wrap(Bx::Row(vec![Bx::Op("−".into()), inner]), prec > P_ADD);
     }
     bx_pos(e, prec, names)
+}
+
+/// A product with its sum factors (and reciprocals of sums) that have more
+/// negative than positive terms negated, in pairs or with the sign of the product, so that the
+/// product is positive where it can be: −x/((a + b − c)(a − b − c)) as
+/// x/((a + b − c)(b + c − a)). For display only: the canonical form puts the
+/// signs back (`pow`).
+fn display_signs(e: &Expr) -> Expr {
+    let Node::Mul(fs) = e.node() else { return e.clone() };
+    let flippable = |f: &Expr| {
+        let (b, k) = base_exp(f);
+        let Node::Add(ts) = b.node() else { return false };
+        // (other powers of the negated sum would go back through `pow`)
+        k.as_int().is_some_and(|k| k.abs() == 1) && 2 * ts.iter().filter(|t| t.is_negative_form()).count() > ts.len()
+    };
+    let k = fs.iter().filter(|f| flippable(f)).count();
+    let negative = fs[0].as_num().is_some_and(|n| n.is_neg());
+    // an odd number of flips changes the sign: only when it makes it positive
+    let flips = if (k % 2 == 1) == negative { k } else { k.saturating_sub(1) };
+    if flips == 0 {
+        return e.clone();
+    }
+    let mut left = flips;
+    let mut out: Vec<Expr> = Vec::new();
+    for f in fs {
+        if left > 0 && flippable(f) {
+            left -= 1;
+            let (b, x) = base_exp(f);
+            let nb = neg_sum(&b);
+            out.push(if x.is_one() { nb } else { Expr::raw(Node::Pow(nb, x)) });
+        } else {
+            out.push(f.clone());
+        }
+    }
+    if flips % 2 == 1 {
+        match out[0].as_num() {
+            Some(n) => out[0] = num(n.neg()),
+            None => out.insert(0, int(-1)),
+        }
+    }
+    Expr::raw(Node::Mul(out))
+}
+
+/// √(1/x) as the root √x to show under a fraction bar, when the radicand
+/// reads as 1/x (after `display_signs`). The result is for display only.
+fn root_of_reciprocal(f: &Expr) -> Option<Expr> {
+    let Node::Pow(b, ex) = f.node() else { return None };
+    if ex.as_rat().is_none_or(|r| r.n != 1 || r.d == 1) {
+        return None;
+    }
+    let b = display_signs(b);
+    let fs = match b.node() {
+        Node::Mul(fs) => fs.clone(),
+        _ => vec![b.clone()],
+    };
+    let mut den = Vec::new();
+    for f in &fs {
+        match f.node() {
+            Node::Num(n) if n.is_one() => {}
+            Node::Pow(x, k) if k.as_int().is_some_and(|k| k < 0) => {
+                let k = -k.as_int().unwrap();
+                den.push(if k == 1 { x.clone() } else { Expr::raw(Node::Pow(x.clone(), int(k))) });
+            }
+            _ => return None,
+        }
+    }
+    let x = if den.len() == 1 { den.pop().unwrap() } else { Expr::raw(Node::Mul(den)) };
+    Some(Expr::raw(Node::Pow(x, ex.clone())))
 }
 
 /// Approximate polynomial degree of a term, for display ordering.
@@ -125,8 +194,9 @@ fn bx_pos(e: &Expr, prec: u8, names: Names) -> Bx {
                 let f = Bx::Frac(Box::new(bx_pos(&scaled, 0, names)), Box::new(Bx::Num(l.to_string())));
                 return f;
             }
+            let ts: Vec<Expr> = ts.iter().map(display_signs).collect();
             let mut v = Vec::new();
-            for (i, t) in sorted_terms(ts).iter().enumerate() {
+            for (i, t) in sorted_terms(&ts).iter().enumerate() {
                 if t.is_negative_form() {
                     v.push(Bx::Op("−".into()));
                     v.push(bx_pos(&neg(t.clone()), P_ADD + 1, names));
@@ -153,6 +223,10 @@ fn bx_pos(e: &Expr, prec: u8, names: Names) -> Bx {
                         denom.push(pow(b.clone(), neg(ex.clone())));
                         continue;
                     }
+                }
+                if let Some(r) = root_of_reciprocal(f) {
+                    denom.push(r);
+                    continue;
                 }
                 numer.push(f.clone());
             }
@@ -235,6 +309,9 @@ fn bx_pos(e: &Expr, prec: u8, names: Names) -> Bx {
             }
         }
         Node::Pow(b, ex) => {
+            if let Some(r) = root_of_reciprocal(e) {
+                return Bx::Frac(Box::new(Bx::Num("1".into())), Box::new(bx_pos(&r, 0, names)));
+            }
             if let Some(r) = ex.as_rat() {
                 if r.n < 0 {
                     let inv = pow(b.clone(), num(Num::R(r.neg())));

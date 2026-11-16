@@ -1,6 +1,6 @@
 [package]
 name = "sggeo"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 description = "Geometry model, constraint solver, and closed-form formula derivation for 2D geometric constructions"
 license = "GPL-3.0-or-later"

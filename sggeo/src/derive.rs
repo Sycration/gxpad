@@ -1897,7 +1897,254 @@ impl<'a> BlockSolver<'a> {
 }
 
 pub fn simplify_result(e: &Expr) -> Expr {
-    deep_best(e)
+    let s = deep_best(e);
+    // a sum kept under one root with others can cancel against the rest
+    // when on its own: √(a·b)/a = √b/√a
+    // (only where such a sum occurs outside the root as well)
+    let s = if past_deadline() || !root_sum_elsewhere(&s) {
+        s
+    } else {
+        let sp = split_roots(&s);
+        let t = deep_best(&sp);
+        if complexity(&t) < complexity(&s) { t } else { s }
+    };
+    divided(s)
+}
+
+/// A sum under a root of a product (kept there by `pow`) that is also a
+/// factor, or the base of a power, outside that root.
+fn root_sum_elsewhere(e: &Expr) -> bool {
+    // (sums under roots of products, and sums that are bases elsewhere)
+    fn walk(e: &Expr, under: &mut Vec<Expr>, bases: &mut Vec<Expr>) {
+        match e.node() {
+            Node::Num(_) | Node::Pi | Node::Sym(_) => {}
+            Node::Add(ts) => ts.iter().for_each(|t| walk(t, under, bases)),
+            Node::Mul(fs) => {
+                for f in fs {
+                    let (b, _) = base_exp(f);
+                    if matches!(b.node(), Node::Add(_)) {
+                        bases.push(b);
+                    }
+                    walk(f, under, bases);
+                }
+            }
+            Node::Pow(b, x) => {
+                if let (Node::Mul(fs), None) = (b.node(), x.as_int()) {
+                    for f in fs {
+                        let (fb, _) = base_exp(f);
+                        if matches!(fb.node(), Node::Add(_)) {
+                            under.push(fb);
+                        }
+                    }
+                    fs.iter().for_each(|g| walk(&base_exp(g).0, under, bases));
+                    return;
+                }
+                walk(b, under, bases);
+            }
+            Node::Fun(_, a) => walk(a, under, bases),
+            Node::Atan2(a, b) => {
+                walk(a, under, bases);
+                walk(b, under, bases);
+            }
+        }
+    }
+    let (mut under, mut bases) = (Vec::new(), Vec::new());
+    walk(e, &mut under, &mut bases);
+    under.iter().any(|u| bases.contains(u))
+}
+
+/// `e` with its quotients divided out (`divide_out`) where that is clearly
+/// smaller: a fraction only a little smaller reads worse than the quotient as
+/// it was ((a² − b²)/(a² + b²) rather than 1 − 2b²/(a² + b²)).
+fn divided(e: Expr) -> Expr {
+    if past_deadline() || e.size() > 1500 {
+        return e;
+    }
+    let d = divide_out(&e);
+    if better_divided(&d, &e) { d } else { e }
+}
+
+/// `d` clearly smaller than `e`, or no larger with fewer divisions (a
+/// fraction inside a fraction gone).
+fn better_divided(d: &Expr, e: &Expr) -> bool {
+    // (fraction bars: a product counts once however many factors its denominator has)
+    fn inverse(e: &Expr) -> Option<&Expr> {
+        match e.node() {
+            Node::Pow(b, x) if x.as_num().is_some_and(|n| n.is_neg()) => Some(b),
+            _ => None,
+        }
+    }
+    fn divisions(e: &Expr) -> usize {
+        match e.node() {
+            Node::Num(_) | Node::Pi | Node::Sym(_) => 0,
+            Node::Add(ts) => ts.iter().map(divisions).sum(),
+            Node::Mul(ts) => {
+                let bar = ts.iter().any(|t| inverse(t).is_some());
+                usize::from(bar) + ts.iter().map(|t| inverse(t).map_or_else(|| divisions(t), divisions)).sum::<usize>()
+            }
+            Node::Pow(b, x) => divisions(b) + usize::from(x.as_num().is_some_and(|n| n.is_neg())),
+            Node::Fun(_, a) => divisions(a),
+            Node::Atan2(a, b) => divisions(a) + divisions(b),
+        }
+    }
+    let (cd, ce) = (complexity(d), complexity(e));
+    10 * cd <= 8 * ce || (cd <= ce && divisions(d) < divisions(e))
+}
+
+/// Each quotient of polynomials as a polynomial part plus a proper fraction
+/// where that is smaller, with square roots multiplied together first taken
+/// under one root: √(−N/Π)/√(a + b + c), with N = (a² + b² + c²)·Π' − 9a²b²c²
+/// of degree 6 and Π' the Heron product, becomes √(9a²b²c²/Π' − a² − b² − c²).
+fn divide_out(e: &Expr) -> Expr {
+    if past_deadline() {
+        return e.clone();
+    }
+    // a rational function is divided as a whole: its parts divided on their
+    // own would leave fractions inside fractions
+    if rational(e) {
+        return quotient_form(e).filter(|q| better_divided(q, e)).unwrap_or_else(|| e.clone());
+    }
+    let r = match e.node() {
+        Node::Num(_) | Node::Pi | Node::Sym(_) => return e.clone(),
+        Node::Add(ts) => add(ts.iter().map(divide_out).collect()),
+        Node::Mul(ts) => mul(ts.iter().map(divide_out).collect()),
+        Node::Pow(b, x) => pow(divide_out(b), x.clone()),
+        Node::Fun(f, a) => fun(*f, divide_out(a)),
+        Node::Atan2(a, b) => atan2(divide_out(a), divide_out(b)),
+    };
+    // a root of a rational function over one denominator, both sides
+    // factored: c² − (a² + c² − b²)²/(4a²) is Π/(4a²) with Π the Heron product,
+    // and the 2a it gives can cancel against the rest of a product
+    let r = match r.node() {
+        Node::Pow(..) => factored_root(&r).filter(|c| complexity(c) < complexity(&r)).unwrap_or(r),
+        Node::Mul(fs) => {
+            let mut best = r.clone();
+            for i in 0..fs.len() {
+                let Some(f) = factored_root(&fs[i]) else { continue };
+                let mut k = fs.clone();
+                k[i] = f;
+                let c = mul(k);
+                if complexity(&c) < complexity(&best) {
+                    best = c;
+                }
+            }
+            best
+        }
+        _ => r,
+    };
+    // √x·√y = √(xy) and √x/√y = √(x/y) wherever both roots are real
+    let Node::Mul(fs) = r.node() else { return r };
+    let half = |f: &Expr| match f.node() {
+        Node::Pow(b, x) => x.as_rat().filter(|q| q.d == 2).map(|q| (b.clone(), q.n)),
+        _ => None,
+    };
+    let roots: Vec<(Expr, i128)> = fs.iter().filter_map(half).collect();
+    if roots.len() < 2 {
+        return r;
+    }
+    let rad = mul(roots.iter().map(|(b, k)| pow(b.clone(), int(*k as i64))).collect());
+    // (a product under the root would be split again by `pow`)
+    let Some(q) = quotient_form(&rad).filter(|q| !matches!(q.node(), Node::Mul(_))) else { return r };
+    let mut rest: Vec<Expr> = fs.iter().filter(|f| half(f).is_none()).cloned().collect();
+    rest.push(pow(q, num(Num::R(Rat::new(1, 2).unwrap()))));
+    let c = mul(rest);
+    if better_divided(&c, &r) { c } else { r }
+}
+
+/// A root (x^(k/2)) of a rational function with its numerator and
+/// denominator factored (see `divide_out`).
+fn factored_root(e: &Expr) -> Option<Expr> {
+    let Node::Pow(b, x) = e.node() else { return None };
+    if x.as_rat().is_none_or(|q| q.d != 2) || !rational(b) || b.size() > 400 {
+        return None;
+    }
+    let mut vars: Vec<u32> = sym_set(b).into_iter().collect();
+    vars.sort();
+    let (n, d) = split_frac(b, &vars);
+    let (n, d) = (expand(&n), expand(&d));
+    let (fnn, fd) = (factor_poly(&n), factor_poly(&d));
+    if fnn.is_none() && fd.is_none() {
+        return None;
+    }
+    Some(pow(div(fnn.unwrap_or(n), fd.unwrap_or(d)), x.clone()))
+}
+
+/// Built from symbols and rational numbers by sums, products and integer powers.
+fn rational(e: &Expr) -> bool {
+    match e.node() {
+        Node::Num(Num::R(_)) | Node::Sym(_) => true,
+        Node::Add(ts) | Node::Mul(ts) => ts.iter().all(rational),
+        Node::Pow(b, x) => x.as_int().is_some() && rational(b),
+        _ => false,
+    }
+}
+
+/// A rational function N/D in its symbols as Q + R/D, N = Q·D + R, from the
+/// division of N by D with one variable leading (the smallest result over the
+/// choice of variable); R and D written as products where `factor_sums` can.
+fn quotient_form(e: &Expr) -> Option<Expr> {
+    if e.size() > 600 {
+        return None;
+    }
+    let mut vars: Vec<u32> = sym_set(e).into_iter().collect();
+    vars.sort();
+    if vars.is_empty() {
+        return None;
+    }
+    let (n, d) = split_frac(e, &vars);
+    if d.is_one() {
+        return None;
+    }
+    let mut ctx = PolyCtx::new(&vars);
+    if !ctx.collect(&n) || !ctx.collect(&d) || !ctx.atoms.is_empty() {
+        return None;
+    }
+    let (np, dp) = (ctx.to_mpoly(&n)?, ctx.to_mpoly(&d)?);
+    if dp.is_const() || np.terms() > 400 || dp.terms() > 200 {
+        return None;
+    }
+    let mut best: Option<Expr> = None;
+    for v in 0..dp.n {
+        if !dp.uses(v) || np.deg(v) < dp.deg(v) || past_deadline() {
+            continue;
+        }
+        let Some((qp, rp)) = divide_lead(&np, &dp, v) else { continue };
+        if qp.is_zero() {
+            continue;
+        }
+        let frac = if rp.is_zero() { zero() } else { div(factor_sums(&ctx.to_expr(&rp)), factor_sums(&ctx.to_expr(&dp))) };
+        let c = add(vec![ctx.to_expr(&qp), frac]);
+        if best.as_ref().is_none_or(|b| complexity(&c) < complexity(b)) {
+            best = Some(c);
+        }
+    }
+    best
+}
+
+/// Division of `n` by `d` in the lexicographic order with variable `v` first:
+/// n = q·d + r, no term of r divisible by the leading term of d.
+fn divide_lead(n: &MPoly, d: &MPoly, v: usize) -> Option<(MPoly, MPoly)> {
+    let key = |m: &Vec<u16>| (m[v], m.clone());
+    let lead = |p: &MPoly| p.t.iter().max_by_key(|(m, _)| key(m)).map(|(m, c)| (m.clone(), c.clone()));
+    let (dm, dc) = lead(d)?;
+    let (mut p, mut q, mut r) = (n.clone(), MPoly::zero(n.n), MPoly::zero(n.n));
+    let mut steps = 0;
+    while let Some((m, c)) = lead(&p) {
+        steps += 1;
+        if steps > 2000 || p.terms() > 2000 || past_deadline() {
+            return None;
+        }
+        if m.iter().zip(&dm).all(|(a, b)| a >= b) {
+            let mut t = MPoly::zero(n.n);
+            t.add_term(m.iter().zip(&dm).map(|(a, b)| a - b).collect(), c / &dc);
+            p = p.sub(&t.mul(d));
+            q = q.add(&t);
+        } else {
+            p.t.remove(&m);
+            r.add_term(m, c);
+        }
+    }
+    Some((q, r))
 }
 
 fn zero_abs(e: &Expr, env: &Env, out: &mut Vec<Expr>) {
@@ -2113,21 +2360,34 @@ fn factor_sums(e: &Expr) -> Expr {
         Node::Atan2(a, b) => atan2(factor_sums(a), factor_sums(b)),
     };
     let Node::Add(ts) = r.node() else { return r };
-    if ts.len() < 3 || r.size() > 2000 {
+    if ts.len() < 3 {
         return r;
     }
-    let mut vars: Vec<u32> = sym_set(&r).into_iter().collect();
+    // a product only a little smaller reads worse than the sum
+    match factor_poly(&r) {
+        Some(f) if 10 * complexity(&f) <= 7 * complexity(&r) => f,
+        _ => r,
+    }
+}
+
+/// The polynomial `r` (in symbols only) as a product of its factors over Q,
+/// with multiplicities; None when it has fewer than two.
+fn factor_poly(r: &Expr) -> Option<Expr> {
+    if r.size() > 2000 || past_deadline() {
+        return None;
+    }
+    let mut vars: Vec<u32> = sym_set(r).into_iter().collect();
     vars.sort();
     let mut ctx = PolyCtx::new(&vars);
-    if vars.is_empty() || !ctx.collect(&r) || !ctx.atoms.is_empty() {
-        return r;
+    if vars.is_empty() || !ctx.collect(r) || !ctx.atoms.is_empty() {
+        return None;
     }
-    let Some(p) = ctx.to_mpoly(&r) else { return r };
+    let p = ctx.to_mpoly(r)?;
     let all: Vec<usize> = (0..p.n).filter(|&v| p.uses(v)).collect();
-    let Some(main) = cheapest_main(&p, &all) else { return r };
+    let main = cheapest_main(&p, &all)?;
     let fs = factor_main(&p, main);
     if fs.iter().filter(|f| !f.is_const()).count() < 2 || past_deadline() {
-        return r;
+        return None;
     }
     // the factors carry p's content only up to a constant, and each stands
     // for all its powers; each factor gets the sign with more positive terms
@@ -2139,12 +2399,12 @@ fn factor_sums(e: &Expr) -> Expr {
             c = h;
             fs_m.push(f);
             if fs_m.len() > 64 {
-                return r;
+                return None;
             }
         }
     }
     if !c.is_const() {
-        return r;
+        return None;
     }
     let mut parts: Vec<Expr> = Vec::new();
     for f in fs_m {
@@ -2166,9 +2426,7 @@ fn factor_sums(e: &Expr) -> Expr {
         }
     }
     parts.push(ctx.to_expr(&c));
-    // a product only a little smaller reads worse than the sum
-    let f = mul(parts);
-    if 10 * complexity(&f) <= 7 * complexity(&r) { f } else { r }
+    Some(mul(parts))
 }
 
 /// Pulls the factor shared by all terms out of each sum where that does not
@@ -3497,6 +3755,11 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
         }
     } else {
         result
+    };
+    // (a normal form much smaller than the substituted formula has not been through `simplify_result`)
+    let result = {
+        set_deadline(Some(work_now() + scaled(100)));
+        divided(result)
     };
     // factored sums only help a formula small enough to read
     let result = if result.size() < 1500 {

@@ -80,10 +80,22 @@ samples (1.3) looks for a simpler relation; the smallest formula is kept.
        parameters (`same_function`), or, without an exact block formula, with numeric re-solves
        of the construction (`agrees_when_perturbed`);
    - the smallest of the block, fitted and direct formulas is kept;
-   - `simplify_result` (= `deep_best`), `fourier_best`, half angles (`half_angles`, and the
-     normal form again when the formula then has θ and θ/2), `factor_sums` (polynomial sums
-     replaced by products, with multiplicities, when at most 70% of the size),
-     `settle_zero_abs`, `settle_branch`.
+   - `simplify_result` (`deep_best`, then `divided`), `fourier_best`, half angles
+     (`half_angles`, and the normal form again when the formula then has θ and θ/2),
+     `divided` again (a normal form much smaller than the substituted formula has not been
+     through `simplify_result`), `factor_sums` (polynomial sums replaced by products, with
+     multiplicities, when at most 70% of the size), `settle_zero_abs`, `settle_branch`.
+   - `divided` (`divide_out`): square roots multiplied together go under one root, and each
+     rational function N/D becomes Q + R/D with N = Q·D + R from the division with one
+     variable leading (each tried; R and D factored by `factor_sums`). A rational function
+     is divided as a whole, never in parts. The result is kept when it is at most 80% of the
+     complexity, or no larger with fewer fraction bars. This is what writes the Euler line
+     as √(9a²b²c²/Π − a² − b² − c²) (Π the Heron product) instead of a degree-6 numerator
+     over Π split into two roots. `simplify_result` also runs on block results, so block
+     results reach later blocks divided too. A root of a rational function is also tried
+     over one denominator with both sides factored (`factored_root`, `factor_poly`), in
+     the product around it, where the factors can cancel: a·√(c² − (a² + c² − b²)²/(4a²))
+     /(a + b + c) is √((a + b − c)(a − b + c)(b + c − a)/(a + b + c))/2.
 
 ### 1.3 Fit to samples (`fit.rs`, `dd.rs`)
 
@@ -168,7 +180,18 @@ flattening, rational arithmetic, collecting like terms, sorting into a canonical
 `deep_best` works bottom-up, and at each node `best_form` produces several candidate forms
 (expanded, Pythagoras-reduced by `trig_best`, over a common denominator by `rationalize_pass`,
 factored by `factor_common`, cancelled by `cancel_fraction`) and keeps the one with the smallest
-`complexity` (a node count).
+`complexity` (a node count, in which a coefficient −1 counts as a minus sign: −c costs 4, c 2).
+
+`pow` takes numbers, symbols and monomials that are non-negative out of a root of a product,
+but keeps sums (odd powers of them) under it with the rest: the Heron product stays one root.
+`split_roots` takes such sums out again: the normal form gets its input that way (separate
+roots keep its inverses small), and `simplify_result` tries it too where such a sum also
+occurs outside the root (√(a·b)/a = √b/√a).
+
+The display (`bx.rs`) shows a product's sum factors that have more negative than positive
+terms negated, in pairs or with the product's sign (`display_signs`): `(d2 + d3 − d1)`
+rather than `−(d1 − d2 − d3)`, which the canonical form would undo. A root of a reciprocal is
+shown as 1 over the root (`root_of_reciprocal`).
 
 `trig_linearize` gives the Fourier form of a polynomial in sines and cosines: products and powers
 become sums of sin and cos of angle sums. That form is canonical for trigonometric polynomials,
@@ -275,7 +298,7 @@ Lengths in characters, times single-threaded (release build):
 | `fermat_point` d5–d7 | 370–371 | 0.2 s | Normal form. |
 | `pedal_triangle_sides` d6 | 330 | 0.2 s | Normal form. |
 | `four_bar_floating_distances` d6 | 324 | 0.2 s | Normal form. |
-| `quadratic_fit_solved_coefficients` y_F | 323 | 0.2 s | Normal form (a rational function). |
+| `quadratic_fit_solved_coefficients` d1 | 226 | 0.2 s | Normal form; a root of a discriminant. |
 | `simson_feet_distance` d5, d7 | 291 / 292 | 0.5 s | Normal form. |
 | `confocal_orthogonal` θ1 | 264 | 0.4 s | Normal form of the cosine; the angle is π/2 (not recognized). |
 | `varignon_other_diagonal` d6 | 142 | 0.1 s | Normal form. |
@@ -330,6 +353,38 @@ The normal form's limits:
 Possible directions: a polynomial gcd (so that denominators need no factoring); a Fourier
 basis for the trigonometric part; earlier block results as symbols with their minimal
 polynomials in later blocks; sparse interpolation in the fit.
+
+Measured (2026-11): for the linkages the normal form is not short of time but larger than the
+substituted formula, so none of the speed directions above shortens them:
+
+- `peaucellier_inversor_fixed_axis`: the normal form of the whole formula completes, with
+  complexity 5,410 against 996 substituted (and −∞ at the current configuration: a
+  denominator vanishes at equal bars). The "power too large" lines in the log are the 60 ms
+  block-level attempts running out of time, not the final one.
+- `four_bar_coupler_triangle_point`: 759 → 990 and 646 → 659.
+- Taking the normal form one level of the tower at a time (each radicand, and then the
+  whole, with roots nested deeper held as symbols) changed no formula of the suite: already
+  one level with only the two Heron roots as generators grows from 394 to 1,437. Expanded
+  polynomials over a common denominator are longer than the nested fractions that
+  substitution leaves, and those fractions are close to the hand-written formula (see the
+  Maxima figures above).
+
+What is left for these formulas is their arrangement, not their normal form:
+
+- Named intermediate quantities. The app (sgpad, the XP pane and sgweb) shows a formula as
+  `latex_short` and the definitions `u_1 = …`, … from `expr::cse`: repeated subexpressions
+  (sums of symbols only from 10 nodes, so a Heron factor stays in place), then, while the
+  formula is longer than 60 nodes, its largest once-used roots and sums up to half its size,
+  numbered in reading order (each definition uses only earlier ones).
+  `peaucellier_inversor_rotating` shows as 7 rows of 395 characters in all instead of 2,126.
+- The target's own form, tried and not kept (2026-11): a distance |PQ| through a point R at
+  driving distances from both, |PQ|² = |PR|² + |RQ|² + 2(R − P)·(Q − R), with Q − R taken
+  as the offset from the circle centre where Q was found on two circles
+  (`solve_circle_circle`). For the rotating linkage that gives 1,849 against 1,836 through C
+  (2,026 through D), and it changed no other formula of the suite. The short hand-written
+  form goes through A, the rhombus centre, where |AB| is a diagonal and not a dimension: it
+  needs B computed in a frame centred on A (a grounding chosen for the target), not a
+  rewriting of the distance.
 
 ### 2.2 Fit limits
 
@@ -387,8 +442,7 @@ This is what produces the long formulas of 2.1 when the fit finds nothing:
   reaches the final formula through the block path gets only the heuristic simplifier.
 - **Greedy local simplification** by node count: the result depends on the order of
   construction. Canonical ordering undoes chosen signs (`d2 + d3 − d1` comes back as
-  `−(d1 − d2 − d3)`); `pow` over a product splits off non-negative factors, which separates a
-  Heron product into two roots.
+  `−(d1 − d2 − d3)`); only the display chooses them again (1.5).
 - **Numeric identity tests** (`fold_constants`, `same_function`, `Env::is_zero`) use a few
   perturbations in f64 with fixed tolerances.
 

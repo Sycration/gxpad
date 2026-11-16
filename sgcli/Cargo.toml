@@ -1,6 +1,6 @@
 [package]
 name = "sgcli"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 description = "An interactive command line for sgpad's geometry, in the statements of the .sgp format"
 license = "GPL-3.0-or-later"
