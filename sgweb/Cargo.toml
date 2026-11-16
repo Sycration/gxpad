@@ -1,6 +1,6 @@
 [package]
 name = "sgweb"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 description = "A web app for constructing 2D geometry with constraints and deriving closed-form formulas, served from one binary"
 license = "GPL-3.0-or-later"

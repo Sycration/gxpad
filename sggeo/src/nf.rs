@@ -1312,6 +1312,7 @@ pub(crate) fn normal_form(e: &Expr, env: &dyn Fn(u32) -> f64) -> Option<Expr> {
 /// Like [`normal_form`], with elements of up to `terms` polynomial terms
 /// (a longer search takes more).
 pub(crate) fn normal_form_sized(e: &Expr, env: &dyn Fn(u32) -> f64, terms: usize) -> Option<Expr> {
+    let e = &crate::expr::split_roots(e);
     MAX_TERMS_NOW.with(|c| c.set(terms));
     let mut seen = BTreeSet::new();
     count_atoms(e, &mut seen);

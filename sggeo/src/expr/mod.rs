@@ -681,7 +681,38 @@ pub fn add(terms: Vec<Expr>) -> Expr {
     }
 }
 
-fn base_exp(f: &Expr) -> (Expr, Expr) {
+/// `e` with the non-negative sums that `pow` keeps under a root with the
+/// rest of a product taken out as roots of their own: √(p·q) as √p·√q. The
+/// normal form (`nf`) keeps its inverses smaller with such roots apart.
+pub fn split_roots(e: &Expr) -> Expr {
+    match e.node() {
+        Node::Num(_) | Node::Pi | Node::Sym(_) => e.clone(),
+        Node::Add(ts) => add(ts.iter().map(split_roots).collect()),
+        Node::Mul(ts) => mul(ts.iter().map(split_roots).collect()),
+        Node::Pow(b, x) => {
+            let b = split_roots(b);
+            if let (Node::Mul(fs), Some(_), None) = (b.node(), x.as_num(), x.as_int()) {
+                let (out, rest): (Vec<Expr>, Vec<Expr>) = fs.iter().cloned().partition(|f| is_nonneg(f) && odd_sum(f));
+                if !out.is_empty() {
+                    let mut parts: Vec<Expr> = out.into_iter().map(|f| pow(f, x.clone())).collect();
+                    parts.push(pow(mul(rest), x.clone()));
+                    return mul(parts);
+                }
+            }
+            pow(b, x.clone())
+        }
+        Node::Fun(f, a) => fun(*f, split_roots(a)),
+        Node::Atan2(a, b) => atan2(split_roots(a), split_roots(b)),
+    }
+}
+
+/// A sum, or an odd power of one.
+fn odd_sum(f: &Expr) -> bool {
+    let (b, k) = base_exp(f);
+    matches!(b.node(), Node::Add(_)) && k.as_int().is_some_and(|k| k % 2 != 0)
+}
+
+pub(crate) fn base_exp(f: &Expr) -> (Expr, Expr) {
     match f.node() {
         Node::Pow(b, e) => (b.clone(), e.clone()),
         _ => (f.clone(), one()),
@@ -947,7 +978,9 @@ pub fn pow(b: Expr, e: Expr) -> Expr {
                         if !a.is_one() {
                             nn.push(num(a));
                         }
-                    } else if is_nonneg(f) {
+                    // (a sum stays under the root with the rest: √(−(a + b − c)(a − b + c)(a − b − c)(a + b + c)),
+                    // not √(−(a + b − c)(a − b + c)(a − b − c))·√(a + b + c))
+                    } else if is_nonneg(f) && !odd_sum(f) {
                         nn.push(f.clone());
                     } else {
                         rest.push(f.clone());
@@ -1576,6 +1609,8 @@ fn complexity_rec(e: &Expr) -> usize {
         Node::Num(Num::R(r)) => 2 + digits(r.n) + if r.d != 1 { digits(r.d) + 1 } else { 0 },
         Node::Num(Num::F(_)) => 12,
         Node::Pi | Node::Sym(_) => 2,
+        // (a coefficient −1 is a minus sign: −c costs about what c does)
+        Node::Mul(v) if v[0].as_num().is_some_and(|n| n.neg().is_one()) => 2 + v[1..].iter().map(complexity_rec).sum::<usize>(),
         Node::Add(v) | Node::Mul(v) => 1 + v.iter().map(complexity_rec).sum::<usize>(),
         Node::Pow(a, b) => 1 + complexity_rec(a) + complexity_rec(b),
         Node::Atan2(a, b) => 3 + complexity_rec(a) + complexity_rec(b),
@@ -2372,13 +2407,28 @@ impl Code {
 
 // ---------------------------------------------------------------- CSE for display
 
-/// Extracts repeated large subexpressions into named temporaries.
-/// Returns the reduced expression and (symbol, definition) pairs in dependency order.
+/// Extracts repeated large subexpressions into named temporaries, and
+/// then, while the formula is still long, large roots and sums that occur
+/// once (the "where u = √(…)" of a written derivation). Returns the reduced
+/// expression and (symbol, definition) pairs in reading order: symbols
+/// numbered from `first_sym` in that order, each definition using only the
+/// ones before it.
 pub fn cse(e: &Expr, first_sym: u32, max_defs: usize) -> (Expr, Vec<(u32, Expr)>) {
     let mut defs: Vec<(u32, Expr)> = Vec::new();
     let mut cur = e.clone();
     let mut next = first_sym;
-    for _ in 0..max_defs {
+    // (a short sum of symbols reads better in place than as a name: d2 + d4 − d5)
+    let worth = |x: &Expr| x.size() >= if is_plain_poly(x) { 10 } else { 6 };
+    let mut extract = |pat: Expr, cur: &mut Expr, defs: &mut Vec<(u32, Expr)>| {
+        let s = sym(next);
+        *cur = replace(cur, &pat, &s);
+        for d in defs.iter_mut() {
+            d.1 = replace(&d.1, &pat, &s);
+        }
+        defs.push((next, pat));
+        next += 1;
+    };
+    while defs.len() < max_defs {
         if cur.size() < 40 && defs.iter().map(|d| d.1.size()).sum::<usize>() < 40 {
             break;
         }
@@ -2389,20 +2439,20 @@ pub fn cse(e: &Expr, first_sym: u32, max_defs: usize) -> (Expr, Vec<(u32, Expr)>
         }
         let best = counts
             .into_iter()
-            .filter(|(x, c)| *c >= 2 && x.size() >= 6)
+            .filter(|(x, c)| *c >= 2 && worth(x))
             .max_by_key(|(x, c)| (x.size() * (*c - 1), x.size()));
         let Some((pat, _)) = best else { break };
-        let s = sym(next);
-        cur = replace(&cur, &pat, &s);
-        for d in defs.iter_mut() {
-            d.1 = replace(&d.1, &pat, &s);
-        }
-        defs.push((next, pat));
-        next += 1;
+        extract(pat, &mut cur, &mut defs);
     }
-    // definitions reference only earlier ones after reversing (later extractions are smaller/outer)
+    while defs.len() < max_defs && cur.size() > 60 {
+        let mut parts = Vec::new();
+        large_parts(&cur, cur.size() / 2, &mut parts);
+        let Some(pat) = parts.into_iter().filter(|r| r.size() >= if is_root_node(r) { 16 } else { 25 }).max_by_key(|r| r.size()) else { break };
+        extract(pat, &mut cur, &mut defs);
+    }
+    // reading order: each definition after the ones it uses (later extractions
+    // are smaller or outer, so the reverse is close)
     defs.reverse();
-    // order definitions so each only refers to previous ones
     let mut ordered: Vec<(u32, Expr)> = Vec::new();
     let mut remaining = defs;
     while !remaining.is_empty() {
@@ -2412,7 +2462,54 @@ pub fn cse(e: &Expr, first_sym: u32, max_defs: usize) -> (Expr, Vec<(u32, Expr)>
             .unwrap_or(0);
         ordered.push(remaining.remove(idx));
     }
+    // numbered in that order
+    let tmp = |i: usize| sym(first_sym.wrapping_add(0x0800_0000).wrapping_add(i as u32));
+    for (i, (s, _)) in ordered.clone().iter().enumerate() {
+        cur = replace(&cur, &sym(*s), &tmp(i));
+        for d in ordered.iter_mut() {
+            d.1 = replace(&d.1, &sym(*s), &tmp(i));
+        }
+    }
+    for i in 0..ordered.len() {
+        let s = sym(first_sym + i as u32);
+        cur = replace(&cur, &tmp(i), &s);
+        for d in ordered.iter_mut() {
+            d.1 = replace(&d.1, &tmp(i), &s);
+        }
+        ordered[i].0 = first_sym + i as u32;
+    }
     (cur, ordered)
+}
+
+/// A polynomial in symbols: no roots, functions or reciprocals.
+fn is_plain_poly(e: &Expr) -> bool {
+    match e.node() {
+        Node::Num(_) | Node::Pi | Node::Sym(_) => true,
+        Node::Add(ts) | Node::Mul(ts) => ts.iter().all(is_plain_poly),
+        Node::Pow(b, x) => x.as_int().is_some_and(|k| k > 0) && is_plain_poly(b),
+        _ => false,
+    }
+}
+
+fn is_root_node(e: &Expr) -> bool {
+    matches!(e.node(), Node::Pow(_, x) if x.as_rat().is_some_and(|q| q.d == 2 && q.n == 1))
+}
+
+/// The square roots and sums in `e` of at most `max` nodes, outermost first.
+fn large_parts(e: &Expr, max: usize, out: &mut Vec<Expr>) {
+    if (is_root_node(e) || matches!(e.node(), Node::Add(_))) && e.size() <= max {
+        out.push(e.clone());
+        return;
+    }
+    match e.node() {
+        Node::Num(_) | Node::Pi | Node::Sym(_) => {}
+        Node::Add(ts) | Node::Mul(ts) => ts.iter().for_each(|t| large_parts(t, max, out)),
+        Node::Pow(a, b) | Node::Atan2(a, b) => {
+            large_parts(a, max, out);
+            large_parts(b, max, out);
+        }
+        Node::Fun(_, a) => large_parts(a, max, out),
+    }
 }
 
 fn count_subs(e: &Expr, counts: &mut BTreeMap<Expr, usize>) {
@@ -2600,5 +2697,42 @@ mod fourier_tests {
         let e = p("sqrt((u*cos(a) + v*cos(a)*cos(b) - v*sin(a)*sin(b))^2 + (u*sin(a) + v*sin(a)*cos(b) + v*cos(a)*sin(b))^2)");
         let f = fourier_best(&e);
         assert_eq!(show(&f), "sqrt(2u*v*cos(b) + u^2 + v^2)");
+    }
+}
+
+#[cfg(test)]
+mod cse_tests {
+    use super::*;
+
+    fn p(s: &str) -> Expr {
+        let names = ["a", "b", "c", "d"];
+        parse::parse(s, &|n: &str| names.iter().position(|x| *x == n).map(|i| sym(i as u32))).unwrap()
+    }
+
+    #[test]
+    fn definitions_in_reading_order() {
+        // a nested root used twice inside a larger one used twice
+        let inner = "sqrt((a + b + c)*(a + b - c)*(a + c - b)*(b + c - a))";
+        let outer = format!("sqrt(d^2 + {inner}*(a^2 - b^2))");
+        let e = p(&format!("({outer} + a)/({outer} - b) + {inner}/(a*b*c + {inner})"));
+        let base = 1000;
+        let (main, defs) = cse(&e, base, 6);
+        assert!(defs.len() >= 2, "{defs:?}");
+        for (i, (s, d)) in defs.iter().enumerate() {
+            // numbered from base in order, and using only earlier names
+            assert_eq!(*s, base + i as u32);
+            assert!(sym_set(d).iter().all(|x| *x < base || *x < *s), "u{i} uses a later name");
+        }
+        let back = defs.iter().rev().fold(main, |acc, (s, d)| replace(&acc, &sym(*s), d));
+        let env = |s: u32| [4.0, 3.0, 5.0, 2.0][s as usize];
+        assert!(eval(&e, &env).is_finite());
+        assert!((eval(&back, &env) - eval(&e, &env)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn short_sums_stay_in_place() {
+        // a + b − c is repeated but reads better than a name
+        let (_, defs) = cse(&p("sqrt((a + b - c)*d)/(a + b - c) + (a + b - c)^3*sqrt(d*(a + b - c))"), 1000, 6);
+        assert!(defs.iter().all(|(_, d)| *d != p("a + b - c")), "{defs:?}");
     }
 }

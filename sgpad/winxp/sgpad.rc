@@ -9,8 +9,8 @@ IDI_SGPAD ICON "res\\sgpad.ico"
 IDB_TOOLBAR BITMAP "res\\toolbar.bmp"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,3,1,0
- PRODUCTVERSION 0,3,1,0
+ FILEVERSION 0,3,2,0
+ PRODUCTVERSION 0,3,2,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -23,12 +23,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "sgpad"
             VALUE "FileDescription", "sgpad geometry pad"
-            VALUE "FileVersion", "0.3.1"
+            VALUE "FileVersion", "0.3.2"
             VALUE "InternalName", "sgpad"
             VALUE "LegalCopyright", "GNU General Public License, version 3 or later"
             VALUE "OriginalFilename", "sgpad.exe"
             VALUE "ProductName", "sgpad"
-            VALUE "ProductVersion", "0.3.1"
+            VALUE "ProductVersion", "0.3.2"
         END
     END
     BLOCK "VarFileInfo"
@@ -390,7 +390,7 @@ FONT 8, "MS Shell Dlg 2"
 BEGIN
     ICON            IDI_SGPAD, IDC_ABOUT_ICON, 10, 10, 21, 20
     LTEXT           "sgpad for Windows", -1, 42, 10, 186, 8
-    LTEXT           "Version 0.3.1", IDC_VERSION, 42, 22, 186, 8
+    LTEXT           "Version 0.3.2", IDC_VERSION, 42, 22, 186, 8
     LTEXT           "", IDC_LIBVERSION, 42, 34, 186, 8
     LTEXT           "Draws geometric constructions and finds closed-form formulas for what you measure.", -1, 42, 50, 186, 18
     LTEXT           "This program is free software, distributed under the GNU General Public License, version 3 or later.", IDC_LICENSE, 42, 72, 186, 18
