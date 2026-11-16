@@ -123,7 +123,7 @@ the library on its own.
 `sgpad/winxp/` holds a native Windows version of sgpad in the style of Windows XP programs: menus and
 toolbars, a tool box like Paint's, Properties dialogs and printing. It runs on Windows XP (SP2 or
 later) and later versions of Windows, opens the same `.sgp` files, and shows the formulas sggeo
-derives, typeset by the library. Releases have it as `sgpad-<version>-winxp-x86.zip`.
+derives, typeset by the library. Releases have it as `sg-<version>-winxp-x86.zip`.
 
 It is a Visual Studio 2008 project that uses sggeo through its C interface.
 [sgpad/winxp/README.md](sgpad/winxp/README.md) describes it and how to build it.
