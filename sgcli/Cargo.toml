@@ -1,15 +1,15 @@
 [package]
 name = "sgcli"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 description = "An interactive command line for sgpad's geometry, in the statements of the .sgp format"
 license = "GPL-3.0-or-later"
 
 [[bin]]
-name = "sg"
+name = "sgcli"
 path = "src/main.rs"
 
 [dependencies]
 sggeo = { path = "../sggeo" }
-# with-dirs (the home crate) would import a function Windows XP does not have; sg finds ~ itself
+# with-dirs (the home crate) would import a function Windows XP does not have; sgcli finds ~ itself
 rustyline = { version = "17.0.2", default-features = false, features = ["with-file-history"] }

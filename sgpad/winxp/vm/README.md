@@ -1,6 +1,6 @@
 # Working with a Windows XP virtual machine
 
-Scripts that build and try out the Windows program (`winxp/`) on a Windows XP virtual machine with
+Scripts that build and try out the Windows program (`sgpad/winxp/`) on a Windows XP virtual machine with
 Visual Studio 2008, from the Linux machine that hosts it. They were made for one libvirt/QEMU
 machine; the environment variables below describe another one.
 
@@ -17,12 +17,12 @@ machine; the environment variables below describe another one.
 ## A typical session
 
 ```sh
-./build.sh winxp                       # the XP library, which the program links against
-winxp/vm/build.sh all                  # first time: sources, bitmaps and the sggeo files
-winxp/vm/launch.sh 'C:\sgpad\some.sgp' # the program on the XP screen, with a drawing
-winxp/vm/ui.py click 40 170 drag 200 560 520 560 shot line   # draw a line, save target/xp-shots/line.png
+./build.sh winxp                             # the XP library, which the program links against
+sgpad/winxp/vm/build.sh all                  # first time: sources, bitmaps and the sggeo files
+sgpad/winxp/vm/launch.sh 'C:\sgpad\some.sgp' # the program on the XP screen, with a drawing
+sgpad/winxp/vm/ui.py click 40 170 drag 200 560 520 560 shot line   # draw a line, save target/xp-shots/line.png
 # change the sources, then
-winxp/vm/cycle.sh 'C:\sgpad\some.sgp'  # close, build, start again
+sgpad/winxp/vm/cycle.sh 'C:\sgpad\some.sgp'      # close, build, start again
 ```
 
 For a release, `./build.sh winxp` builds the program here itself (with `build.sh all rebuild`) and puts it in

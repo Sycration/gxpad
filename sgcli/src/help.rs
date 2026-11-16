@@ -1,7 +1,7 @@
 //! The help pages.
 
 const OVERVIEW: &str = r#"
-sg builds a construction from the statements of a .sgp file, one per line,
+sgcli builds a construction from the statements of a .sgp file, one per line,
 solves it, and derives closed-form formulas for what you measure in it.
 
   triangle ABC           points are made where they are first named
@@ -133,7 +133,7 @@ const DOC: &str = r#"
   save [FILE.sgp]   save the document
   quit              (or Ctrl-D)
 
-At the prompt, arrows go through earlier lines (kept in ~/.sg_history) and
+At the prompt, arrows go through earlier lines (kept in ~/.sgcli_history) and
 Ctrl-C drops the line being typed.
 
 `# text` starts a comment.

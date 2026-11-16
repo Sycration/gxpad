@@ -4,7 +4,7 @@
 On a network where IPv6 connections to Microsoft's download servers hang, xwin
 (see XWIN_DIR at the top of build.sh) downloads through it:
 
-  python3 winxp/vm/v4proxy.py &
+  python3 sgpad/winxp/vm/v4proxy.py &
   xwin --accept-license --https-proxy http://127.0.0.1:8899 --arch x86,x86_64 splat --output ~/.xwin
 
 Usage: v4proxy.py [PORT]   (8899 by default)

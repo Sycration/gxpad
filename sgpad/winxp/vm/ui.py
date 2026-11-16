@@ -25,7 +25,7 @@ import time
 DOMAIN = os.environ.get("XP_DOMAIN", "winxp")
 LIBVIRT = os.environ.get("XP_LIBVIRT", "qemu:///system")
 W, H = (int(v) for v in os.environ.get("XP_SCREEN", "1280x960").split("x"))
-SHOTS = os.environ.get("XP_SHOTS", os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../target/xp-shots"))
+SHOTS = os.environ.get("XP_SHOTS", os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../target/xp-shots"))
 
 
 def qmp(events):

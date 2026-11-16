@@ -24,7 +24,7 @@ closed-form formula for that dimension in terms of the driving dimensions and va
 | `sggeo/src/expr/mod.rs` | Expression type `Expr`, canonicalizing constructors, evaluation, the simplifier, the work clock. |
 | `sggeo/src/expr/poly.rs` | `Expr`-level polynomial helpers (`coeffs`, `split_frac`). |
 | `sggeo/src/alg.rs` | Sparse multivariate polynomials over Q (`MPoly`), resultants, factorization. |
-| `src/app.rs` | `compute_formula`, background search levels, formula display state. |
+| `sgpad/src/app.rs` | `compute_formula`, background search levels, formula display state. |
 | `sggeo/tests/testkit/mod.rs` | `Kit`: builds constructions in tests and checks derived formulas. |
 | `sggeo/tests/gen_*.rs` | Generated tests (constructions with known answers). |
 | `sggeo/tests/examples.rs` | Formula lengths of saved examples; `derive_file` for debugging. |
@@ -426,7 +426,7 @@ Environment variables:
   dimension of a saved construction (`derive_file` in `tests/examples.rs`).
 
 Each test run writes its construction to `test_examples/<suite>/<test>.sgp`, which opens in the
-app (`cargo run --release -- <file>`).
+app (`cargo run --release -p sgpad -- <file>`).
 
 Commands:
 

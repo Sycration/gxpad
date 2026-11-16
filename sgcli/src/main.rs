@@ -1,4 +1,4 @@
-//! sg: an interactive command line for sgpad's geometry. A line is a
+//! sgcli: an interactive command line for sgpad's geometry. A line is a
 //! statement of the .sgp format, which sggeo reads into the document, or
 //! one of the few commands of the session (`?`, `ls`, `undo`, `save`, ...).
 
@@ -17,12 +17,12 @@ fn main() {
     while i < args.len() {
         match args[i].as_str() {
             "-h" | "--help" => {
-                println!("usage: sg [FILE.sgp] [-c COMMAND]...\n\nWith no commands, sg reads commands from the terminal (or from standard input).\n`help` in sg lists them.");
+                println!("usage: sgcli [FILE.sgp] [-c COMMAND]...\n\nWith no commands, sgcli reads commands from the terminal (or from standard input).\n`help` in sgcli lists them.");
                 return;
             }
             "-c" => {
                 let Some(c) = args.get(i + 1) else {
-                    eprintln!("sg: -c needs a command");
+                    eprintln!("sgcli: -c needs a command");
                     std::process::exit(2);
                 };
                 commands.push(c.clone());
@@ -57,14 +57,14 @@ fn main() {
 }
 
 /// Reads commands at a prompt with line editing and a history kept between
-/// sessions (in ~/.sg_history). Ctrl-C drops the line being typed, Ctrl-D quits.
+/// sessions (in ~/.sgcli_history). Ctrl-C drops the line being typed, Ctrl-D quits.
 fn prompt(s: &mut cmd::Session) {
     use rustyline::error::ReadlineError;
-    println!("sg {}: geometry in the statements of .sgp files. `help` lists the commands.", env!("CARGO_PKG_VERSION"));
+    println!("sgcli {}: geometry in the statements of .sgp files. `help` lists the commands.", env!("CARGO_PKG_VERSION"));
     let mut rl = match rustyline::DefaultEditor::new() {
         Ok(rl) => rl,
         Err(e) => {
-            eprintln!("sg: no line editing ({e})");
+            eprintln!("sgcli: no line editing ({e})");
             for line in std::io::stdin().lock().lines().map_while(Result::ok) {
                 if matches!(line.trim(), "quit" | "exit") {
                     break;
@@ -74,7 +74,7 @@ fn prompt(s: &mut cmd::Session) {
             return;
         }
     };
-    let history = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(|h| std::path::PathBuf::from(h).join(".sg_history"));
+    let history = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(|h| std::path::PathBuf::from(h).join(".sgcli_history"));
     if let Some(h) = &history {
         let _ = rl.load_history(h);
     }
@@ -92,7 +92,7 @@ fn prompt(s: &mut cmd::Session) {
             Err(ReadlineError::Interrupted) => continue,
             Err(ReadlineError::Eof) => break,
             Err(e) => {
-                eprintln!("sg: {e}");
+                eprintln!("sgcli: {e}");
                 break;
             }
         }

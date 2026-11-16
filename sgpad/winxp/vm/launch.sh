@@ -2,7 +2,7 @@
 # Starts the sgpad.exe built by build.sh on the screen of the XP machine, at the next whole minute, and
 # waits until it runs.
 #
-# Usage: winxp/vm/launch.sh [ARGUMENT...]    (the arguments of sgpad.exe, such as a .sgp file on the XP machine)
+# Usage: sgpad/winxp/vm/launch.sh [ARGUMENT...]    (the arguments of sgpad.exe, such as a .sgp file on the XP machine)
 #
 # A program started over telnet runs on the invisible desktop of the telnet session. The task scheduler of
 # XP (`at /interactive`, which needs an administrator) starts it on the screen instead, as the SYSTEM
@@ -17,7 +17,7 @@ remote=${dir#*:\\}
 # the batch file the scheduler runs: it starts sgpad.exe with the arguments and returns
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-printf '%s\r\n' '@echo off' "cd /d $dir\\winxp\\Release" 'start "" sgpad.exe %*' > "$tmp/launch.bat"
+printf '%s\r\n' '@echo off' "cd /d $dir\\sgpad\\winxp\\Release" 'start "" sgpad.exe %*' > "$tmp/launch.bat"
 python3 "$here/vm.py" put "$tmp" "$remote" launch.bat
 
 # `at` takes whole minutes and moves a time that has passed to the next day, so the job goes at least

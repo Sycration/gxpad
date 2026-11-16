@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Release builds of sgpad (desktop program), sg (command line) and sggeo (C library / Wasm module), collected
+# Release builds of sgpad (desktop program), sgcli (command line) and sggeo (C library / Wasm module), collected
 # under build/:
 #
-#   build/<platform>/<arch>/bin   sgpad and sg executables and the sg README.md
+#   build/<platform>/<arch>/bin   sgpad and sgcli executables and the sgcli README.md
 #   build/<platform>/<arch>/lib   sggeo shared library, import library, sggeo.h and the sggeo README.md
 #   build/web/wasm32/lib          sggeo Wasm module, its wasm-bindgen JS glue and the sggeo README.md
-#   build/winxp/<arch>/bin        sg executable for Windows XP and the sg README.md; for x86 also sgpad.exe, the
-#                                 Windows XP program (winxp/), and the sggeo DLL it runs with
+#   build/winxp/<arch>/bin        sgcli executable for Windows XP and the sgcli README.md; for x86 also
+#                                 sgpad.exe, the Windows XP program (sgpad/winxp/), and the sggeo DLL it runs with
 #   build/winxp/<arch>/lib        sggeo DLL for Windows XP, its import library, sggeo.h and the sggeo README.md
 #
 # Usage: ./build.sh [linux] [windows] [macos] [web] [winxp]    (no arguments builds everything)
@@ -23,8 +23,8 @@
 #         (VC-LTL-*Binary.7z) and the YY-Thunks obj release (YY-Thunks-*Objs.zip)
 #       - XWIN_DIR (default ~/.xwin): the MSVC CRT and Windows SDK libraries for x86 and x86_64, as written by
 #         `xwin --accept-license --arch x86,x86_64 splat --output ~/.xwin` (cargo install xwin)
-#       - the Windows XP machine with Visual Studio 2008 that winxp/vm/ works with (see winxp/vm/README.md),
-#         running: the Windows XP program is built there
+#       - the Windows XP machine with Visual Studio 2008 that sgpad/winxp/vm/ works with (see
+#         sgpad/winxp/vm/README.md), running: the Windows XP program is built there
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -33,7 +33,7 @@ OUT=$ROOT/build
 TARGET_DIR=${CARGO_TARGET_DIR:-$ROOT/target}
 HEADER=$ROOT/sggeo/include/sggeo.h
 LIB_README=$ROOT/sggeo/README.md
-SG_README=$ROOT/sgcli/README.md
+SGCLI_README=$ROOT/sgcli/README.md
 
 # Linux binaries link against this glibc version so that they load on older distributions.
 GLIBC=2.17
@@ -47,14 +47,14 @@ need() {
   command -v "$1" >/dev/null || { echo "error: $1 is not installed ($2)" >&2; exit 1; }
 }
 
-# collect PLATFORM ARCH TRIPLE EXE_SUFFIX LIB...: copies the executables (sgpad, sg) and the library files of
+# collect PLATFORM ARCH TRIPLE EXE_SUFFIX LIB...: copies the executables (sgpad, sgcli) and the library files of
 # one target into build/
 collect() {
   local platform=$1 arch=$2 triple=$3 ext=$4
   shift 4
   local rel=$TARGET_DIR/$triple/release dest=$OUT/$platform/$arch
   mkdir -p "$dest/bin" "$dest/lib"
-  cp "$rel/sgpad$ext" "$rel/sg$ext" "$SG_README" "$dest/bin/"
+  cp "$rel/sgpad$ext" "$rel/sgcli$ext" "$SGCLI_README" "$dest/bin/"
   for f in "$@"; do cp "$rel/$f" "$dest/lib/"; done
   cp "$HEADER" "$LIB_README" "$dest/lib/"
 }
@@ -196,7 +196,7 @@ build_winxp() {
       check_xp_imports "$rel/$file" "$work/yy-thunks/Config/$yy_arch/$exports.txt"
     }
     xp_thunk sggeo.dll --lib -- --release -p sggeo --lib
-    xp_thunk sg.exe -- --release -p sgcli --bin sg
+    xp_thunk sgcli.exe -- --release -p sgcli --bin sgcli
 
     # The imports in the x86 import library from lld-link have the name type "export as", which the
     # linkers of Visual C++ 2008 and older reject, so llvm-dlltool writes the import library from the
@@ -210,22 +210,22 @@ build_winxp() {
     llvm-dlltool -m "$machine" -d "$def" -l "$dest/sggeo.lib"
     cp "$rel/sggeo.dll" "$HEADER" "$LIB_README" "$dest/"
     mkdir -p "$OUT/winxp/$arch/bin"
-    cp "$rel/sg.exe" "$SG_README" "$OUT/winxp/$arch/bin/"
+    cp "$rel/sgcli.exe" "$SGCLI_README" "$OUT/winxp/$arch/bin/"
   done
 
   # The Windows XP program, built with Visual Studio 2008 on the XP machine against the DLL just built.
   # A running copy keeps sggeo.dll open, which fails the build, so it is closed first.
   echo "==> winxp sgpad (Visual Studio 2008 on the XP machine)"
-  local vm=$ROOT/winxp/vm remote=${XP_DIR:-'C:\sgpad'} out
+  local vm=$ROOT/sgpad/winxp/vm remote=${XP_DIR:-'C:\sgpad'} out
   remote=${remote#*:\\}
   python3 "$vm/vm.py" run 'taskkill /f /im sgpad.exe >nul 2>&1 & echo closed' 30 >/dev/null \
-    || { echo "error: the Windows XP machine does not answer (see winxp/vm/README.md)" >&2; exit 1; }
+    || { echo "error: the Windows XP machine does not answer (see sgpad/winxp/vm/README.md)" >&2; exit 1; }
   out=$("$vm/build.sh" all rebuild 2>&1) || true
   echo "$out" | grep -qE '\b1 Projects succeeded' \
     || { echo "$out" | tail -20 >&2; echo "error: the Windows XP program did not build" >&2; exit 1; }
   local bin=$OUT/winxp/x86/bin
   rm -f "$bin/sgpad.exe"
-  python3 "$vm/vm.py" get "$remote/winxp/Release/sgpad.exe" "$bin/sgpad.exe"
+  python3 "$vm/vm.py" get "$remote/sgpad/winxp/Release/sgpad.exe" "$bin/sgpad.exe"
   cp "$OUT/winxp/x86/lib/sggeo.dll" "$bin/"
 }
 

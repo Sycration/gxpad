@@ -228,7 +228,7 @@ fn blocks_first(doc: &str) -> &str {
     doc.split("```").nth(1).unwrap()
 }
 
-/// Statements applied one at a time, as sg does, build what a file does.
+/// Statements applied one at a time, as sgcli does, build what a file does.
 #[test]
 fn statements_apply_to_a_document() {
     use sggeo::ops::{self, Document};

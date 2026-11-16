@@ -3039,7 +3039,7 @@ dependencies = [
 
 [[package]]
 name = "sgcli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "rustyline",
  "sggeo",
@@ -3047,7 +3047,7 @@ dependencies = [
 
 [[package]]
 name = "sggeo"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "js-sys",
  "latex-rust",
@@ -3062,7 +3062,7 @@ dependencies = [
 
 [[package]]
 name = "sgpad"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "eframe",
  "latex-rust",

@@ -1,6 +1,14 @@
-# sgpad
+# sg
 
-A 2D geometry pad with constraints that gives closed-form formulas for what you measure.
+2D geometry with constraints that gives closed-form formulas for what you measure. The project has
+three parts:
+
+- [`sgpad/`](sgpad): sgpad, the geometry pad, a desktop program (and in `sgpad/winxp/`, its
+  Windows XP version)
+- [`sgcli/`](sgcli): sgcli, the same geometry on the command line
+- [`sggeo/`](sggeo): sggeo, the geometry core they share, also a C library and a Wasm module
+
+## sgpad
 
 Draw points, lines, circles, arcs, conics and curves `y = f(x)`; add constraints and driving
 dimensions; select a measured dimension. sgpad solves the construction numerically and shows a
@@ -30,34 +38,34 @@ formula for the measured dimension in terms of the driving ones.
 Requires Rust 1.99 or later (edition 2024; the latex-rust formula renderer needs 1.99).
 
 ```sh
-cargo run --release                                   # empty pad
-cargo run --release -- file.sgp                       # open a construction
-cargo run --release -- file.sgp d5                    # open it and select dimension d5
+cargo run --release -p sgpad                          # empty pad
+cargo run --release -p sgpad -- file.sgp              # open a construction
+cargo run --release -p sgpad -- file.sgp d5           # open it and select dimension d5
 ```
 
 The constructions built by sggeo's tests are in `sggeo/test_examples/` and open the same way,
 for example:
 
 ```sh
-cargo run --release -- sggeo/test_examples/gen_invariants/ptolemy_diagonals.sgp d5
+cargo run --release -p sgpad -- sggeo/test_examples/gen_invariants/ptolemy_diagonals.sgp d5
 ```
 
 ## Command line
 
-`sg` is sgpad's geometry on the command line: each line is a statement of the
+`sgcli` is sgpad's geometry on the command line: each line is a statement of the
 [.sgp format](docs/sgp-format.md), and `?` derives the formula of a measure. It is built with the
 rest and ships next to sgpad; see [sgcli/README.md](sgcli/README.md).
 
 ```sh
-cargo run --release -p sgcli                          # sg, interactive
-cargo run --release -p sgcli -- file.sgp              # open a construction in sg
+cargo run --release -p sgcli                          # sgcli, interactive
+cargo run --release -p sgcli -- file.sgp              # open a construction in sgcli
 ```
 
 ## Release builds
 
 `./build.sh` builds release binaries for every platform into `build/<platform>/<arch>/`: `bin/`
-holds sgpad and sg, `lib/` the sggeo C library. Windows XP gets sg and the sggeo DLL (sgpad for
-XP is the program in `winxp/`), and the web the sggeo Wasm module. The comment at the top of
+holds sgpad and sgcli, `lib/` the sggeo C library. Windows XP gets sgcli and the sggeo DLL (sgpad for
+XP is the program in `sgpad/winxp/`), and the web the sggeo Wasm module. The comment at the top of
 `build.sh` lists what each platform needs; `./release.sh` packs `build/` into release archives.
 
 ## Tests
@@ -112,13 +120,13 @@ the library on its own.
 
 ![sgpad for Windows on Windows XP, with the diagonals of a rhombus](docs/xp.png)
 
-`winxp/` holds a native Windows version of sgpad in the style of Windows XP programs: menus and
+`sgpad/winxp/` holds a native Windows version of sgpad in the style of Windows XP programs: menus and
 toolbars, a tool box like Paint's, Properties dialogs and printing. It runs on Windows XP (SP2 or
 later) and later versions of Windows, opens the same `.sgp` files, and shows the formulas sggeo
 derives, typeset by the library. Releases have it as `sgpad-<version>-winxp-x86.zip`.
 
 It is a Visual Studio 2008 project that uses sggeo through its C interface.
-[winxp/README.md](winxp/README.md) describes it and how to build it.
+[sgpad/winxp/README.md](sgpad/winxp/README.md) describes it and how to build it.
 
 ## How the formulas are derived
 

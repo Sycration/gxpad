@@ -3,14 +3,14 @@
 #
 # Usage: ./release.sh [--publish] [--dry-run] [TAG]
 #
-#   TAG        release tag; defaults to v<version in Cargo.toml>
+#   TAG        release tag; defaults to v<version in sgpad/Cargo.toml>
 #   --publish  publishes the release immediately instead of creating a draft
 #   --dry-run  only writes the archives to build/dist, without creating a release
 #
 # Archives: sgpad-TAG-<platform>-<arch>.tar.gz (linux, macos), .zip (windows, and winxp x86 with the Windows XP
-# program), sggeo-TAG-web.tar.gz, sggeo-TAG-winxp-x64.zip (the sggeo DLL and sg), plus SHA256SUMS. Each one
+# program), sggeo-TAG-web.tar.gz, sggeo-TAG-winxp-x64.zip (the sggeo DLL and sgcli), plus SHA256SUMS. Each one
 # holds a top-level folder with bin/ and lib/ as in build/ and LICENSE; the sgpad archives also hold the sgpad
-# README.md, or for Windows XP the README.md of winxp/ (bin/ holds the sg README.md and lib/ the sggeo
+# README.md, or for Windows XP the README.md of sgpad/winxp/ (bin/ holds the sgcli README.md and lib/ the sggeo
 # README.md, from ./build.sh).
 # The release tag points at the current commit, which must be clean and pushed. ./set-version.sh X.Y.Z
 # sets the version beforehand (the crates, and the VERSIONINFO of the Windows XP program).
@@ -31,7 +31,7 @@ for a in "$@"; do
   esac
 done
 if [ -z "$tag" ]; then
-  tag=v$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -n1)
+  tag=v$(sed -n 's/^version *= *"\(.*\)"/\1/p' sgpad/Cargo.toml | head -n1)
 fi
 
 die() { echo "error: $*" >&2; exit 1; }
@@ -70,7 +70,7 @@ for t in "${targets[@]}"; do
   cp LICENSE "$stage/$name/"
   case $name in
     sggeo-*) ;;
-    sgpad-*-winxp-*) cp winxp/README.md "$stage/$name/" ;;
+    sgpad-*-winxp-*) cp sgpad/winxp/README.md "$stage/$name/" ;;
     *) cp README.md "$stage/$name/" ;;
   esac
   if [ "$platform" = windows ] || [ "$platform" = winxp ]; then

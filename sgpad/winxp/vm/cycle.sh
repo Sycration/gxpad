@@ -2,7 +2,7 @@
 # Closes sgpad on the XP machine, builds it again with build.sh and starts it with launch.sh: the loop of
 # changing the program and looking at the change.
 #
-# Usage: winxp/vm/cycle.sh [ARGUMENT...]    (the arguments of sgpad.exe)
+# Usage: sgpad/winxp/vm/cycle.sh [ARGUMENT...]    (the arguments of sgpad.exe)
 # Settings come from the environment; see README.md.
 set -euo pipefail
 

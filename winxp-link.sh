@@ -22,7 +22,7 @@ for a in "$@"; do
 done
 
 # thunk passes the YY-Thunks object last. lld-link reads its inputs in order, so an import library read
-# before it (sg's dependencies import WakeByAddressSingle, say) has already supplied a function the object
+# before it (sgcli's dependencies import WakeByAddressSingle, say) has already supplied a function the object
 # defines, and the link fails with a duplicate symbol. Read first, the object supplies the function itself.
 first=() rest=()
 for a in "$@"; do

@@ -39,15 +39,15 @@ and needs no redistributable.
 
 1. Build the XP library with `./build.sh winxp` (see the top of `build.sh`). The project takes
    `sggeo.h` from `sggeo/include` and `sggeo.lib` and `sggeo.dll` from `build/winxp/x86/lib`.
-2. On Windows with Visual Studio 2008, open `winxp/sgpad.sln` and build the Release
+2. On Windows with Visual Studio 2008, open `sgpad/winxp/sgpad.sln` and build the Release
    configuration, or run in a Visual Studio 2008 Command Prompt:
 
    ```bat
-   cd winxp
+   cd sgpad\winxp
    vcbuild sgpad.sln "Release|Win32"
    ```
 
-   The build writes `winxp/Release/sgpad.exe` and copies `sggeo.dll` next to it.
+   The build writes `sgpad/winxp/Release/sgpad.exe` and copies `sggeo.dll` next to it.
 3. For a release, both files go to `build/winxp/x86/bin`, where `./release.sh` packs them as
    `sgpad-TAG-winxp-x86.zip`. `./build.sh winxp` does steps 1 to 3 itself, building the program on
    the XP machine of `vm/`.
