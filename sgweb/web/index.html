@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <title>sgweb</title>
+    <meta name="description" content="Construct 2D geometry with constraints and get closed-form formulas for what you measure." />
+    <meta name="theme-color" content="#f6f4ee" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="sgweb" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="modulepreload" href="pkg/sggeo.js" />
+    <script type="module" src="js/main.js"></script>
+  </head>
+  <body>
+    <div id="app" class="loading">
+      <header class="bar">
+        <a class="brand" href="./" aria-label="sgweb">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path class="b1" d="M5 26L16 5l11 21z" />
+            <circle class="b2" cx="16" cy="18.6" r="5.6" />
+            <circle class="b3" cx="16" cy="5" r="2.2" />
+          </svg>
+          <span>sgweb</span>
+        </a>
+        <input id="doc-name" class="doc-name" aria-label="Name of the construction" spellcheck="false" autocomplete="off" />
+        <nav class="menus wide-only" aria-label="Menus">
+          <button type="button" id="menu-file">File</button>
+          <button type="button" id="menu-view">View</button>
+        </nav>
+        <span class="grow"></span>
+        <button type="button" class="ibtn" id="undo" title="Undo" aria-label="Undo">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M9 14L4.5 9.5 9 5" /><path d="M4.5 9.5H14a5.5 5.5 0 0 1 0 11h-3" /></svg>
+        </button>
+        <button type="button" class="ibtn" id="redo" title="Redo" aria-label="Redo">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M15 14l4.5-4.5L15 5" /><path d="M19.5 9.5H10a5.5 5.5 0 0 0 0 11h3" /></svg>
+        </button>
+        <button type="button" class="ibtn wide-only" id="help-btn" title="Help and shortcuts" aria-label="Help">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-.9.8-.9 1.4v.6" /><circle class="f" cx="12" cy="17" r="1.2" /></svg>
+        </button>
+        <button type="button" class="ibtn narrow-only" id="menu-more" title="Menu" aria-label="Menu">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
+      </header>
+
+      <main class="work">
+        <nav id="rail" class="rail" aria-label="Tools"></nav>
+
+        <section id="stage" class="stage" aria-label="Drawing">
+          <canvas id="canvas" tabindex="0" aria-label="Construction canvas"></canvas>
+
+          <div id="hint" class="hint" hidden>
+            <span class="tool-name"></span>
+            <span class="text"></span>
+            <button type="button" class="btn small done">Done</button>
+          </div>
+
+          <div id="fnbar" class="fnbar" hidden>
+            <label for="fn-input">Function</label>
+            <input id="fn-input" type="text" spellcheck="false" autocomplete="off" placeholder="y = sin(x)" />
+            <button type="button" class="btn primary add">Add</button>
+            <button type="button" class="btn cancel">Cancel</button>
+            <p class="msg" aria-live="polite"></p>
+          </div>
+
+          <div id="actions" class="actions" role="toolbar" aria-label="Actions for the selection" hidden></div>
+
+          <div id="dim-editor" class="dim-editor" hidden>
+            <span class="label"></span>
+            <input type="text" spellcheck="false" autocomplete="off" enterkeyhint="done" aria-label="Value or expression" />
+            <span class="unit"></span>
+            <button type="button" class="ok" aria-label="Set">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            </button>
+          </div>
+
+          <div id="welcome" class="welcome" hidden>
+            <button type="button" class="ibtn close" aria-label="Close">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+            <h2>Construct. Constrain. Derive.</h2>
+            <p>
+              Draw points, lines, circles and conics, tie them together with constraints and dimensions, then select a measurement:
+              sgweb finds a closed-form formula for it.
+            </p>
+            <div class="welcome-actions">
+              <button type="button" class="btn primary draw">Start drawing</button>
+              <button type="button" class="btn open">Open a .sgp file</button>
+            </div>
+            <h3>Or explore an example</h3>
+            <ul class="examples"></ul>
+          </div>
+
+          <div class="status">
+            <span id="dof" class="dof"></span>
+            <span id="coords" class="coords wide-only"></span>
+          </div>
+          <div class="zoomctl wide-only">
+            <button type="button" class="ibtn" id="zoom-out" title="Zoom out" aria-label="Zoom out">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M6 12h12" /></svg>
+            </button>
+            <button type="button" class="ibtn" id="zoom-fit" title="Fit the construction (Home)" aria-label="Fit">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+            </button>
+            <button type="button" class="ibtn" id="zoom-in" title="Zoom in" aria-label="Zoom in">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12" /></svg>
+            </button>
+          </div>
+        </section>
+
+        <aside id="inspector" class="inspector" aria-label="Inspector">
+          <div class="sheet-handle narrow-only" aria-hidden="true"><span></span></div>
+          <div class="tabs" role="tablist">
+            <button type="button" role="tab" data-tab="result">Result</button>
+            <button type="button" role="tab" data-tab="quantities">Quantities</button>
+            <button type="button" role="tab" data-tab="text">Text</button>
+          </div>
+          <div class="panes">
+            <div id="pane-result" class="pane" role="tabpanel" aria-live="polite"></div>
+            <div id="pane-quantities" class="pane" role="tabpanel" hidden></div>
+            <div id="pane-text" class="pane text-pane" role="tabpanel" hidden></div>
+          </div>
+        </aside>
+      </main>
+
+      <div id="toasts" class="toasts"></div>
+
+      <dialog id="help" class="help">
+        <header>
+          <h2>Using sgweb</h2>
+          <button type="button" class="ibtn close" aria-label="Close">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="help-body">
+          <section>
+            <h3>How it works</h3>
+            <p>
+              Pick a tool and tap on the canvas: the hint at the top says what each step wants. Taps snap to points and curves, so
+              new points can sit on what is already there.
+            </p>
+            <p>
+              Select items to see what you can do with them: constraints such as <em>parallel</em> or <em>tangent</em>, and
+              measurements. A driving dimension sets a value; a measured one only reads it. Select a dimension or variable to get a
+              formula for it in the Result tab.
+            </p>
+            <p>
+              On a touch screen, tapping adds to the selection; tap empty space to clear it. Drag with one finger to move things or pan,
+              pinch with two to zoom. With a drawing tool, the preview follows your finger and the point goes where you lift it.
+            </p>
+          </section>
+          <section class="help-keys"></section>
+        </div>
+        <p id="about" class="about"></p>
+      </dialog>
+
+      <div class="boot">
+        <div class="spinner"></div>
+        <p id="boot-error" class="error"></p>
+      </div>
+    </div>
+    <noscript>sgweb needs JavaScript and WebAssembly.</noscript>
+  </body>
+</html>

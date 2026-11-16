@@ -1,5 +1,5 @@
 [workspace]
-members = ["sgpad", "sgcli", "sggeo"]
+members = ["sgpad", "sgcli", "sggeo", "sgweb"]
 exclude = ["vendor"]
 resolver = "3"
 

@@ -1,0 +1,16 @@
+# sgweb on port 8080:  docker compose -f sgweb/compose.yaml up -d
+# (set SGWEB_PORT for another port on the host)
+services:
+  sgweb:
+    build:
+      context: ..
+      dockerfile: sgweb/Dockerfile
+    image: sgweb
+    ports:
+      - "${SGWEB_PORT:-8080}:8080"
+    restart: unless-stopped
+    # as process 1 the server would not end on SIGTERM; the init process passes it on
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]

@@ -1,0 +1,29 @@
+# An ellipse and its foci
+sgp 2
+
+given
+  a = 5
+  b = 3
+  e1 = ellipse(O)
+    a1: a(e1) = a
+    b1: b(e1) = b
+  point B
+
+construct
+  A = focus(e1)
+    O == mid(A, B)
+  point C on e1
+    d1: dist(A, C) = 3
+
+find
+  d2: dist(B, C)
+
+where
+  e1 a 5 b 3 angle 0° [fixed angle]
+  B (-4, 4.746153505532806e-37)
+  A (4, -8.140606889314247e-38)
+  C (2.5, 2.598076211353316)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

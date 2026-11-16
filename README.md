@@ -1,10 +1,12 @@
 # sg
 
 2D geometry with constraints that gives closed-form formulas for what you measure. The project has
-three parts:
+four parts:
 
 - [`sgpad/`](sgpad): sgpad, the geometry pad, a desktop program (and in `sgpad/winxp/`, its
   Windows XP version)
+- [`sgweb/`](sgweb): sgweb, a web app for the same geometry, for desktops and phones, served from
+  one binary
 - [`sgcli/`](sgcli): sgcli, the same geometry on the command line
 - [`sggeo/`](sggeo): sggeo, the geometry core they share, also a C library and a Wasm module
 
@@ -61,11 +63,26 @@ cargo run --release -p sgcli                          # sgcli, interactive
 cargo run --release -p sgcli -- file.sgp              # open a construction in sgcli
 ```
 
+## Web app
+
+`sgweb` is a web app of its own design for constructions, constraints and formulas, for mouse and
+touch. It is one binary that serves the app with sggeo's Wasm module built in, and loads nothing from
+elsewhere; the geometry runs in the browser. See [sgweb/README.md](sgweb/README.md).
+
+```sh
+cargo run --release -p sgweb -- --open                # serve on http://127.0.0.1:8080/ and open it
+docker compose -f sgweb/compose.yaml up -d            # or in a container, on port 8080
+```
+
+Building sgweb builds sggeo for the web, which needs `rustup target add wasm32-unknown-unknown` and
+`wasm-bindgen-cli` (see below); the workspace's `cargo build` and `cargo test` include it.
+
 ## Release builds
 
 `./build.sh` builds release binaries for every platform into `build/<platform>/<arch>/`: `bin/`
 holds sgpad and sgcli, `lib/` the sggeo C library. Windows XP gets sgcli and the sggeo DLL (sgpad for
-XP is the program in `sgpad/winxp/`), and the web the sggeo Wasm module. The comment at the top of
+XP is the program in `sgpad/winxp/`), and the web the sggeo Wasm module in `lib/` and sgweb for Linux
+and Windows x64 in `bin/`. The comment at the top of
 `build.sh` lists what each platform needs; `./release.sh` packs `build/` into release archives.
 
 ## Tests
@@ -74,7 +91,8 @@ XP is the program in `sgpad/winxp/`), and the web the sggeo Wasm module. The com
 cargo test --no-fail-fast
 ```
 
-sgpad's own tests cover the app: tools, drags, undo and the formula panel. The geometry tests
+sgpad's own tests cover the app: tools, drags, undo and the formula panel. sgweb's tests cover its
+server and, with Node.js, the web app's tools and examples. The geometry tests
 are sggeo's: its generated tests (`sggeo/tests/gen_*.rs`) build constructions with known answers,
 derive each measured dimension, and check that the formula stays correct while the construction
 is dragged and its values changed.
