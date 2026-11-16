@@ -1,0 +1,25 @@
+sgp 2
+
+given
+  segment OB
+    d1: |OB| = 1
+    θ1: angle(xaxis, OB) = 60°
+  segment BC
+    d2: |BC| = 3.5
+  segment CA
+    d3: |CA| = 2.5
+
+find
+  x_C: x(C)
+  y_C: y(C)
+
+where
+  B (0.5000000000000001, 0.8660254037844386)
+  C (3.61105748345916, 2.469559417958369)
+  A (4, 0) [fixed]
+  d1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)

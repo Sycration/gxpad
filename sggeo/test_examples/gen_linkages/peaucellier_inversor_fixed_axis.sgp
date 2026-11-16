@@ -1,0 +1,34 @@
+sgp 2
+
+given
+  d = 2.2
+  segment OC
+    d1: |OC| = 3
+  segment OD
+    d2: |OD| = 3
+
+construct
+  point A on xaxis
+    d7: dist(O, A) = d
+  polygon ACBD
+    d3: |AC| = 1
+    d4: |CB| = 1
+    d5: |BD| = 1
+    d6: |DA| = 1
+
+find
+  x_B: x(B)
+
+where
+  C (2.918181818181818, 0.6958554993912588)
+  D (2.918181818181818, -0.6958554993912588)
+  A (2.2, 1.2217618084706527e-33)
+  B (3.6363636363636362, 6.2269446290940205e-18)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d7 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
+  d6 label (0.3, 0.3)
+  x_B label (0.3, 0.3)

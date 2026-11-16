@@ -1,0 +1,26 @@
+sgp 2
+
+given
+  a = 4
+  g1 = curve(y = x^2)
+  point A
+    x_A: x(A) = 0
+    y_A: y(A) = -a
+
+construct
+  B = tangent(A, g1)
+  segment AB
+  point C on AB
+
+find
+  x_B: x(B)
+  y_B: y(B)
+
+where
+  A (-2.2624284242705737e-29, -4)
+  B (2, 4)
+  C (0.9473976603467185, -0.2104093586131264)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)

@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    r1: r(k1) = 1
+  point B
+  k2 = circle(B)
+    k1 tan k2
+    r2: r(k2) = 2
+  point C
+  k3 = circle(C)
+    k1 tan k3
+    k2 tan k3
+    r3: r(k3) = 3
+  segment AB
+  segment AC
+
+find
+  θ1: ∠BAC
+
+where
+  A (0.027913440204421474, 0.037415517982406075)
+  k1 r 1
+  B (3.027888578888981, 0.025202112455775003)
+  k2 r 2
+  C (0.04419798090659678, 4.0373823695618185)
+  k3 r 3
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  r3 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)

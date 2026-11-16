@@ -1,0 +1,15 @@
+sgp 2
+
+given
+  point A
+    d1: dist(A, xaxis) = 2.5
+    d2: dist(O, A) = 6.5
+
+find
+  x_A: x(A)
+
+where
+  A (6, 2.5)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  x_A label (0.3, 0.3)

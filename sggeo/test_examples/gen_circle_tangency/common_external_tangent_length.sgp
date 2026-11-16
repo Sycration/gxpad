@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    r1: r(k1) = 3
+  point B
+    d1: dist(A, B) = 7
+  k2 = circle(B)
+    r2: r(k2) = 2
+
+construct
+  point C on k1
+  point D on k2
+  segment CD
+    CD tan k1
+    CD tan k2
+
+find
+  d2: |CD|
+
+where
+  A (0.14502127151200167, 0.044304269519239256)
+  k1 r 3
+  B (7.143316433336498, -0.11017818250639765)
+  k2 r 2
+  C (0.6390160256938013, 3.0033529651038293)
+  D (7.472646269457697, 1.862520947883329)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

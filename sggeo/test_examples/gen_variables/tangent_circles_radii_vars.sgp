@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  u = 2.5
+  v = 1
+  k1 = circle(O)
+    r1: r(k1) = u
+
+construct
+  point A on xaxis
+  k2 = circle(A)
+    k1 tan k2
+    r2: r(k2) = v
+
+find
+  d1: dist(O, A)
+
+where
+  k1 r 2.5
+  A (3.5, 0)
+  k2 r 1
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

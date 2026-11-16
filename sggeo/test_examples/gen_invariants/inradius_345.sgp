@@ -1,0 +1,28 @@
+sgp 2
+
+given
+  segment AB
+    d1: |AB| = 4
+  segment AC
+    d2: |AC| = 3
+  segment BC
+    d3: |BC| = 5
+  point D
+  k1 = circle(D)
+    AB tan k1
+    AC tan k1
+    BC tan k1
+
+find
+  r1: r(k1)
+
+where
+  A (0.0391275891966505, 0.05759183008238235)
+  B (4.038735290147761, 0.11361181305787138)
+  C (-0.002887398034966104, 3.057297605795715)
+  D (1.025024518690556, 1.071498751064032)
+  k1 r 1
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  r1 label (0.3, 0.3)

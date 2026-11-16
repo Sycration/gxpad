@@ -1,0 +1,25 @@
+sgp 2
+
+given
+  g1 = curve(y = x^3 - 3*x^2 + 2)
+
+construct
+  point A on g1
+    x_A: x(A) = 1
+  segment AB
+    AB tan g1
+    d1: |AB| = 2
+
+find
+  d2: dx(A, B)
+  d3: dy(A, B)
+  y_A: y(A)
+
+where
+  A (1, -1.5482722733933507e-17)
+  B (1.6324555320336758, -1.8973665961010275)
+  x_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  y_A label (0.3, 0.3)

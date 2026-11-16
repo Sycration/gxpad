@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  point A
+  point B
+    x_B: x(B) = -5
+    y_B: y(B) = -6
+
+find
+  d1: dist(A, B)
+  d2: dx(A, B)
+  d3: dy(A, B)
+
+where
+  A (-3.7, -2.1) [fixed]
+  B (-5, -6)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

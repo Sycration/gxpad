@@ -1,0 +1,19 @@
+sgp 2
+
+given
+  h1 = hyperbola(O)
+    a1: a(h1) = 3
+    b1: b(h1) = 4
+
+construct
+  l1 = asymptote(h1, 1)
+  l2 = asymptote(h1, -1)
+
+find
+  θ1: angle(l1, l2)
+
+where
+  h1 a 3 b 4 angle 11.459155902616466°
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  θ1 label (0.490033, 0.0993347)

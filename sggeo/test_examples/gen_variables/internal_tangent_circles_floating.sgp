@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  R = 5
+  point A B
+  k1 = circle(A)
+    r1: r(k1) = R
+  k2 = circle(B)
+    k1 tan k2 inside
+    r2: r(k2) = R*2/5
+
+find
+  d1: dist(A, B)
+
+where
+  A (-0.545276864444911, -0.1514657956791419)
+  B (2.345276864444911, 0.6514657956791419)
+  k1 r 5
+  k2 r 2
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

@@ -1,0 +1,26 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 1.5
+  segment AB
+    horiz A B
+    |OA| == |AB|
+  segment BC
+    horiz B C
+    |OA| == |BC|
+  segment CD
+    horiz C D
+    |OA| == |CD|
+
+find
+  d2: dist(O, D)
+
+where
+  A (1.5, 9.0234489689521e-116)
+  B (3, 1.6958854513508135e-115)
+  C (4.5, 2.284798249025779e-115)
+  D (6, 2.5981993675107046e-115)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    xaxis tan k1
+    O on k1
+
+construct
+  point B on k1
+    x_B: x(B) = 4
+    y_B: y(B) = 2
+
+find
+  r1: r(k1)
+
+where
+  A (2.418811547317896e-38, 5)
+  k1 r 5
+  B (4, 2)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  r1 label (0.3, 0.3)

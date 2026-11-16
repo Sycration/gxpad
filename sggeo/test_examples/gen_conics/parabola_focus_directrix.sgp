@@ -1,0 +1,25 @@
+sgp 2
+
+given
+  a = 1.5
+  p1 = parabola(O)
+    a1: a(p1) = a
+
+construct
+  A = focus(p1)
+  l1 = directrix(p1, A)
+  point B on p1
+    y_B: y(B) = 3
+
+find
+  d1: dist(B, A)
+  d2: dist(B, l1)
+
+where
+  p1 a 1.5 angle 0° [fixed angle]
+  A (1.5, 0)
+  B (1.5, 3)
+  a1 label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

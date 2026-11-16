@@ -1,10 +1,10 @@
-# Symbolic derivation in gxpad: shortcomings
+# Symbolic derivation in sgpad: shortcomings
 
 This file describes how the formula derivation works and where it falls short. It is for someone
 continuing the work on it. Expected results are kept in tests, not here: `Kit::check` in the
 generated tests (section 1.8) and `known_short_formulas_stay_short` for formula lengths.
 
-gxpad is a 2D constraint-based geometry pad. A user draws points, lines, circles and conics, adds
+sgpad is a 2D constraint-based geometry pad. A user draws points, lines, circles and conics, adds
 constraints and driving dimensions (lengths, angles, coordinates, radii; named `d1`, `θ1`, `r1`,
 …, or user variables such as `L`, `s`), and selects a reference dimension. The app then shows a
 closed-form formula for that dimension in terms of the driving dimensions and variables.
@@ -15,19 +15,19 @@ closed-form formula for that dimension in terms of the driving dimensions and va
 
 | File | Content |
 |---|---|
-| `gxgeo/src/model.rs` | `Doc`: entities, parameters, constraints, dimensions. `Doc::equations`, `Doc::con_eqs`: constraints as expressions equal to 0. |
-| `gxgeo/src/solver.rs` | Numeric solver (`Sys::build`, `Sys::solve`), used by the app, by the fit and by checks inside the derivation. |
-| `gxgeo/src/derive.rs` | The derivation: structure, block solving, target, checks. |
-| `gxgeo/src/nf.rs` | Normal form of formulas with nested square roots: exact arithmetic in the tower of roots. |
-| `gxgeo/src/fit.rs` | Formula discovery from samples: a polynomial relation fitted to numeric solutions. |
-| `gxgeo/src/dd.rs` | Double-double arithmetic (about 31 digits) for the fit. |
-| `gxgeo/src/expr/mod.rs` | Expression type `Expr`, canonicalizing constructors, evaluation, the simplifier, the work clock. |
-| `gxgeo/src/expr/poly.rs` | `Expr`-level polynomial helpers (`coeffs`, `split_frac`). |
-| `gxgeo/src/alg.rs` | Sparse multivariate polynomials over Q (`MPoly`), resultants, factorization. |
-| `src/app.rs` | `compute_formula`, background search levels, formula display state. |
-| `gxgeo/tests/testkit/mod.rs` | `Kit`: builds constructions in tests and checks derived formulas. |
-| `gxgeo/tests/gen_*.rs` | Generated tests (constructions with known answers). |
-| `gxgeo/tests/examples.rs` | Formula lengths of saved examples; `derive_file` for debugging. |
+| `sggeo/src/model.rs` | `Doc`: entities, parameters, constraints, dimensions. `Doc::equations`, `Doc::con_eqs`: constraints as expressions equal to 0. |
+| `sggeo/src/solver.rs` | Numeric solver (`Sys::build`, `Sys::solve`), used by the app, by the fit and by checks inside the derivation. |
+| `sggeo/src/derive.rs` | The derivation: structure, block solving, target, checks. |
+| `sggeo/src/nf.rs` | Normal form of formulas with nested square roots: exact arithmetic in the tower of roots. |
+| `sggeo/src/fit.rs` | Formula discovery from samples: a polynomial relation fitted to numeric solutions. |
+| `sggeo/src/dd.rs` | Double-double arithmetic (about 31 digits) for the fit. |
+| `sggeo/src/expr/mod.rs` | Expression type `Expr`, canonicalizing constructors, evaluation, the simplifier, the work clock. |
+| `sggeo/src/expr/poly.rs` | `Expr`-level polynomial helpers (`coeffs`, `split_frac`). |
+| `sggeo/src/alg.rs` | Sparse multivariate polynomials over Q (`MPoly`), resultants, factorization. |
+| `sgpad/src/app.rs` | `compute_formula`, background search levels, formula display state. |
+| `sggeo/tests/testkit/mod.rs` | `Kit`: builds constructions in tests and checks derived formulas. |
+| `sggeo/tests/gen_*.rs` | Generated tests (constructions with known answers). |
+| `sggeo/tests/examples.rs` | Formula lengths of saved examples; `derive_file` for debugging. |
 
 ### 1.2 Order of work (`derive.rs`)
 
@@ -289,12 +289,12 @@ answer is not (l² − s²)/OP. Checked with Maxima for the fixed-axis test:
   (the eliminant is its square; |OQ|² of the rotating test has degree 4 as well). A formula
   with two levels of square roots is therefore the simplest kind there is.
 - The formula written by hand (A and B from OP, then Q on the two circles) has 860 characters
-  in Maxima's notation; gxpad's has 990. Maxima's own simplifiers only lengthen it: `ratsimp`
+  in Maxima's notation; sgpad's has 990. Maxima's own simplifiers only lengthen it: `ratsimp`
   4,190, `radcan` 4,277, `fullratsimp` 4,023, `ratsimp` with `algebraic: true` 2,866,
   `factor` 28,105 characters, and `sqrtdenest` changes nothing. The form over a denominator
   without roots did not finish in 10 minutes.
 - For the rotating test, |OQ| written by hand as √(x² + y²) has 1,751 characters, and
-  through |OQ|² = |OA|² + |AQ|² + 2·OA·AQ it has 1,103. gxpad measures √(x² + y²) of its
+  through |OQ|² = |OA|² + |AQ|² + 2·OA·AQ it has 1,103. sgpad measures √(x² + y²) of its
   coordinates and has 2,233: the shorter arrangement is not found.
 
 Both tests sit at equal bars, where factors such as d1 − d2 are zero. The normal form keeps
@@ -414,32 +414,32 @@ normal form, on the same machine); the slowest single derivation takes 1.1 s.
 ## 3. Tools
 
 Environment variables:
-- `GXGEO_DEBUG=1`: per-block log of the derivation (blocks, equations, elimination steps,
+- `SGGEO_DEBUG=1`: per-block log of the derivation (blocks, equations, elimination steps,
   factor sizes, failure reasons, direct solving), the fit (`fit:` lines: atoms, bases, ranks,
   relations, check results), the normal form (`normal form:` sizes, time and ticks, and the
   reason of a failure), the stages after the blocks with real time and ticks (`stage`),
   and ticks against real time per strategy (`work:`).
-- `GXGEO_DUMP=<file>`: write the last polynomial of a polynomial block, for `factor_dump`.
-- `GXGEO_FACTOR_FILE=<file>` (with optional `GXGEO_MAIN=<var>|cheapest`): factor a dumped
+- `SGGEO_DUMP=<file>`: write the last polynomial of a polynomial block, for `factor_dump`.
+- `SGGEO_FACTOR_FILE=<file>` (with optional `SGGEO_MAIN=<var>|cheapest`): factor a dumped
   polynomial and report timings (`alg::tests::factor_dump`).
-- `GXGEO_DERIVE_FILE=<file.gxp>` (with optional `GXGEO_DERIVE_LEVEL=<n>`): derive every reference
+- `SGGEO_DERIVE_FILE=<file.sgp>` (with optional `SGGEO_DERIVE_LEVEL=<n>`): derive every reference
   dimension of a saved construction (`derive_file` in `tests/examples.rs`).
 
-Each test run writes its construction to `test_examples/<suite>/<test>.gxp`, which opens in the
-app (`cargo run --release -- <file>`).
+Each test run writes its construction to `test_examples/<suite>/<test>.sgp`, which opens in the
+app (`cargo run --release -p sgpad -- <file>`).
 
 Commands:
 
 ```sh
-# (in the gxgeo directory)
+# (in the sggeo directory)
 cargo test --no-fail-fast                                   # full suite
 cargo test --lib                                            # unit tests (alg, expr, derive, nf, fit, dd)
 timeout 300 cargo test --test gen_invariants ptolemy_diagonals -- --nocapture   # one test, prints formulas
-GXGEO_DEBUG=1 timeout 300 cargo test --test gen_linkages peaucellier_inversor_rotating -- --nocapture
-GXGEO_DERIVE_FILE=test_examples/gen_constructions/simson_line.gxp \
+SGGEO_DEBUG=1 timeout 300 cargo test --test gen_linkages peaucellier_inversor_rotating -- --nocapture
+SGGEO_DERIVE_FILE=test_examples/gen_constructions/simson_line.sgp \
   cargo test --test examples derive_file -- --ignored --nocapture
-GXGEO_DUMP=target/p.poly cargo test --test gen_invariants ptolemy_diagonals
-GXGEO_FACTOR_FILE=target/p.poly GXGEO_MAIN=cheapest cargo test -p gxgeo --lib alg::tests::factor_dump -- --ignored --nocapture
+SGGEO_DUMP=target/p.poly cargo test --test gen_invariants ptolemy_diagonals
+SGGEO_FACTOR_FILE=target/p.poly SGGEO_MAIN=cheapest cargo test -p sggeo --lib alg::tests::factor_dump -- --ignored --nocapture
 ```
 
 Run single tests under `timeout`: a stuck derivation otherwise blocks the run. Formulas do not

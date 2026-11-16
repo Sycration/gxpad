@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  segment AC
+    horiz A C
+  segment AB
+    d1: |AB| = 1.5
+    θ1: ∠CAB = 120°
+  segment BC
+    d2: |BC| = 5
+
+find
+  d3: dist(A, C)
+  d4: dist(B, AC)
+
+where
+  A (0.3333333333333333, 0.19999999999999984)
+  C (4.411635312290326, 0.19999999999999984)
+  B (-0.41666666666666635, 1.499038105676658)
+  d1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)

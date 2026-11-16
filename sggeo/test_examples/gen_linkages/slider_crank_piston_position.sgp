@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  segment OA
+    d1: |OA| = 1.2
+    θ1: angle(xaxis, OA) = 70°
+
+construct
+  point B on xaxis
+  segment AB
+    d2: |AB| = 4
+
+find
+  x_B: x(B)
+
+where
+  A (0.4104241719908026, 1.12763114494309)
+  B (4.248190188953579, 6.986410453395435e-23)
+  d1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  x_B label (0.3, 0.3)

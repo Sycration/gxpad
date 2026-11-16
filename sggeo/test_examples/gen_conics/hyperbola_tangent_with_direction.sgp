@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  a = 3
+  h1 = hyperbola(O)
+    a1: a(h1) = a
+    b1: b(h1) = 2
+  line AB
+    AB tan h1 near (-3.2504180333157686, -0.8340576562282993)
+    θ1: angle(xaxis, AB) = 60°
+
+find
+  d1: dist(O, AB)
+
+where
+  h1 a 3 b 2 angle 0° [fixed angle]
+  A (0.0018001827392023146, 4.798949531279924)
+  B (2.0173542805898363, 8.289991634160874)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

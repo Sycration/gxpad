@@ -9,9 +9,9 @@
 # will likely look very different (and much more reasonable).
 # See Cargo.toml.orig for the original contents.
 
-# Vendored from latex-rust 3.0.3 (crates.io) for gxpad. The only change from
+# Vendored from latex-rust 3.0.3 (crates.io) for sgpad. The only change from
 # the published crate: the optional egui and epaint dependencies take 0.37
-# instead of the exact pin =0.36.2, so the egui shapes match gxpad's egui.
+# instead of the exact pin =0.36.2, so the egui shapes match sgpad's egui.
 # Tests, benches and dev-dependencies are left out with their files. Drop
 # this copy once a latex-rust release supports egui 0.37.
 

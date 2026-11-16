@@ -1,0 +1,30 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    r1: r(k1) = 2
+  point B
+  k2 = circle(B)
+    k1 tan k2
+    r2: r(k2) = 3
+  segment AB
+
+construct
+  C = meet(k1, k2)
+  line CD
+    CD tan k1
+
+find
+  θ1: angle(CD, AB)
+
+where
+  A (0.0360977878694983, 0.06397729268291957)
+  k1 r 2
+  B (5.035542005562746, 0.13852602958402133)
+  k2 r 3
+  C (2.0358754749467973, 0.09379678744336027)
+  D (1.9924847316209557, 3.0036998902896985)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)

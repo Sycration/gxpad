@@ -1,0 +1,33 @@
+sgp 2
+
+given
+  triangle ABC
+    d1: |AB| = 6.020797289396148
+    d2: |BC| = 5.656854249492381
+    d3: |CA| = 4.924428900898052
+
+construct
+  D = mid(A, B)
+  l1 = perp(AB, D)
+  E = reflect(C, l1)
+  segment CE
+
+find
+  d4: dist(E, A)
+  d5: dist(E, B)
+  d6: dist(E, C)
+  d7: |CE|
+
+where
+  A (0, 0)
+  B (6, 0.5)
+  C (2, 4.5)
+  D (3, 0.25)
+  E (3.2827586206896555, 4.606896551724137)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
+  d6 label (0.3, 0.3)
+  d7 label (0.3, 0.3)

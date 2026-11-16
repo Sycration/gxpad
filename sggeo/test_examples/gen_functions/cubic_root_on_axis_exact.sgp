@@ -1,0 +1,14 @@
+sgp 2
+
+given
+  g1 = curve(y = x^3 - 3*x^2 + 2)
+
+construct
+  A = meet(g1, xaxis)
+
+find
+  x_A: x(A)
+
+where
+  A (1, -2.775962655148298e-56)
+  x_A label (0.3, 0.3)

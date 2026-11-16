@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  a = 5
+  b = 3
+  t = 35
+  e1 = ellipse(O)
+    a1: a(e1) = a
+    b1: b(e1) = b
+
+construct
+  point A on e1
+    x_A: x(A) = a*cos(t°)
+
+find
+  y_A: y(A)
+
+where
+  e1 a 5 b 3 angle 0° [fixed angle]
+  A (4.095760221444959, 1.7207293090531384)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

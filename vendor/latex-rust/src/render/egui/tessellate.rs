@@ -852,15 +852,15 @@ mod tests {
         let mut inside_seen = 0;
         for i in 0..n {
             for j in 0..n {
-                let gx = x0 - pad + (x1 - x0 + 2 * pad) * i / n;
-                let gy = y0 - pad + (y1 - y0 + 2 * pad) * j / n;
+                let grid_x = x0 - pad + (x1 - x0 + 2 * pad) * i / n;
+                let grid_y = y0 - pad + (y1 - y0 + 2 * pad) * j / n;
                 let q = (
                     Frac {
-                        n: i128::from(gx) * 97 + 31,
+                        n: i128::from(grid_x) * 97 + 31,
                         d: 97,
                     },
                     Frac {
-                        n: i128::from(gy) * 89 + 53,
+                        n: i128::from(grid_y) * 89 + 53,
                         d: 89,
                     },
                 );

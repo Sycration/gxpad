@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    xaxis tan k1
+    r1: r(k1) = 4
+  point B
+  k2 = circle(B)
+    xaxis tan k2
+    k1 tan k2
+    r2: r(k2) = 1
+
+find
+  d1: dx(A, B)
+
+where
+  A (0.05000000000000071, 4)
+  k1 r 4
+  B (4.050000000000001, 1)
+  k2 r 1
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

@@ -1,0 +1,14 @@
+sgp 2
+
+given
+  segment AB
+    θ1: angle(yaxis, AB) = 25°
+
+find
+  θ2: angle(xaxis, AB)
+
+where
+  A (1, 1) [fixed]
+  B (2.541199506065036, 4.305113006642382)
+  θ1 label (0.289784, 0.957092)
+  θ2 label (0.843391, 0.5373)

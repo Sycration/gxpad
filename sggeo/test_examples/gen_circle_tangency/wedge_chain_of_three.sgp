@@ -1,0 +1,37 @@
+sgp 2
+
+given
+  line OA
+    θ1: angle(xaxis, OA) = 60°
+  point B
+  k1 = circle(B)
+    xaxis tan k1
+    OA tan k1
+    r1: r(k1) = 9
+  point C
+  k2 = circle(C)
+    xaxis tan k2
+    OA tan k2
+    k1 tan k2
+  point D
+  k3 = circle(D)
+    xaxis tan k3
+    OA tan k3
+    k2 tan k3
+
+find
+  r2: r(k2)
+  r3: r(k3)
+
+where
+  A (9.861855070027817, 17.0812340381689)
+  B (15.5884572681199, 9)
+  k1 r 9
+  C (5.196152422706635, 3.000000000000001)
+  k2 r 3.000000000000001
+  D (1.7320508075688787, 1.0000000000000007)
+  k3 r 1.0000000000000007
+  θ1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  r3 label (0.3, 0.3)

@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  w = 3
+  segment OA
+    horiz O A
+    d1: |OA| = 3w
+  segment OB
+    d2: |OB| = 2w
+    θ1: ∠AOB = 90°
+
+construct
+  C = mid(A, B)
+  D = mid(A, B)
+  l1 = perp(AB, D)
+  E = meet(l1, OA)
+
+find
+  x_E: x(E)
+  d3: dist(C, E)
+
+where
+  A (9, -1.362074305821859e-47)
+  B (3.67394039744206e-16, 6)
+  C (4.5, 3)
+  D (4.5, 3)
+  E (2.5, -3.543699707557746e-48)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  x_E label (0.3, 0.3)
+  d3 label (0.3, 0.3)

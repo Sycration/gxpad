@@ -1,0 +1,26 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    r1: r(k1) = 5
+  k2 = circle(A)
+    r2: r(k2) = 3
+
+construct
+  point B on k1
+  C = tangent(B, k2)
+  segment BC
+
+find
+  d1: |BC|
+
+where
+  A (1.4185362094342406, 0.9177147785471637)
+  k1 r 5
+  k2 r 3
+  B (5.755959167711127, 3.4050350395936966)
+  C (1.7860947491115835, 3.8951130924968203)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

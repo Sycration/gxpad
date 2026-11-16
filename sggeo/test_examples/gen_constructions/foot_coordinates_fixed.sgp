@@ -1,0 +1,39 @@
+sgp 2
+
+given
+  point C
+    x_C: x(C) = 5
+    y_C: y(C) = 0
+  line AB
+    x_A: x(A) = 0
+    y_A: y(A) = 1
+    x_B: x(B) = 4
+    y_B: y(B) = 4
+
+construct
+  l1 = perp(AB, C)
+  D = meet(l1, AB)
+  E = reflect(C, AB)
+
+find
+  x_D: x(D)
+  y_D: y(D)
+  x_E: x(E)
+  y_E: y(E)
+
+where
+  C (5, 2.993483424694323e-53)
+  A (1.99021786273955e-53, 1)
+  B (4, 4)
+  D (2.72, 3.04)
+  E (0.4400000000000004, 6.08)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_D label (0.3, 0.3)
+  y_D label (0.3, 0.3)
+  x_E label (0.3, 0.3)
+  y_E label (0.3, 0.3)

@@ -1,0 +1,45 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    r1: r(k1) = 3
+  point B
+    d1: dist(A, B) = 7
+  k2 = circle(B)
+    r2: r(k2) = 2
+
+construct
+  point C on k1
+  point D on k2
+  point E on k1
+  point F on k2
+  segment CD
+    CD tan k1
+    CD tan k2
+  segment EF
+    EF tan k1
+    EF tan k2
+  segment AC
+  segment AE
+
+find
+  d2: |CD|
+  d3: |EF|
+  θ1: ∠CAE
+
+where
+  A (-0.0047619039725019805, -0.00007682267936492714)
+  k1 r 3
+  B (6.995238094549253, 0.000067036350783368)
+  k2 r 2
+  C (0.42374850300245986, 2.9691619402216842)
+  D (7.280911699199228, 1.979559544951483)
+  E (0.42387054601438373, -2.9692979701889675)
+  F (7.280993061207178, -1.9794137286556184)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)

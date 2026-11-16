@@ -1,0 +1,26 @@
+sgp 2
+
+given
+  segment AB
+    d1: |AB| = 3
+  segment BD
+    |AB| == |BD|
+  segment DC
+    |BD| == |DC|
+  l1 = segment CA
+    |DC| == len(l1)
+  l2 = segment AC
+    θ1: angle(AB, l2) = 70°
+  segment AD
+
+find
+  d2: |AD|
+
+where
+  A (0.005386228746231469, 0.028434637449153862)
+  B (3.0050898525118424, -0.013733710484609725)
+  D (4.070674201230775, 2.7906432249085715)
+  C (1.070970577465164, 2.8328115728423344)
+  d1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

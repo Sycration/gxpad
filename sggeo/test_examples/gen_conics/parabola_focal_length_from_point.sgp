@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  point A
+  p1 = parabola(A)
+
+construct
+  point B on p1
+    d1: dx(A, B) = 2
+    d2: dy(A, B) = 3
+
+find
+  a1: a(p1)
+
+where
+  A (1, 0.9999999999999998)
+  p1 a 1.125 angle 0° [fixed angle]
+  B (3, 4)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  a1 label (0.3, 0.3)

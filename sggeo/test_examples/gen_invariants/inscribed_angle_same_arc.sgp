@@ -1,0 +1,33 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 2
+
+construct
+  point A on k1
+  point B on k1
+  point C on k1
+  point D on k1
+  segment CA
+  segment CB
+    θ1: angle(CA, BC) = 70°
+  segment DA
+  segment DB
+  segment OA
+  segment OB
+
+find
+  θ2: angle(DA, BD)
+  θ3: ∠AOB
+
+where
+  k1 r 2
+  A (-1.8811673782293175, 0.6791239173271956)
+  B (1.8775902561689723, 0.6889519794146274)
+  C (0.3588684599791816, 1.9675399432875997)
+  D (-0.9999999999999998, 1.7320508075688774)
+  r1 label (0.3, 0.3)
+  θ1 label (0.3, 0.3)
+  θ2 label (0.3, 0.3)
+  θ3 label (0.3, 0.3)

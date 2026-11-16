@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  g1 = curve(y = exp(-x^2))
+  line AB
+    horiz A B
+
+construct
+  C = meet(AB, g1)
+  D = meet(AB, g1)
+
+find
+  d1: dist(C, D)
+
+where
+  A (0, 0.5) [fixed]
+  B (1, 0.5)
+  C (0.8325546111576978, 0.5)
+  D (-0.8325546111576978, 0.5)
+  d1 label (0.3, 0.3)

@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  point A
+
+construct
+  point B on yaxis
+  point C on xaxis
+  w1 = arc(A, B, C)
+    xaxis tan w1
+    yaxis tan w1
+    r1: r(w1) = 2
+
+find
+  d1: dist(C, B)
+
+where
+  A (2, 2)
+  B (0, 2)
+  C (2, 0)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

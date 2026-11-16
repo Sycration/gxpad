@@ -1,0 +1,52 @@
+sgp 2
+
+given
+  triangle OAB
+    x_A: x(A) = 6
+    y_A: y(A) = 0
+    x_B: x(B) = 0
+    y_B: y(B) = 8
+
+construct
+  C = mid(O, A)
+  l1 = perp(OA, C)
+  D = mid(O, B)
+  l2 = perp(OB, D)
+  E = meet(l1, l2)
+  F = mid(A, B)
+  G = mid(B, O)
+  segment OF
+  segment AG
+  H = meet(OF, AG)
+  l3 = bisect(AO, AB)
+  l4 = bisect(OA, OB)
+  I = meet(l3, l4)
+
+find
+  x_E: x(E)
+  y_E: y(E)
+  x_H: x(H)
+  y_H: y(H)
+  x_I: x(I)
+  y_I: y(I)
+
+where
+  A (6, -1.4214723253087986e-50)
+  B (3.794464548141142e-52, 8)
+  C (3, -8.327593562059717e-51)
+  D (2.3776578155269624e-52, 4)
+  E (3, 4)
+  F (3, 4)
+  G (8.874414076477993e-53, 4)
+  H (2, 2.6666666666666665)
+  I (2, 2)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_E label (0.3, 0.3)
+  y_E label (0.3, 0.3)
+  x_H label (0.3, 0.3)
+  y_H label (0.3, 0.3)
+  x_I label (0.3, 0.3)
+  y_I label (0.3, 0.3)

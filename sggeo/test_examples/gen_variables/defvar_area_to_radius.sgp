@@ -1,0 +1,29 @@
+sgp 2
+
+given
+  polygon ABCD
+    horiz A B
+    horiz C D
+    vert B C
+    vert D A
+    d1: |AB| = 5
+    d2: |BC| = 3
+  point E
+  k1 = circle(E)
+    r1: r(k1) = sqrt(A/pi)
+
+find
+  D1: diam(k1)
+  A = d1*d2
+
+where
+  A (-0.49999999999999967, -7.457483374570332e-25)
+  B (4.5, -7.457483374570332e-25)
+  C (4.5, 3)
+  D (-0.49999999999999967, 3)
+  E (10, 10)
+  k1 r 2.185096861184158
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  D1 label (0.3, 0.3)

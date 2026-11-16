@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  h1 = hyperbola(O)
+    a1: a(h1) = 3
+    b1: b(h1) = 4
+  point B
+
+construct
+  A = focus(h1)
+    O == mid(A, B)
+  l1 = directrix(h1, B)
+
+find
+  d1: dist(O, l1)
+
+where
+  h1 a 3 b 4 angle 0°
+  B (-5, 0)
+  A (5, 0)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

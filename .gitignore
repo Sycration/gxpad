@@ -1,8 +1,8 @@
 /target
 /build
-# Visual Studio 2008 output of winxp/gxpad.sln
-/winxp/Debug
-/winxp/Release
-/winxp/*.ncb
-/winxp/*.suo
-/winxp/*.user
+# Visual Studio 2008 output of sgpad/winxp/sgpad.sln
+/sgpad/winxp/Debug
+/sgpad/winxp/Release
+/sgpad/winxp/*.ncb
+/sgpad/winxp/*.suo
+/sgpad/winxp/*.user

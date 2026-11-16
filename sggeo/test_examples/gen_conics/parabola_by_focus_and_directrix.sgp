@@ -1,0 +1,29 @@
+sgp 2
+
+given
+  point A
+    x_A: x(A) = 0
+    y_A: y(A) = 3
+  point B
+  p1 = parabola(B)
+    A == focus(p1)
+    xaxis == directrix(p1, A)
+
+construct
+  point C on p1
+    d1: dist(A, C) = 5
+
+find
+  a1: a(p1)
+  d2: dist(C, xaxis)
+
+where
+  A (3.338676287644258e-26, 3)
+  B (-9.184850989229518e-17, 1.5)
+  p1 a 1.5 angle 90°
+  C (4.58257569495584, 5)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  a1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

@@ -1,0 +1,19 @@
+sgp 2
+
+given
+  triangle ABC
+    horiz A B
+    vert B C
+    d1: |AB| = 1000
+    d2: |BC| = 2000
+
+find
+  d3: |CA|
+
+where
+  A (-8.325822489922594e-17, 0.9999999999999974)
+  B (1000, 0.9999999999999974)
+  C (1000, 2001)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

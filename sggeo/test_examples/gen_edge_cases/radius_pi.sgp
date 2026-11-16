@@ -1,0 +1,19 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = pi
+
+construct
+  point A on k1
+    y_A: y(A) = 1
+
+find
+  x_A: x(A)
+
+where
+  k1 r 3.141592653589793
+  A (2.9781881070693568, 1)
+  r1 label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

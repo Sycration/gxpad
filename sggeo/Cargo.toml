@@ -1,0 +1,25 @@
+[package]
+name = "sggeo"
+version = "0.3.1"
+edition = "2024"
+description = "Geometry model, constraint solver, and closed-form formula derivation for 2D geometric constructions"
+license = "GPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+num-bigint = "0.4"
+num-rational = "0.4"
+num-traits = "0.2"
+num-integer = "0.1"
+web-time = "1.1"
+# typesets formulas as PNG images (ops::latex_png); the workspace takes the vendored copy
+latex-rust = { version = "3.0.3", default-features = false, features = ["std", "png"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+wasm-bindgen = "0.2.130"
+js-sys = "0.3"
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"

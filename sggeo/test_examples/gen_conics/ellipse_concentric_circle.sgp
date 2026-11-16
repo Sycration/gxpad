@@ -1,0 +1,27 @@
+sgp 2
+
+given
+  point A
+  e1 = ellipse(A)
+    a1: a(e1) = 5
+    b1: b(e1) = 3
+  k1 = circle(A)
+    r1: r(k1) = 4
+
+construct
+  B = meet(e1, k1)
+
+find
+  d1: dx(A, B)
+  d2: dy(A, B)
+
+where
+  A (1.996405430584631, 0.9999999999999998)
+  e1 a 5 b 3 angle 0° [fixed angle]
+  k1 r 4
+  B (5.303594569415369, 3.25)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

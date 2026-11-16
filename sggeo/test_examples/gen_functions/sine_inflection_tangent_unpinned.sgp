@@ -1,0 +1,15 @@
+sgp 2
+
+given
+  g1 = curve(y = sin(x))
+  segment OA
+    OA tan g1 near (0.0004860098616927157, 0.00048600981126334375)
+    d1: |OA| = 3
+
+find
+  d2: dx(O, A)
+
+where
+  A (2.121320468821149, 2.1213202182981292)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

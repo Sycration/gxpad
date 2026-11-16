@@ -1,0 +1,30 @@
+sgp 2
+
+given
+  W = 12
+  line AB
+    vert A B
+    x_A: x(A) = W
+  point C
+  k1 = circle(C)
+    xaxis tan k1
+    yaxis tan k1
+  point D
+  k2 = circle(D)
+    xaxis tan k2
+    AB tan k2
+    k1 tan k2
+    r(k1) == r(k2)
+
+find
+  r1: r(k1)
+
+where
+  A (12, 3.9975020798640077)
+  B (12, -1.997502079864008)
+  C (3, 3)
+  k1 r 3
+  D (9, 3)
+  k2 r 3
+  x_A label (0.3, 0.3)
+  r1 label (0.3, 0.3)

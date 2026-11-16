@@ -1,0 +1,31 @@
+sgp 2
+
+given
+  l1 = segment AB
+    d1: len(l1) = 4
+  l2 = segment AD
+    d2: len(l2) = 3
+    θ1: angle(l1, l2) = 85°
+  l3 = segment BA
+  l4 = segment BC
+    θ2: angle(l3, l4) = 95°
+  l5 = segment CB
+  l6 = segment CD
+  l7 = segment DC
+  l8 = segment DA
+    θ3: angle(l8, l7) = 100°
+
+find
+  θ4: angle(l5, l6)
+
+where
+  A (0.11094564336927815, 0.09336564988917262)
+  B (4.110945348523978, 0.09182982362493346)
+  D (0.3735603388253756, 3.0818491318128225)
+  C (4.4045486692813665, 3.4329553946730713)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  θ1 label (0.748282, 0.663381)
+  θ2 label (-0.66359, 0.748097)
+  θ3 label (0.711019, -0.703173)
+  θ4 label (-0.707378, -0.706835)

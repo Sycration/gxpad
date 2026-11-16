@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  s ~ 0.75
+  g1 = curve(y = s*x^2)
+
+construct
+  point A on g1
+    x_A: x(A) = 2
+    y_A: y(A) = 3
+  point B on g1
+    x_B: x(B) = -4
+
+find
+  y_B: y(B)
+
+where
+  A (2, 3)
+  B (-4, 12)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)

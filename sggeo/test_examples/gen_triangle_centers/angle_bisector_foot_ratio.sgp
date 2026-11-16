@@ -1,0 +1,29 @@
+sgp 2
+
+given
+  l1 = segment BC
+    d1: len(l1) = 14
+  segment CA
+    d2: |CA| = 15
+  segment AB
+    d3: |AB| = 13
+  l3 = line BC
+
+construct
+  l2 = bisect(AB, AC)
+  D = meet(l2, l3)
+
+find
+  d4: dist(B, D)
+  d5: dist(D, C)
+
+where
+  B (-0.031203432306989055, 0.04042156277237483)
+  C (13.966323095029786, -0.222734505945971)
+  A (5.193475529214727, 11.9443171330902)
+  D (6.4676481696708, -0.08175804056114287)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
