@@ -1,0 +1,31 @@
+# The Peaucellier–Lipkin inversor
+sgp 2
+
+given
+  segment OC
+    d1: |OC| = 3
+  segment OD
+    d2: |OD| = 3
+  polygon ACBD
+    d3: |AC| = 1
+    d4: |CB| = 1
+    d5: |BD| = 1
+    d6: |DA| = 1
+    d7: dist(O, A) = 2.4
+
+find
+  d8: dist(O, B)
+
+where
+  C (2.8725662714434637, 0.8650797744516963)
+  D (2.860636672061713, -0.903746552112752)
+  A (2.3999454182114692, -0.016186092974395383)
+  B (3.3332575252937073, -0.022480684686660334)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
+  d6 label (0.3, 0.3)
+  d7 label (0.3, 0.3)
+  d8 label (0.3, 0.3)

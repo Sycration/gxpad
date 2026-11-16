@@ -8,8 +8,8 @@
 #   --dry-run  only writes the archives to build/dist, without creating a release
 #
 # Archives: sg-TAG-<platform>-<arch>.tar.gz (linux, macos, web) or .zip (windows, winxp), one for each
-# directory of build/, plus SHA256SUMS. web-wasm32 holds only the sggeo Wasm module, winxp-x64 the sggeo DLL and
-# sgcli, and winxp-x86 the Windows XP program besides. Each one holds a top-level folder with bin/ and lib/ as in
+# directory of build/, plus SHA256SUMS. web-wasm32 holds the sggeo Wasm module and sgweb for Linux and Windows x64,
+# winxp-x64 the sggeo DLL and sgcli, and winxp-x86 the Windows XP program besides. Each one holds a top-level folder with bin/ and lib/ as in
 # build/ and LICENSE; the archives with sgpad also hold the README.md of the project, or for Windows XP the
 # README.md of sgpad/winxp/ (bin/ holds the sgcli README.md and lib/ the sggeo README.md, from ./build.sh).
 # The release tag points at the current commit, which must be clean and pushed. ./set-version.sh X.Y.Z

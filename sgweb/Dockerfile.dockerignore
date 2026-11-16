@@ -1,0 +1,7 @@
+# The build context of sgweb/Dockerfile is the whole repository; the image build needs its sources only.
+.git
+target
+build
+sgpad/winxp
+sggeo/test_examples
+docs/*.png

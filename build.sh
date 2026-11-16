@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Release builds of sgpad (desktop program), sgcli (command line) and sggeo (C library / Wasm module), collected
-# under build/:
+# Release builds of sgpad (desktop program), sgcli (command line), sgweb (web app server) and sggeo (C library /
+# Wasm module), collected under build/:
 #
 #   build/<platform>/<arch>/bin   sgpad and sgcli executables and the sgcli README.md
 #   build/<platform>/<arch>/lib   sggeo shared library, import library, sggeo.h and the sggeo README.md
+#   build/web/wasm32/bin          sgweb, the web app server with the sggeo Wasm module built in, for Linux x64 (sgweb)
+#                                 and Windows x64 (sgweb.exe), and the sgweb README.md
 #   build/web/wasm32/lib          sggeo Wasm module, its wasm-bindgen JS glue and the sggeo README.md
 #   build/winxp/<arch>/bin        sgcli executable for Windows XP and the sgcli README.md; for x86 also
 #                                 sgpad.exe, the Windows XP program (sgpad/winxp/), and the sggeo DLL it runs with
@@ -15,7 +17,7 @@
 #   - rustup targets: x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-pc-windows-gnu
 #     aarch64-pc-windows-gnullvm x86_64-apple-darwin aarch64-apple-darwin wasm32-unknown-unknown
 #     i686-pc-windows-msvc x86_64-pc-windows-msvc
-#   - linux, windows: zig and cargo-zigbuild
+#   - linux, windows, web: zig and cargo-zigbuild
 #   - macos: osxcross (its target/bin on PATH, or OSXCROSS_BIN set to that directory)
 #   - web: wasm-bindgen-cli matching the wasm-bindgen version in Cargo.lock
 #   - winxp: zig, thunk (cargo install thunk-cli), bsdtar, llvm-readobj and llvm-dlltool (llvm), and
@@ -34,6 +36,9 @@ TARGET_DIR=${CARGO_TARGET_DIR:-$ROOT/target}
 HEADER=$ROOT/sggeo/include/sggeo.h
 LIB_README=$ROOT/sggeo/README.md
 SGCLI_README=$ROOT/sgcli/README.md
+SGWEB_README=$ROOT/sgweb/README.md
+# the sggeo Wasm module and its JS glue, which build/web ships and the sgweb binaries embed
+PKG=$TARGET_DIR/sggeo-pkg
 
 # Linux binaries link against this glibc version so that they load on older distributions.
 GLIBC=2.17
@@ -64,7 +69,7 @@ build_linux() {
   for pair in x64:x86_64 arm64:aarch64; do
     local arch=${pair%%:*} triple=${pair#*:}-unknown-linux-gnu
     echo "==> linux $arch"
-    cargo zigbuild --release --workspace --target "$triple.$GLIBC"
+    cargo zigbuild --release --workspace --exclude sgweb --target "$triple.$GLIBC"
     collect linux "$arch" "$triple" "" libsggeo.so
   done
 }
@@ -77,7 +82,7 @@ build_windows() {
   for pair in x64:x86_64-pc-windows-gnu arm64:aarch64-pc-windows-gnullvm; do
     local arch=${pair%%:*} triple=${pair#*:}
     echo "==> windows $arch"
-    cargo zigbuild --release --workspace --target "$triple"
+    cargo zigbuild --release --workspace --exclude sgweb --target "$triple"
     collect windows "$arch" "$triple" .exe sggeo.dll libsggeo.dll.a
   done
 }
@@ -109,14 +114,25 @@ build_macos() {
   done
 }
 
+# The sggeo Wasm module, and sgweb with that module built in, for Linux x64 and Windows x64.
 build_web() {
   need wasm-bindgen "cargo install wasm-bindgen-cli --version <the wasm-bindgen version in Cargo.lock>"
+  need cargo-zigbuild "cargo install cargo-zigbuild"
   echo "==> web wasm32"
   cargo build --release -p sggeo --target wasm32-unknown-unknown
-  local dest=$OUT/web/wasm32/lib
-  mkdir -p "$dest"
-  wasm-bindgen --target web --out-dir "$dest" "$TARGET_DIR/wasm32-unknown-unknown/release/sggeo.wasm"
-  cp "$LIB_README" "$dest/"
+  rm -rf "$PKG"
+  wasm-bindgen --target web --out-dir "$PKG" "$TARGET_DIR/wasm32-unknown-unknown/release/sggeo.wasm"
+  local dest=$OUT/web/wasm32
+  mkdir -p "$dest/lib" "$dest/bin"
+  cp -r "$PKG/." "$dest/lib/"
+  cp "$LIB_README" "$dest/lib/"
+  for spec in x86_64-unknown-linux-gnu:x86_64-unknown-linux-gnu.$GLIBC: x86_64-pc-windows-gnu:x86_64-pc-windows-gnu:.exe; do
+    IFS=: read -r triple target ext <<<"$spec"
+    echo "==> web sgweb $triple"
+    SGWEB_SGGEO_PKG=$PKG cargo zigbuild --release -p sgweb --target "$target"
+    cp "$TARGET_DIR/$triple/release/sgweb$ext" "$dest/bin/"
+  done
+  cp "$SGWEB_README" "$dest/bin/"
 }
 
 # check_xp_imports DLL EXPORTS: fails when DLL imports a function that is missing from EXPORTS, the list of
