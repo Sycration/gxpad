@@ -616,3 +616,385 @@ fn numeric_dimension_drops_from_formula() {
     assert!(text.contains(&n2), "{text}");
     k.check_value(dd, 5.0);
 }
+
+/// Real root of p(x) = 0 nearest `guess`, by Newton's method.
+fn zero_near(p: impl Fn(f64) -> f64, guess: f64) -> f64 {
+    let mut x = guess;
+    for _ in 0..200 {
+        let h = 1e-6 * (1.0 + x.abs());
+        let d = (p(x + h) - p(x - h)) / (2.0 * h);
+        x -= p(x) / d;
+    }
+    x
+}
+
+/// Solved variable s with a right triangle of legs s and s² + s and
+/// hypotenuse 3: s⁴ + 2s³ + 2s² − 9 = 0 (irreducible quartic), unknowns
+/// coupled with the triangle's coordinates.
+#[test]
+fn solved_var_quartic_triangle() {
+    let mut k = Kit::new();
+    k.solved_var("s", 1.2);
+    let a = k.point(0.0, 0.0);
+    let b = k.point(1.2, 0.1);
+    let c = k.point(0.1, 2.7);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.perpendicular(ab, ac);
+    k.drive(DimKind::Length(ab), "s");
+    k.drive(DimKind::Length(ac), "s^2 + s");
+    k.drive(DimKind::Length(bc), "3");
+    let ang = k.measure_angle(ab, bc);
+    let s0 = zero_near(|s| s.powi(4) + 2.0 * s.powi(3) + 2.0 * s * s - 9.0, 1.2);
+    k.check_value(ang, std::f64::consts::PI - (s0 / 3.0).acos());
+}
+
+/// Solved variable s with s³ + s = 3 through two dimensions of one point.
+#[test]
+fn solved_var_cubic() {
+    let mut k = Kit::new();
+    k.solved_var("s", 1.2);
+    let p = k.point(1.2, 3.0);
+    let f = k.curve("y = x^3 + x");
+    k.on(p, f);
+    k.drive(DimKind::CoordX(p), "s");
+    k.drive(DimKind::CoordY(p), "3");
+    let q = k.point(1.2, 1.2);
+    let g = k.curve("y = x");
+    k.on(q, g);
+    k.drive(DimKind::CoordX(q), "s");
+    let qy = k.measure(DimKind::CoordY(q));
+    k.check_value(qy, zero_near(|x| x.powi(3) + x - 3.0, 1.2));
+}
+
+/// Three solved variables u, v, w with u + v + w = 2, uv + vw + wu = −1,
+/// uvw = −1 (elementary symmetric functions): u is a root of
+/// t³ − 2t² − t + 1 = 0 (three real roots), a polynomial system whose
+/// eliminant is an irreducible cubic.
+#[test]
+fn symmetric_system_cubic() {
+    let mut k = Kit::new();
+    let t0 = zero_near(|t| t.powi(3) - 2.0 * t * t - t + 1.0, 2.25);
+    let t1 = zero_near(|t| t.powi(3) - 2.0 * t * t - t + 1.0, 0.55);
+    let t2 = zero_near(|t| t.powi(3) - 2.0 * t * t - t + 1.0, -0.8);
+    k.solved_var("u", t0 + 0.01);
+    k.solved_var("v", t1 - 0.01);
+    k.solved_var("w", t2 + 0.01);
+    // points on vertical lines x = 2, x = −1, x = −1 whose x coordinates
+    // are driven by the symmetric functions
+    for (xv, e, y) in [(2.0, "u + v + w", 0.0), (-1.0, "u*v + v*w + w*u", 1.0), (-1.0, "u*v*w", 2.0)] {
+        let c = k.curve(&format!("x = {e}"));
+        let p = k.point(xv, y);
+        k.on(p, c);
+        k.drive(DimKind::CoordX(p), &format!("{xv}"));
+        k.drive(DimKind::CoordY(p), &format!("{y}"));
+    }
+    let s = k.point(t0, t0);
+    let g = k.curve("y = x");
+    k.on(s, g);
+    k.drive(DimKind::CoordX(s), "u");
+    let sy = k.measure(DimKind::CoordY(s));
+    k.check_value(sy, t0);
+}
+
+/// Solved variable with two positive roots (s² − 5s + c = 0), upper root.
+#[test]
+fn solved_var_quadratic_upper_root() {
+    let mut k = Kit::new();
+    k.var("c", 6.0);
+    k.solved_var("s", 3.2);
+    let a = k.origin();
+    let b = k.point(15.0, 0.1);
+    let cpt = k.point(0.1, 15.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, cpt);
+    k.horizontal(ab);
+    k.vertical(ac);
+    k.drive(DimKind::Length(ab), "s*s + c");
+    k.drive(DimKind::Length(ac), "5*s");
+    k.equal(ab, ac);
+    let m = k.measure(DimKind::Distance(b, cpt));
+    k.check_value(m, 15.0 * 2f64.sqrt());
+}
+
+/// Same, lower root.
+#[test]
+fn solved_var_quadratic_lower_root() {
+    let mut k = Kit::new();
+    k.var("c", 6.0);
+    k.solved_var("s", 1.8);
+    let a = k.origin();
+    let b = k.point(10.0, 0.1);
+    let cpt = k.point(0.1, 10.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, cpt);
+    k.horizontal(ab);
+    k.vertical(ac);
+    k.drive(DimKind::Length(ab), "s*s + c");
+    k.drive(DimKind::Length(ac), "5*s");
+    k.equal(ab, ac);
+    let m = k.measure(DimKind::Distance(b, cpt));
+    k.check_value(m, 10.0 * 2f64.sqrt());
+}
+
+/// Solved variable at a double root (discriminant exactly zero). The
+/// numeric solution of a double root is only accurate to about √ε, so the
+/// measurement is too.
+#[test]
+fn solved_var_double_root() {
+    let mut k = Kit::new();
+    k.value_tol = 1e-7;
+    k.var("c", 6.25);
+    k.solved_var("s", 2.4);
+    let a = k.origin();
+    let b = k.point(12.5, 0.1);
+    let cpt = k.point(0.1, 12.5);
+    let ab = k.line(a, b);
+    let ac = k.line(a, cpt);
+    k.horizontal(ab);
+    k.vertical(ac);
+    k.drive(DimKind::Length(ab), "s*s + c");
+    k.drive(DimKind::Length(ac), "5*s");
+    k.equal(ab, ac);
+    let m = k.measure(DimKind::Distance(b, cpt));
+    println!("measured {} vs exact {}", k.value(m), 12.5 * 2f64.sqrt());
+    k.check(m);
+}
+
+/// A chain of defined variables feeding a driving dimension.
+#[test]
+fn defvar_long_chain() {
+    let mut k = Kit::new();
+    k.var("s", 2.0);
+    k.defvar("t", "2*s + 1");
+    k.defvar("u", "t^2 - s");
+    k.defvar("w", "sqrt(u) / t");
+    k.defvar("z", "w*t*t");
+    let a = k.origin();
+    let b = k.point(3.0, 0.1);
+    let c = k.point(0.1, 15.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    k.horizontal(ab);
+    k.perpendicular(ab, ac);
+    k.drive(DimKind::Length(ab), "t");
+    k.drive(DimKind::Length(ac), "z");
+    let d = k.measure(DimKind::Distance(b, c));
+    let (t, u) = (5.0f64, 23.0f64);
+    let z = u.sqrt() * t;
+    k.check_value(d, (t * t + z * z).sqrt());
+}
+
+/// Dimensions driven by expressions of other dimensions.
+#[test]
+fn dims_referencing_dims() {
+    let mut k = Kit::new();
+    let a = k.origin();
+    let b = k.point(3.0, 0.1);
+    let c = k.point(1.0, 3.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.horizontal(ab);
+    let d1 = k.drive(DimKind::Length(ab), "3");
+    let n1 = nm(&k, d1);
+    let d2 = k.drive(DimKind::Length(ac), &format!("{n1} + 1"));
+    let n2 = nm(&k, d2);
+    k.drive(DimKind::Length(bc), &format!("({n1} + {n2})/2 + 1"));
+    let ang = k.measure_angle(ab, ac);
+    // a=3, b=4, c=4.5
+    k.check_value(ang, ((9.0 + 16.0 - 20.25) / 24.0f64).acos());
+}
+
+/// Angle driven by an expression of another angle (radians).
+#[test]
+fn angle_expression_of_angle() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let p = k.point(4.0, 1.0);
+    let q = k.point(1.0, 4.0);
+    let l1 = k.line(o, p);
+    let l2 = k.line(o, q);
+    let xa = k.xaxis();
+    let t1 = k.drive_angle(xa, l1, "20");
+    let n1 = nm(&k, t1);
+    k.drive_angle(l1, l2, &format!("2*{n1}"));
+    k.drive(DimKind::Length(l1), "4");
+    k.drive(DimKind::Length(l2), "4");
+    let y = k.measure(DimKind::CoordY(q));
+    k.check_value(y, 4.0 * (60.0f64).to_radians().sin());
+}
+
+/// Variable taken far (×20) and then to a small value, re-deriving each time.
+#[test]
+fn var_far_moves_reder() {
+    let mut k = Kit::new();
+    let s = k.var("s", 2.0);
+    let a = k.origin();
+    let b = k.point(2.0, 0.1);
+    let c = k.point(1.0, 1.5);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.horizontal(ab);
+    k.drive(DimKind::Length(ab), "s");
+    k.drive(DimKind::Length(ac), "s");
+    k.drive(DimKind::Length(bc), "s");
+    let y = k.measure(DimKind::CoordY(c));
+    k.check_value(y, 3f64.sqrt());
+    let f = k.formula(y);
+    k.set_var(s, 40.0);
+    k.still(y, &f, "s=40");
+    k.set_var(s, 0.001);
+    k.still(y, &f, "s=0.001");
+}
+
+/// A driving dimension with functions of other dimensions.
+#[test]
+fn dim_expression_with_functions() {
+    let mut k = Kit::new();
+    let a = k.origin();
+    let b = k.point(3.0, 0.1);
+    let c = k.point(0.1, 3.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    k.horizontal(ab);
+    k.perpendicular(ab, ac);
+    let d1 = k.drive(DimKind::Length(ab), "3");
+    let n1 = nm(&k, d1);
+    k.drive(DimKind::Length(ac), &format!("sqrt({n1}^2 + 7)"));
+    let d = k.measure(DimKind::Distance(b, c));
+    k.check_value(d, (9.0f64 + 16.0).sqrt());
+}
+
+/// A defined variable of a dimension feeds another dimension.
+#[test]
+fn defvar_of_dimension() {
+    let mut k = Kit::new();
+    let a = k.origin();
+    let b = k.point(3.0, 0.1);
+    let c = k.point(1.0, 3.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.horizontal(ab);
+    let d1 = k.drive(DimKind::Length(ab), "4");
+    let n1 = nm(&k, d1);
+    k.defvar("w", &format!("{n1}*3/4"));
+    k.drive(DimKind::Length(ac), "w");
+    k.drive(DimKind::Length(bc), "w + 2");
+    let ang = k.measure_angle(ab, ac);
+    // a=4, b=3, c=5 → right angle at A
+    k.check_value(ang, PI / 2.0);
+}
+
+/// Solved variable fixed by a geometric condition: right triangle with legs
+/// s and s+1 and hypotenuse 5 → s = 3 (other root −4 is not geometric).
+#[test]
+fn solved_var_pythagorean_root() {
+    let mut k = Kit::new();
+    k.solved_var("s", 2.8);
+    let a = k.origin();
+    let b = k.point(3.0, 0.1);
+    let c = k.point(0.1, 4.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.horizontal(ab);
+    k.perpendicular(ab, ac);
+    k.drive(DimKind::Length(ab), "s");
+    k.drive(DimKind::Length(ac), "s + 1");
+    let h = k.drive(DimKind::Length(bc), "5");
+    let m = k.measure(DimKind::Distance(a, b));
+    k.check_value(m, 3.0);
+    let f = k.formula(m);
+    k.set(h, "13");
+    k.still(m, &f, "hyp 13");
+}
+
+/// Defined variable of a solved variable.
+#[test]
+fn defvar_of_solved_var() {
+    let mut k = Kit::new();
+    k.solved_var("s", 2.8);
+    k.defvar("w", "2*s + 1");
+    let a = k.origin();
+    let b = k.point(3.0, 0.1);
+    let c = k.point(0.1, 7.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.horizontal(ab);
+    k.perpendicular(ab, ac);
+    k.drive(DimKind::Length(ab), "s");
+    k.drive(DimKind::Length(ac), "w");
+    k.drive(DimKind::Length(bc), "w + 1/3");
+    // s² + (2s+1)² = (2s + 4/3)² → s² + 4s + 1 = 4s²... solve numerically below
+    let m = k.measure(DimKind::Distance(a, b));
+    // s² + 4s² + 4s + 1 = 4s² + 16s/3 + 16/9 → s² − 4s/3 − 7/9 = 0 → s = (4/3 + sqrt(16/9 + 28/9))/2
+    k.check_value(m, (4.0 / 3.0 + (44.0f64 / 9.0).sqrt()) / 2.0);
+}
+
+/// Solved variable that is a root of a cubic with three real roots
+/// s³ − 6s² + 11s − c = 0 (c = 6: roots 1, 2, 3).
+fn cubic_root_case(guess: f64, expect_s: f64) {
+    let mut k = Kit::new();
+    let cv = k.var("c", 6.0);
+    k.solved_var("s", guess);
+    let a = k.origin();
+    let l = expect_s.powi(3) + 11.0 * expect_s + 10.0;
+    let b = k.point(l, 0.1);
+    let cpt = k.point(0.1, l);
+    let ab = k.line(a, b);
+    let ac = k.line(a, cpt);
+    k.horizontal(ab);
+    k.vertical(ac);
+    k.drive(DimKind::Length(ab), "s^3 + 11*s + 10");
+    k.drive(DimKind::Length(ac), "6*s^2 + c + 10");
+    k.equal(ab, ac);
+    let m = k.measure(DimKind::Length(ab));
+    let s = expect_s;
+    k.check_value(m, s * s * s + 11.0 * s + 10.0);
+    let f = k.formula(m);
+    k.set_var(cv, 6.1);
+    k.still(m, &f, "c = 6.1");
+}
+
+#[test]
+fn solved_var_cubic_root_low() {
+    cubic_root_case(0.9, 1.0);
+}
+
+#[test]
+fn solved_var_cubic_root_mid() {
+    cubic_root_case(2.1, 2.0);
+}
+
+#[test]
+fn solved_var_cubic_root_high() {
+    cubic_root_case(3.1, 3.0);
+}
+
+/// Length driven by an expression that is 0 (coincident end points).
+#[test]
+fn zero_length_by_expression() {
+    let mut k = Kit::new();
+    let a = k.origin();
+    let b = k.point(3.0, 0.1);
+    let c = k.point(3.2, 0.3);
+    let d = k.point(1.0, 4.0);
+    let ab = k.line(a, b);
+    k.horizontal(ab);
+    let d1 = k.drive(DimKind::Length(ab), "3");
+    let n1 = nm(&k, d1);
+    let ok = k.try_constrain(sggeo::model::Con::Coincident(c, c));
+    let _ = ok;
+    k.drive(DimKind::Distance(b, c), &format!("{n1} - 3"));
+    let ad = k.line(a, d);
+    let cd = k.line(c, d);
+    k.drive(DimKind::Length(ad), "4");
+    k.drive(DimKind::Length(cd), "5");
+    let y = k.measure(DimKind::CoordY(d));
+    k.check_value(y, 4.0);
+}

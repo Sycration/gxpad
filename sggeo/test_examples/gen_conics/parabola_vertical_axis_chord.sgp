@@ -1,0 +1,27 @@
+sgp 2
+
+given
+  p1 = parabola(O)
+    a1: a(p1) = 1
+  line AB
+    horiz A B
+    y_A: y(A) = 4
+    x_A: x(A) = -6
+
+construct
+  C = meet(AB, p1)
+  D = meet(AB, p1)
+
+find
+  d1: dist(C, D)
+
+where
+  p1 a 1 angle 90° [fixed angle]
+  A (-6, 4)
+  B (6, 4)
+  C (4, 4)
+  D (-4, 4)
+  a1 label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)

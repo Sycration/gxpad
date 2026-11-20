@@ -90,10 +90,13 @@ point goes where it is lifted. *Help* (or `?`) lists the keyboard shortcuts.
 ```
 sgweb/
   src/main.rs, src/lib.rs   the server (tiny_http): embedded files, gzip, ETags, a strict CSP
-  build.rs                  embeds web/, examples/ and the sggeo Wasm module into the binary, and gives the
-                            service worker the list of files to keep and a version that changes with them
+  build.rs                  embeds web/, examples/, the constructions of sggeo's tests and the sggeo Wasm
+                            module into the binary, and gives the service worker the list of files to keep
+                            and a version that changes with them
   web/                      the app: index.html, css/app.css and ES modules in js/
-  examples/                 the example constructions the Examples menu offers
+  examples/                 the featured example constructions of the Examples menu; All examples… adds
+                            those of sggeo/test_examples/, a folder for each gen_ test file (served as
+                            examples/<name without gen_>/), which the service worker keeps once opened
   tests/                    server tests (server.rs) and the app's tests (js/, run by web.rs)
   Dockerfile, compose.yaml  the container image and how to run it (with Dockerfile.dockerignore)
 ```

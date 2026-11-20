@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  k1 = circle(O)
+
+construct
+  point A on k1
+  point B on k1
+  point C on k1
+  point D on k1
+  polygon ABCD
+    d1: |AB| = 2
+    d2: |BC| = 3
+    d3: |CD| = 4
+    d4: |DA| = 5
+
+find
+  r1: r(k1)
+  d5: dist(A, C)
+
+where
+  k1 r 2.617648435778444
+  A (2.6176146701000107, 0.013295571087658003)
+  B (1.8441920588800607, 1.857697225948582)
+  C (-1.1117732612603277, 2.369819307221525)
+  D (-2.150074066391732, -1.4930722830335625)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  d5 label (0.3, 0.3)

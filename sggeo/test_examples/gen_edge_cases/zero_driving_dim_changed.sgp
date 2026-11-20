@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 3
+  segment AB
+    d2: |AB| = 2
+    d3: dx(A, B) = 1
+
+find
+  d4: dist(O, B)
+
+where
+  A (3, 4.0389678347315804e-28)
+  B (4, 1.7320508075688772)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)

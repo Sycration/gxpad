@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 5
+  segment OB
+    d2: |OB| = 3
+    θ1: ∠AOB = 0°
+
+find
+  d3: dist(A, B)
+
+where
+  A (5, -1.2420632407917143e-170)
+  B (3, -1.8837959152007667e-169)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  θ1 label (0.499379, 0.0249069)
+  d3 label (0.3, 0.3)

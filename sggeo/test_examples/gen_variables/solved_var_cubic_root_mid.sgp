@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  c = 6.1
+  s ~ 1.8989687421189854
+  segment OA
+    horiz O A
+    d1: |OA| = s^3 + 11*s + 10
+  segment OB
+    vert O B
+    |OA| == |OB|
+    d2: |OB| = 6*s^2 + c + 10
+
+find
+  d3: |OA|
+
+where
+  A (37.73649370126977, 0)
+  B (0, 37.73649370126977)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

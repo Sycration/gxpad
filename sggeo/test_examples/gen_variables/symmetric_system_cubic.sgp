@@ -1,0 +1,41 @@
+sgp 2
+
+given
+  u ~ 2.246979603717467
+  v ~ 0.5549581320873711
+  w ~ -0.8019377358048382
+  g1 = curve(x = u + v + w)
+  g2 = curve(x = u*v + v*w + w*u)
+  g3 = curve(x = u*v*w)
+  point D
+    x_D: x(D) = u
+  g4 = curve(y = x)
+    D on g4
+
+construct
+  point A on g1
+    x_A: x(A) = 2
+    y_A: y(A) = 0
+  point B on g2
+    x_B: x(B) = -1
+    y_B: y(B) = 1
+  point C on g3
+    x_C: x(C) = -1
+    y_C: y(C) = 2
+
+find
+  y_D: y(D)
+
+where
+  D (2.2469796037174667, 2.2469796037174667)
+  A (2, 0)
+  B (-1, 1)
+  C (-1, 2)
+  x_D label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  y_D label (0.3, 0.3)

@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  s = 2
+  segment OA
+    horiz O A
+    d1: |OA| = t
+  segment OB
+    OA ⟂ OB
+    d2: |OB| = z
+
+find
+  d3: dist(A, B)
+  t = 2*s + 1
+  u = t^2 - s
+  w = sqrt(u) / t
+  z = w*t*t
+
+where
+  A (5, 3.616855998553078e-234)
+  B (1.1256506025225099e-231, 23.979157616563597)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

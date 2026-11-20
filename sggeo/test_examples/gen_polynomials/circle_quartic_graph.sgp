@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  point A
+    x_A: x(A) = 0
+    y_A: y(A) = 1
+  k1 = circle(A)
+    r1: r(k1) = 2
+  g1 = curve(y = x^4)
+
+construct
+  B = meet(k1, g1)
+
+find
+  x_B: x(B)
+
+where
+  A (0, 1)
+  k1 r 2
+  B (1.2636967812688173, 2.5501840035979058)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  x_B label (0.3, 0.3)

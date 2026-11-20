@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  c = 6
+  s ~ 2.0000000000000004
+  segment OA
+    horiz O A
+    d1: |OA| = s*s + c
+  segment OB
+    vert O B
+    |OA| == |OB|
+    d2: |OB| = 5*s
+
+find
+  d3: dist(A, B)
+
+where
+  A (10.000000000000002, 0)
+  B (0, 10.000000000000002)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

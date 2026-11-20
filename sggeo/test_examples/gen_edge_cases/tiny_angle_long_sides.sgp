@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 1000
+  segment OB
+    d2: |OB| = 1000
+    θ1: ∠AOB = 0.001°
+
+find
+  d3: dist(A, B)
+
+where
+  A (1000, 0)
+  B (999.9999998476914, 0.017453292519057202)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  θ1 label (0.5, 0.00025)
+  d3 label (0.3, 0.3)

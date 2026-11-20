@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  r = 2
+  c = 3
+  point A
+    horiz O A
+  point B
+    d1: dist(A, B) = c
+  w1 = arc(O, A, B)
+    r1: r(w1) = r
+  segment OA
+  segment OB
+
+find
+  θ1: ∠AOB
+
+where
+  A (2, -1.857925203976527e-26)
+  B (-0.2500000000000001, 1.9843134832984428)
+  d1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  θ1 label (0.330719, 0.375)

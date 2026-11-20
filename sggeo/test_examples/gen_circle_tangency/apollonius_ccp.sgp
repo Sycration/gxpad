@@ -1,0 +1,42 @@
+sgp 2
+
+given
+  point A
+    x_A: x(A) = 0
+    y_A: y(A) = 4
+  point B
+    x_B: x(B) = 0
+    y_B: y(B) = 0
+  point C
+    x_C: x(C) = 6
+    y_C: y(C) = 0
+  k1 = circle(B)
+    r1: r(k1) = 1
+  k2 = circle(C)
+    r2: r(k2) = 2
+  point D
+  k3 = circle(D)
+    A on k3
+    k3 tan k1
+    k3 tan k2
+
+find
+  r3: r(k3)
+
+where
+  A (6.656013887802287e-31, 4)
+  B (-7.888609052210118e-31, -9.367723249499515e-31)
+  C (6, 1.0107280348144214e-30)
+  k1 r 1
+  k2 r 2
+  D (2.3139500814355904, 2.779074877846615)
+  k3 r 2.6162995113864604
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  r3 label (0.3, 0.3)

@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  g1 = curve(y = x^3)
+  point A
+    x_A: x(A) = 1
+    y_A: y(A) = 0.3
+
+construct
+  B = tangent(A, g1)
+  segment AB
+  point C on AB
+
+find
+  x_B: x(B)
+
+where
+  A (1, 0.3)
+  B (1.4262617571955178, 2.9013339000576694)
+  C (1.2290886719911147, 1.6980520619313606)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)

@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  a = 3
+  g1 = curve(y = x^5)
+
+construct
+  point A on g1
+    y_A: y(A) = a
+
+find
+  x_A: x(A)
+
+where
+  A (1.2457309396155174, 3)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

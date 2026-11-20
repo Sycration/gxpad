@@ -1,0 +1,30 @@
+sgp 2
+
+given
+  h1 = hyperbola(O)
+    a1: a(h1) = 3
+    b1: b(h1) = 4
+  point B
+
+construct
+  A = focus(h1)
+    O == mid(A, B)
+  segment OA
+    θ1: angle(xaxis, OA) = 30°
+  line AC
+    AC ⟂ OA
+  D = meet(AC, h1)
+
+find
+  d1: dist(A, D)
+
+where
+  h1 a 3 b 4 angle 30°
+  B (-4.330127018922194, -2.4999999999999996)
+  A (4.330127018922194, 2.4999999999999996)
+  C (3.210080830223214, 4.43997690565051)
+  D (1.6634603522555271, 7.118802153517006)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  θ1 label (0.484456, 0.123702)
+  d1 label (0.3, 0.3)

@@ -658,3 +658,230 @@ fn euler_line_og_only() {
     let oh_v = (9.0 * R * R - 590.0f64).sqrt();
     k.check_value(og, oh_v / 3.0);
 }
+
+/// Triangle from two sides b = AC, c = AB and the bisector length t from A:
+/// a = (b + c) sqrt(1 - t^2/(b c)).
+#[test]
+fn triangle_two_sides_and_bisector() {
+    let mut k = Kit::new();
+    let a = k.point(0.0, 0.0);
+    let b = k.point(4.0, 0.1);
+    let c = k.point(-0.45, 4.95);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.drive(DimKind::Length(ab), "4");
+    k.drive(DimKind::Length(ac), "5");
+    let (bis, _) = k.angle_bisector(ab, ac, [1.0, 1.0]);
+    let d = k.intersect(bis, bc, [1.5, 2.0]);
+    k.drive(DimKind::Distance(a, d), "3");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(bc));
+    k.check_value(len, 9.0 * 0.55f64.sqrt());
+}
+
+/// Triangle from b, c and the median m_a: a = sqrt(2b^2 + 2c^2 - 4 m^2).
+#[test]
+fn triangle_two_sides_and_median() {
+    let mut k = Kit::new();
+    let a = k.point(0.0, 0.0);
+    let b = k.point(4.0, 0.1);
+    let c = k.point(-1.5, 4.7);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.drive(DimKind::Length(ab), "4");
+    k.drive(DimKind::Length(ac), "5");
+    let m = k.midpoint_of(b, c);
+    k.drive(DimKind::Distance(a, m), "3");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(bc));
+    k.check_value(len, 46f64.sqrt());
+}
+
+/// Triangle from a, the altitude h_a and the angle A: b, c are roots of a
+/// quadratic (b c = 2 a h / sin A, b^2 + c^2 = a^2 + 2 b c cos A).
+#[test]
+fn triangle_side_altitude_angle() {
+    let mut k = Kit::new();
+    let b = k.point(0.0, 0.0);
+    let c = k.point(6.0, 0.1);
+    let a = k.point(0.4, 4.0);
+    let bc = k.line(b, c);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    k.drive(DimKind::Length(bc), "6");
+    k.drive(DimKind::PointLine(a, bc), "4");
+    k.drive_angle(ab, ac, "60");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(ac));
+    // bc = 48/sqrt3, b^2 + c^2 = 36 + bc
+    let p = 48.0 / 3f64.sqrt();
+    let s = (36.0 + 3.0 * p).sqrt();
+    let dd = (36.0 - p).sqrt();
+    k.check_value(len, (s + dd) / 2.0);
+}
+
+/// Triangle from a, the sum b + c = L and the angle A (the 5-7-8 triangle).
+#[test]
+fn triangle_side_sum_and_angle() {
+    let mut k = Kit::new();
+    let a = k.point(0.0, 0.0);
+    let b = k.point(8.0, 0.1);
+    let c = k.point(2.5, 4.3);
+    let d = k.point(6.5, 11.26);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let ad = k.line(a, d);
+    let cd = k.line(c, d);
+    k.on(c, ad);
+    k.equal(cd, ab);
+    let bc = k.line(b, c);
+    k.drive(DimKind::Length(ad), "13");
+    k.drive(DimKind::Length(bc), "7");
+    k.drive(DimKind::Angle(ab, ac), "60");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(ab));
+    k.check_value(len, 8.0);
+}
+
+/// Triangle from its three medians 9, 12, 15: c = (2/3) sqrt(2 m_a^2 + 2 m_b^2 - m_c^2) = 10.
+#[test]
+fn triangle_from_three_medians() {
+    let mut k = Kit::new();
+    let b = k.point(0.0, 0.0);
+    let c = k.point(17.1, 0.1);
+    let a = k.point(5.38, 8.43);
+    let ab = k.line(a, b);
+    let ma = k.midpoint_of(b, c);
+    let mb = k.midpoint_of(c, a);
+    let mc = k.midpoint_of(a, b);
+    k.drive(DimKind::Distance(a, ma), "9");
+    k.drive(DimKind::Distance(b, mb), "12");
+    k.drive(DimKind::Distance(c, mc), "15");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(ab));
+    k.check_value(len, 10.0);
+}
+
+/// Triangle from its three altitudes 3, 4, 5: sides proportional to 1/h.
+#[test]
+fn triangle_from_three_altitudes() {
+    let mut k = Kit::new();
+    let b = k.point(0.0, 0.0);
+    let c = k.point(6.69, 0.05);
+    let a = k.point(2.67, 3.0);
+    let bc = k.line(b, c);
+    let ca = k.line(c, a);
+    let ab = k.line(a, b);
+    k.drive(DimKind::PointLine(a, bc), "3");
+    k.drive(DimKind::PointLine(b, ca), "4");
+    k.drive(DimKind::PointLine(c, ab), "5");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(bc));
+    let heron = (23.5f64 * 3.5 * 8.5 * 11.5).sqrt();
+    k.check_value(len, 20.0 * 30.0 / heron);
+}
+
+fn disc(k: &mut Kit, x: f64, y: f64, r: f64) -> (usize, usize) {
+    let p = k.point(x, y);
+    let c = k.circle(p, r);
+    (p, c)
+}
+
+/// Triangle from a = 14, inradius 4 and circumradius 65/8 (the 13-14-15
+/// triangle): b and c from a quadratic.
+#[test]
+fn triangle_from_side_inradius_circumradius() {
+    let mut k = Kit::new();
+    let b = k.point(0.0, 0.0);
+    let c = k.point(14.1, 0.1);
+    let a = k.point(5.1, 11.9);
+    let bc = k.inf_line(b, c);
+    let ca = k.inf_line(c, a);
+    let ab = k.inf_line(a, b);
+    let (_, inc) = disc(&mut k, 6.0, 4.0, 4.0);
+    k.tangent(inc, bc);
+    k.tangent(inc, ca);
+    k.tangent(inc, ab);
+    let (circ, _) = k.circle_through(a, b, c);
+    k.drive(DimKind::Distance(b, c), "14");
+    k.drive(DimKind::Radius(inc), "4");
+    k.drive(DimKind::Radius(circ), "8.125");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Distance(c, a));
+    k.check_value(len, 15.0);
+}
+
+/// Triangle from the angle A = 60, altitude h_a = 4 and median m_a = 5.
+#[test]
+fn triangle_angle_altitude_median() {
+    let mut k = Kit::new();
+    let b = k.point(-3.2, 0.0);
+    let c = k.point(3.2, 0.05);
+    let a = k.point(3.0, 4.0);
+    let bc = k.line(b, c);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let m = k.midpoint_of(b, c);
+    k.drive(DimKind::Distance(a, m), "5");
+    k.drive(DimKind::PointLine(a, bc), "4");
+    k.drive_angle(ab, ac, "60");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(bc));
+    k.check_value(len, 6.396338941055198);
+}
+
+/// Triangle from b + c = 13, angle A = 60 and the altitude h_a = 4:
+/// a = -4 sqrt 3 + sqrt(48 + 169).
+#[test]
+fn triangle_side_sum_angle_altitude() {
+    let mut k = Kit::new();
+    let a = k.point(0.0, 0.0);
+    let b = k.point(8.99, 0.05);
+    let c = k.point(2.0, 3.47);
+    let d = k.point(6.5, 11.26);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let ad = k.line(a, d);
+    let cd = k.line(c, d);
+    k.on(c, ad);
+    k.equal(cd, ab);
+    let bc = k.line(b, c);
+    k.drive(DimKind::Length(ad), "13");
+    k.drive(DimKind::PointLine(a, bc), "4");
+    k.drive_angle(ab, ac, "60");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(bc));
+    k.check_value(len, -4.0 * 3f64.sqrt() + 217f64.sqrt());
+}
+
+/// Triangle from its exradii 12, 14, 10.5 (the 13-14-15 triangle):
+/// r = 1/(1/ra + 1/rb + 1/rc), area sqrt(r ra rb rc), a = area (1/r - 1/ra)... = 14.
+#[test]
+fn triangle_from_exradii() {
+    let mut k = Kit::new();
+    let b = k.point(0.0, 0.0);
+    let c = k.point(14.1, 0.1);
+    let a = k.point(5.1, 11.9);
+    let bc = k.inf_line(b, c);
+    let ca = k.inf_line(c, a);
+    let ab = k.inf_line(a, b);
+    // excircle opposite A: below BC
+    let (_, ea) = disc(&mut k, 8.0 + 0.1, -12.0, 12.0);
+    // opposite B: right of CA
+    let (_, eb) = disc(&mut k, 21.0, 14.0, 14.0);
+    // opposite C: left of AB
+    let (_, ec) = disc(&mut k, -5.0, 10.0, 10.5);
+    for &e in &[ea, eb, ec] {
+        k.tangent(e, bc);
+        k.tangent(e, ca);
+        k.tangent(e, ab);
+    }
+    k.drive(DimKind::Radius(ea), "12");
+    k.drive(DimKind::Radius(eb), "14");
+    k.drive(DimKind::Radius(ec), "10.5");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Distance(b, c));
+    k.check_value(len, 14.0);
+}

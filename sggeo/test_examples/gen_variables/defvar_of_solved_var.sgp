@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  s ~ 1.7722082634517995
+  segment OA
+    horiz O A
+    d1: |OA| = s
+  segment OB
+    OA ⟂ OB
+    d2: |OB| = w
+  segment AB
+    d3: |AB| = w + 1/3
+
+find
+  d4: dist(O, A)
+  w = 2*s + 1
+
+where
+  A (1.7722082634517995, -4.043174611952195e-174)
+  B (5.100717471390941e-172, 4.544416526903599)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)

@@ -1,0 +1,28 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 2
+
+construct
+  point A on xaxis
+    A on k1
+  polygon ABCD
+    B on k1
+    C on k1
+    D on k1
+    |AB| == |BC|
+    |AB| == |CD|
+    |AB| == |DA|
+
+find
+  d1: |AB|
+
+where
+  k1 r 2
+  A (2, 8.552847072295026e-50)
+  B (-5.797133959567821e-17, 2)
+  C (-2, 7.138318521025609e-17)
+  D (3.487005745158613e-17, -2)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

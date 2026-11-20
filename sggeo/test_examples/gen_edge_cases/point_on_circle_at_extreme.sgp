@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 5
+  point B
+
+construct
+  point A on k1
+    x_A: x(A) = 4
+
+find
+  d1: dist(A, B)
+
+where
+  k1 r 5
+  B (0, 5) [fixed]
+  A (4, 3)
+  r1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)

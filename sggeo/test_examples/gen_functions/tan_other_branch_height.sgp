@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  c = 0.8
+  g1 = curve(y = tan(x))
+
+construct
+  point A on g1
+    y_A: y(A) = c
+
+find
+  x_A: x(A)
+
+where
+  A (3.816333595813346, 0.8)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

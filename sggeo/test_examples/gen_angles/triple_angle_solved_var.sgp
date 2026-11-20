@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  t ~ 0.19600086784918916
+  segment OA
+    d1: |OA| = 1
+    θ1: angle(xaxis, OA) = t
+  segment OB
+    θ2: angle(xaxis, OB) = 3*t
+    x_B: x(B) = 3
+    y_B: y(B) = 2
+
+find
+  y_A: y(A)
+
+where
+  A (0.9808532435112985, 0.19474833681796958)
+  B (3, 2)
+  d1 label (0.3, 0.3)
+  θ1 label (0.498008, 0.044585)
+  θ2 label (0.480132, 0.139547)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  y_A label (0.3, 0.3)

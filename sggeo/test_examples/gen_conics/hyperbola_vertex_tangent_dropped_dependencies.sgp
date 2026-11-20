@@ -1,0 +1,26 @@
+sgp 2
+
+given
+  h1 = hyperbola(O)
+    a1: a(h1) = 3
+    b1: b(h1) = 5
+  point A
+    x_A: x(A) = 3.5
+    y_A: y(A) = 6
+
+construct
+  B = tangent(A, h1)
+  segment AB
+
+find
+  y_B: y(B)
+
+where
+  h1 a 3 b 5 angle 0° [fixed angle]
+  A (3.5, 6)
+  B (3.033440470291587, 0.7486303916761827)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  y_B label (0.3, 0.3)

@@ -1,0 +1,30 @@
+sgp 2
+
+given
+  s = 2
+  segment OA
+    θ1: angle(xaxis, OA) = 60°
+    d1: |OA| = s
+  segment AB
+    d2: |AB| = s
+  segment OB
+    d3: |OB| = s
+  segment BC
+    d4: |BC| = s
+  segment AC
+    d5: |AC| = s
+
+find
+  d6: dist(O, C)
+
+where
+  A (1, 1.7320508075688772)
+  B (2, 0)
+  C (3, 1.7320508075688772)
+  θ1 label (0.433013, 0.25)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
+  d6 label (0.3, 0.3)

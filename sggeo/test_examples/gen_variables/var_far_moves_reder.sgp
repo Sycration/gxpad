@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  s = 0.001
+  segment OA
+    horiz O A
+    d1: |OA| = s
+  segment OB
+    d2: |OB| = s
+  segment AB
+    d3: |AB| = s
+
+find
+  y_B: y(B)
+
+where
+  A (0.001, 0)
+  B (0.0005, 0.0008660254037844387)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  y_B label (0.3, 0.3)

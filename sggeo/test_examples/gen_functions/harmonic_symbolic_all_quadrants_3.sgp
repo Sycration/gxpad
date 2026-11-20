@@ -1,0 +1,19 @@
+sgp 2
+
+given
+  a = 1
+  b = 2
+  c = 0.7
+  g1 = curve(y = a*cos(x) + b*sin(x))
+
+construct
+  point A on g1
+    y_A: y(A) = c
+
+find
+  x_A: x(A)
+
+where
+  A (-3.923642510475573, 0.7)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

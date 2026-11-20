@@ -1,0 +1,15 @@
+sgp 2
+
+given
+  g1 = curve(y = exp(x))
+  g2 = curve(y = exp(-x) + 1)
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+
+where
+  A (0.4812118250596034, 1.618033988749895)
+  x_A label (0.3, 0.3)

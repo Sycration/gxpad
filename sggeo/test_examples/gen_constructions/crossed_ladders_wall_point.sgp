@@ -1,0 +1,28 @@
+sgp 2
+
+construct
+  point A on xaxis
+  segment AB
+    AB ⟂ xaxis
+  point C on AB
+  point D on yaxis
+  segment OC
+    d1: |OC| = 3
+  segment AD
+    d2: |AD| = 2
+  E = meet(OC, AD)
+    y_E: y(E) = 1
+
+find
+  d3: dist(O, A)
+
+where
+  A (1.2311857237786688, 6.409494854920721e-31)
+  B (1.2311857237786688, 2.7357232630724018)
+  C (1.2311857237786688, 2.7357232523710424)
+  D (9.860761315262648e-31, 1.576128710976231)
+  E (0.45004030386173166, 1)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  y_E label (0.3, 0.3)
+  d3 label (0.3, 0.3)

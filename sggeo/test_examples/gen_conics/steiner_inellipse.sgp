@@ -1,0 +1,36 @@
+sgp 2
+
+construct
+  point A on xaxis
+    d1: dist(O, A) = 14
+  line OA
+  line AB
+    d2: dist(A, B) = 15
+    d3: dist(B, O) = 13
+  line BO
+  C = mid(O, A)
+  D = mid(A, B)
+  line BC
+  line OD
+  E = meet(BC, OD)
+  e1 = ellipse(E)
+    e1 tan OA near (6.999999999999999, 2.5132608688329812e-22)
+    e1 tan AB near (9.5, 6.000000000000001)
+    e1 tan BO near (2.5000000000000004, 6)
+
+find
+  a1: a(e1)
+  b1: b(e1)
+
+where
+  A (14, 5.483312600095442e-22)
+  B (5.000000000000001, 12)
+  C (7, 2.6406083698436584e-22)
+  D (9.5, 6)
+  E (6.333333333333333, 4)
+  e1 a 3.7005425177147293 b 4.3684966352697705 angle 49.148572484918425°
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)

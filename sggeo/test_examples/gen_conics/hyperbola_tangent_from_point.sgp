@@ -17,7 +17,7 @@ find
 where
   h1 a 2 b 3 angle 0° [fixed angle]
   A (1, 0) [fixed]
-  B (4.000000000000002, 5.196152422706635)
+  B (4, 5.196152422706632)
   a1 label (0.3, 0.3)
   b1 label (0.3, 0.3)
   d1 label (0.3, 0.3)

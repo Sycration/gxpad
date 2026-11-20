@@ -237,9 +237,12 @@ export class Shell {
       "-",
       { label: "Examples", icon: "folder", submenu: () => examples() },
     ];
+    // the featured examples, then the browser of all of them (the constructions of sggeo's tests by folder)
     const examples = async () => {
       const list = await files.examples();
-      return list.length ? list.map((x) => ({ label: x.title, run: () => files.openExample(x.path, x.title) })) : [{ label: "No examples", disabled: true, run() {} }];
+      const items = list.filter((x) => !x.folder).map((x) => ({ label: x.title, run: () => files.openExample(x.path, x.title) }));
+      if (list.some((x) => x.folder)) items.push("-", { label: `All examples (${list.length})…`, icon: "folder", run: () => this.browseExamples() });
+      return items.length ? items : [{ label: "No examples", disabled: true, run() {} }];
     };
     const view = () => [
       { label: "Fit the construction", icon: "fit", keys: "Home", run: () => app.fit() },
@@ -590,10 +593,54 @@ export class Shell {
       this.welcomeClosed = true;
       this.updateWelcome();
     });
+    const all = this.welcome.querySelector(".all-examples");
+    all.addEventListener("click", () => this.browseExamples());
     this.files.examples().then((list) => {
       const ul = this.welcome.querySelector(".examples");
-      ul.replaceChildren(...list.slice(0, 6).map((x) => h("li", null, h("button.link", { type: "button", onclick: () => this.files.openExample(x.path, x.title) }, x.title))));
+      const featured = list.filter((x) => !x.folder);
+      ul.replaceChildren(...featured.slice(0, 6).map((x) => h("li", null, h("button.link", { type: "button", onclick: () => this.files.openExample(x.path, x.title) }, x.title))));
+      all.hidden = list.length <= 6;
     });
+  }
+
+  /** The dialog with every example: the featured ones and the constructions of sggeo's tests, a folder each
+   *  (their test file), with a filter by name across all of them. */
+  async browseExamples() {
+    const d = this.$("#examples");
+    if (!d.dataset.built) {
+      d.dataset.built = "1";
+      const list = await this.files.examples();
+      const label = (f) => (f ? f[0].toUpperCase() + f.slice(1).replaceAll("_", " ") : "Featured");
+      const folders = [...new Set(list.map((x) => x.folder ?? ""))];
+      const nav = d.querySelector(".examples-folders"), ul = d.querySelector(".examples-list"), filter = d.querySelector(".examples-filter");
+      let current = folders[0];
+      const open = (x) => (d.close(), this.files.openExample(x.path, x.title));
+      const show = () => {
+        const q = filter.value.trim().toLowerCase();
+        const rows = q ? list.filter((x) => x.title.toLowerCase().includes(q)) : list.filter((x) => (x.folder ?? "") === current);
+        for (const b of nav.children) {
+          b.setAttribute("aria-current", String(!q && b.dataset.folder === current));
+          // (on a phone the folders are a row that scrolls)
+          if (!q && b.dataset.folder === current) b.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+        ul.replaceChildren(
+          ...rows.map((x) => h("li", null, h("button.menu-item", { type: "button", onclick: () => open(x) }, h("span.grow", null, x.title), q ? h("span.note", null, label(x.folder)) : null))),
+        );
+        if (!rows.length) ul.append(h("li.empty", null, "No example has that in its name"));
+        ul.scrollTop = 0;
+      };
+      const count = (f) => list.filter((x) => (x.folder ?? "") === f).length;
+      nav.replaceChildren(
+        ...folders.map((f) =>
+          h("button.menu-item", { type: "button", "data-folder": f, onclick: () => ((current = f), (filter.value = ""), show()) }, h("span.grow", null, label(f)), h("span.note", null, String(count(f)))),
+        ),
+      );
+      filter.addEventListener("input", show);
+      d.querySelector(".close").addEventListener("click", () => d.close());
+      d.addEventListener("click", (ev) => ev.target === d && d.close());
+      show();
+    }
+    d.showModal();
   }
 
   updateWelcome() {

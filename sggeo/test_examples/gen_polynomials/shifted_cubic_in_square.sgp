@@ -1,0 +1,16 @@
+sgp 2
+
+given
+  g1 = curve(y = x^6 + 6*x^5 + 15*x^4 + 20*x^3 + 16*x^2 + 8*x + 2)
+
+construct
+  point A on g1
+    y_A: y(A) = 3
+
+find
+  x_A: x(A)
+
+where
+  A (0.10154966422864005, 3)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

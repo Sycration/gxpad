@@ -1,0 +1,18 @@
+sgp 2
+
+given
+  r = 2
+  g1 = curve(x^2 + y^2 = r^2)
+  g2 = curve(y = x^3)
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+  y_A: y(A)
+
+where
+  A (1.174221742316821, 1.6190130635268045)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

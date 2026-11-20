@@ -3,6 +3,7 @@
 use sggeo::model::DimKind;
 mod testkit;
 use testkit::Kit;
+use std::f64::consts::PI;
 
 type P = [f64; 2];
 
@@ -962,4 +963,405 @@ fn circle_through_right_triangle() {
     k.check_value(oc, 5.0);
     let r = k.measure(DimKind::Radius(circ));
     k.check_value(r, 5.0);
+}
+
+/// Ladder of length 4 over a unit box in the corner: 1/w + 1/h = 1,
+/// w² + h² = 16; s = w + h = 1 + √17, h = (s + √(s² − 4s))/2.
+#[test]
+fn ladder_over_unit_box() {
+    let mut k = Kit::new();
+    let xa = k.xaxis();
+    let ya = k.yaxis();
+    let s = 1.0 + 17f64.sqrt();
+    let h = (s + (s * s - 4.0 * s).sqrt()) / 2.0;
+    let w = s - h;
+    let a = k.point(w + 0.03, 0.0);
+    let b = k.point(0.0, h - 0.02);
+    k.on(a, xa);
+    k.on(b, ya);
+    let ab = k.line(a, b);
+    k.drive(DimKind::Length(ab), "4");
+    let c = k.point(1.0, 1.0);
+    k.drive(DimKind::CoordX(c), "1");
+    k.drive(DimKind::CoordY(c), "1");
+    k.on(c, ab);
+    assert_eq!(k.dof(), 0);
+    let by = k.measure(DimKind::CoordY(b));
+    k.check_value(by, h);
+}
+
+/// Real root of p(x) = 0 nearest `guess`, by Newton's method.
+fn zero_near(p: impl Fn(f64) -> f64, guess: f64) -> f64 {
+    let mut x = guess;
+    for _ in 0..200 {
+        let h = 1e-6 * (1.0 + x.abs());
+        let d = (p(x + h) - p(x - h)) / (2.0 * h);
+        x -= p(x) / d;
+    }
+    x
+}
+
+/// Crossed ladders of lengths 3 and 2 crossing at height 1: the width
+/// w ≈ 1.2311857 is a root of a quartic (in w², via p = √(9 − w²),
+/// q = √(4 − w²), 1/p + 1/q = 1, i.e. a quartic in p).
+#[test]
+fn crossed_ladders_wall_point() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    let ya = k.yaxis();
+    let w = 1.2311857;
+    let p = (9.0 - w * w as f64).sqrt();
+    let q = (4.0 - w * w as f64).sqrt();
+    let b = k.point(w + 0.02, 0.0);
+    k.on(b, xa);
+    let top = k.point(w + 0.02, p);
+    let wall = k.line(b, top);
+    k.perpendicular(wall, xa);
+    let pp = k.point(w + 0.02, p - 0.03);
+    k.on(pp, wall);
+    let qq = k.point(0.0, q + 0.02);
+    k.on(qq, ya);
+    let l1 = k.line(o, pp);
+    let l2 = k.line(b, qq);
+    k.drive(DimKind::Length(l1), "3");
+    k.drive(DimKind::Length(l2), "2");
+    let x = k.intersect(l1, l2, [w * q / (p + q), p * q / (p + q)]);
+    k.drive(DimKind::CoordY(x), "1");
+    let _ = top;
+    let d = k.measure(DimKind::Distance(o, b));
+    // refine w: f(w) = 1/p + 1/q − 1
+    let w0 = zero_near(|w| 1.0 / (9.0 - w * w).sqrt() + 1.0 / (4.0 - w * w).sqrt() - 1.0, 1.23);
+    k.check_value(d, w0);
+}
+
+/// Crossed ladders of lengths 3 and 2 crossing at height 1: the width of
+/// the alley is a root of a quartic.
+#[test]
+fn crossed_ladders() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let (xa, ya) = (k.xaxis(), k.yaxis());
+    let f2 = k.point(1.23, 0.0);
+    k.on(f2, xa);
+    let t1 = k.point(1.23, 2.74);
+    let wall = k.inf_line(f2, t1);
+    k.vertical(wall);
+    let t2 = k.point(0.0, 1.58);
+    k.on(t2, ya);
+    let l1 = k.line(o, t1);
+    let l2 = k.line(f2, t2);
+    k.drive(DimKind::Length(l1), "3");
+    k.drive(DimKind::Length(l2), "2");
+    let x = k.intersect(l1, l2, [0.6, 1.0]);
+    k.drive(DimKind::CoordY(x), "1");
+    assert_eq!(k.dof(), 0);
+    let w = k.measure(DimKind::CoordX(f2));
+    k.check_value(w, 1.231185723778669);
+}
+
+/// Point with both coordinates driven.
+fn placed(k: &mut Kit, x: f64, y: f64) -> usize {
+    let p = k.point(x + 0.01, y - 0.01);
+    k.drive(DimKind::CoordX(p), &format!("{x}"));
+    k.drive(DimKind::CoordY(p), &format!("{y}"));
+    p
+}
+
+/// Ladder of length 5 against a wall, touching the corner (1, 1) of a box:
+/// x + y = x y, x^2 + y^2 = 25.
+#[test]
+fn ladder_over_box() {
+    let mut k = Kit::new();
+    let (xa, ya) = (k.xaxis(), k.yaxis());
+    let a = k.point(1.26, 0.0);
+    let b = k.point(0.0, 4.84);
+    k.on(a, xa);
+    k.on(b, ya);
+    let l = k.line(a, b);
+    k.drive(DimKind::Length(l), "5");
+    let kk = placed(&mut k, 1.0, 1.0);
+    k.on(kk, l);
+    assert_eq!(k.dof(), 0);
+    let y = k.measure(DimKind::CoordY(b));
+    let p = 1.0 + 26f64.sqrt();
+    k.check_value(y, (p + (p * p - 4.0 * p).sqrt()) / 2.0);
+}
+
+/// Alhazen's billiard: the point on a unit circle where a ray from P
+/// reflects to Q (quartic).
+#[test]
+fn alhazen_reflection() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let circ = k.circle(o, 1.0);
+    k.drive(DimKind::Radius(circ), "1");
+    let p = placed(&mut k, 2.0, 0.5);
+    let q = placed(&mut k, 0.3, 2.2);
+    let x = k.point(0.68, 0.73);
+    k.on(x, circ);
+    let n = k.inf_line(o, x);
+    let p2 = k.reflect(p, n);
+    let xq = k.inf_line(x, q);
+    k.on(p2, xq);
+    assert_eq!(k.dof(), 0);
+    let xx = k.measure(DimKind::CoordX(x));
+    k.check_value(xx, 0.6791085472639447);
+}
+
+/// Square inscribed in the 13-14-15 triangle on side a = 14 (h = 12):
+/// side a h / (a + h).
+#[test]
+fn inscribed_square_in_triangle() {
+    let mut k = Kit::new();
+    let a = k.point(5.2, 11.8);
+    let b = k.point(-0.2, 0.1);
+    let c = k.point(14.1, -0.2);
+    let la = k.line(b, c);
+    let lb = k.line(c, a);
+    let lc = k.line(a, b);
+    k.drive(DimKind::Length(la), "14");
+    k.drive(DimKind::Length(lb), "15");
+    k.drive(DimKind::Length(lc), "13");
+    let s = 168.0 / 26.0;
+    let p = k.point(2.8, 0.05);
+    let q = k.point(2.8 + s, 0.0);
+    let r = k.point(2.8 + s, s);
+    let t = k.point(2.8, s + 0.1);
+    k.on(p, la);
+    k.on(q, la);
+    k.on(r, lb);
+    k.on(t, lc);
+    let pq = k.line(p, q);
+    let qr = k.line(q, r);
+    let rt = k.line(r, t);
+    let tp = k.line(t, p);
+    k.perpendicular(pq, qr);
+    k.perpendicular(qr, rt);
+    k.perpendicular(rt, tp);
+    k.equal(pq, qr);
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(pq));
+    k.check_value(len, s);
+}
+
+/// Morley's theorem: the triangle of adjacent angle trisectors is
+/// equilateral with side 8 R sin(A/3) sin(B/3) sin(C/3).
+#[test]
+fn morley_triangle_side() {
+    let mut k = Kit::new();
+    let b = k.origin();
+    let xa = k.xaxis();
+    let c = k.point(6.0, 0.0);
+    k.on(c, xa);
+    let a = k.point(4.18, 4.99);
+    let bc = k.line(b, c);
+    let ba = k.line(b, a);
+    let ca = k.line(c, a);
+    let ab = k.line(a, b);
+    k.drive(DimKind::Length(bc), "6");
+    let tb = k.drive_angle(bc, ba, "50");
+    let tc = k.drive_angle(bc, ca, "110");
+    let nb = k.doc().dims[tb].as_ref().unwrap().name.clone();
+    let nc = k.doc().dims[tc].as_ref().unwrap().name.clone();
+    // trisectors from B (B/3 and 2B/3 from BC)
+    let t1 = k.point(3.5, 1.05);
+    let t2 = k.point(3.1, 2.05);
+    let bt1 = k.line(b, t1);
+    let bt2 = k.line(b, t2);
+    k.drive_angle(bc, bt1, &format!("{nb}/3"));
+    k.drive_angle(bc, bt2, &format!("2*{nb}/3"));
+    // trisector from C adjacent to BC: angle from +x is pi - C/3, C = pi - nc
+    let s1 = k.point(3.54, 1.06);
+    let cs1 = k.line(c, s1);
+    k.drive_angle(bc, cs1, &format!("pi - (pi - {nc})/3"));
+    // trisector from A adjacent to AB
+    let u1 = k.point(3.1, 2.05);
+    let au1 = k.line(a, u1);
+    k.drive_angle(ab, au1, &format!("(pi - {nb} - (pi - {nc}))/3"));
+    let x = k.intersect(bt1, cs1, [3.54, 1.06]);
+    let y = k.intersect(bt2, au1, [3.12, 2.05]);
+    assert_eq!(k.dof(), 4);
+    let d = k.measure(DimKind::Distance(x, y));
+    let (aa, bb, cc) = (60f64.to_radians(), 50f64.to_radians(), 70f64.to_radians());
+    let r = 6.0 / (2.0 * aa.sin());
+    k.check_value(d, 8.0 * r * (aa / 3.0).sin() * (bb / 3.0).sin() * (cc / 3.0).sin());
+}
+
+/// Langley's adventitious angles: 80-80-20 triangle, cevians at 60 and 50
+/// degrees; the angle BDE is 30 degrees.
+#[test]
+fn langley_adventitious_angles() {
+    let mut k = Kit::new();
+    let b = k.origin();
+    let xa = k.xaxis();
+    let c = k.point(1.0, 0.0);
+    k.on(c, xa);
+    let a = k.point(0.5, 2.83);
+    let bc = k.line(b, c);
+    let ba = k.line(b, a);
+    let ca = k.line(c, a);
+    k.drive(DimKind::Length(bc), "1");
+    k.drive_angle(bc, ba, "80");
+    k.drive_angle(bc, ca, "100");
+    let d = k.point(0.766, 1.327);
+    k.on(d, ca);
+    let e = k.point(0.1736, 0.9848);
+    k.on(e, ba);
+    let bd = k.line(b, d);
+    let ce = k.line(c, e);
+    k.drive_angle(bc, bd, "60");
+    k.drive_angle(bc, ce, "130");
+    let db = k.line(d, b);
+    let de = k.line(d, e);
+    assert_eq!(k.dof(), 0);
+    let ang = k.measure_angle(db, de);
+    k.check_value(ang, PI / 6.0);
+}
+
+/// Equilateral triangle with an interior point at distances 3, 4, 5 from
+/// the vertices: side sqrt(25 + 12 sqrt 3).
+#[test]
+fn equilateral_point_distances_345() {
+    let mut k = Kit::new();
+    let s = (25.0 + 12.0 * 3f64.sqrt()).sqrt();
+    let a = k.point(0.0, 0.0);
+    let b = k.point(s, 0.1);
+    let c = k.point(s / 2.0, s * 0.866);
+    let ab = k.line(a, b);
+    let bc = k.line(b, c);
+    let ca = k.line(c, a);
+    k.equal(ab, bc);
+    k.equal(bc, ca);
+    // P with PA = 3, PB = 4, PC = 5: solve roughly
+    let p = k.point(2.6, 1.55);
+    k.drive(DimKind::Distance(p, a), "3");
+    k.drive(DimKind::Distance(p, b), "4");
+    k.drive(DimKind::Distance(p, c), "5");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(ab));
+    k.check_value(len, s);
+}
+
+/// Square with an interior point at distances 1, 2, 3 from consecutive
+/// corners: side sqrt(5 + 2 sqrt 2).
+#[test]
+fn square_point_distances_123() {
+    let mut k = Kit::new();
+    let s = (5.0 + 2.0 * 2f64.sqrt()).sqrt();
+    let a = k.point(0.0, 0.0);
+    let b = k.point(s, 0.05);
+    let c = k.point(s, s);
+    let d = k.point(0.05, s);
+    let ab = k.line(a, b);
+    let bc = k.line(b, c);
+    let cd = k.line(c, d);
+    let da = k.line(d, a);
+    k.perpendicular(ab, bc);
+    k.perpendicular(bc, cd);
+    k.perpendicular(cd, da);
+    k.equal(ab, bc);
+    let p = k.point(0.5, 0.85);
+    k.drive(DimKind::Distance(p, a), "1");
+    k.drive(DimKind::Distance(p, b), "2");
+    k.drive(DimKind::Distance(p, c), "3");
+    assert_eq!(k.dof(), 3);
+    let len = k.measure(DimKind::Length(ab));
+    k.check_value(len, s);
+}
+
+/// Trisecting the arc of a chord with three equal chords: the small chord is
+/// 2 r sin(asin(c / 2r) / 3) (casus irreducibilis cubic).
+#[test]
+fn trisect_arc_equal_chords() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let circ = k.circle(o, 2.0);
+    k.drive(DimKind::Radius(circ), "2");
+    let th = 1.696124157962962f64;
+    let at = |t: f64| (2.0 * t.cos(), 2.0 * t.sin());
+    let (ax, ay) = at(0.0);
+    let (px, py) = at(th / 3.0);
+    let (qx, qy) = at(2.0 * th / 3.0);
+    let (bx, by) = at(th);
+    let a = k.point(ax, ay + 0.02);
+    let p = k.point(px, py);
+    let q = k.point(qx, qy);
+    let b = k.point(bx, by);
+    for &pt in &[a, p, q, b] {
+        k.on(pt, circ);
+    }
+    let ab = k.line(a, b);
+    let ap = k.line(a, p);
+    let pq = k.line(p, q);
+    let qb = k.line(q, b);
+    k.drive(DimKind::Length(ab), "3");
+    k.equal(ap, pq);
+    k.equal(pq, qb);
+    assert_eq!(k.dof(), 1);
+    let len = k.measure(DimKind::Length(ap));
+    k.check_value(len, 1.1157493966630492);
+}
+
+/// Equilateral triangle with its vertices on three parallel lines at
+/// distances p, q: side 2 sqrt((p^2 + p q + q^2) / 3).
+#[test]
+fn equilateral_on_three_parallels() {
+    let mut k = Kit::new();
+    let xa = k.xaxis();
+    let o = k.origin();
+    let u = k.point(1.0, 2.0);
+    let v = k.point(3.0, 2.0);
+    let l1 = k.inf_line(u, v);
+    k.parallel(l1, xa);
+    let w = k.point(1.0, 5.0);
+    let z = k.point(3.0, 5.0);
+    let l2 = k.inf_line(w, z);
+    k.parallel(l2, xa);
+    k.drive(DimKind::PointLine(o, l1), "2");
+    k.drive(DimKind::PointLine(u, l2), "3");
+    let s = 2.0 * ((4.0 + 6.0 + 9.0) / 3.0f64).sqrt();
+    let a = k.point(0.0, 0.0);
+    k.on(a, xa);
+    let b = k.point(4.4, 2.0);
+    k.on(b, l1);
+    let c = k.point(-1.0, 5.0);
+    k.on(c, l2);
+    let ab = k.line(a, b);
+    let bc = k.line(b, c);
+    let ca = k.line(c, a);
+    k.equal(ab, bc);
+    k.equal(bc, ca);
+    let len = k.measure(DimKind::Length(ab));
+    k.check_value(len, s);
+}
+
+/// Three equal chords AB = BC = CD on a circle of radius R, AD = d driven:
+/// AB = 2R sin(asin(d/(2R))/3).
+#[test]
+fn trisection_equal_chords() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    k.var("R", 2.0);
+    k.var("d", 3.0);
+    let c = k.circle(o, 2.0);
+    k.drive(DimKind::Radius(c), "R");
+    let big = 2.0 * (3.0f64 / 4.0).asin(); // central angle of AD
+    let pts: Vec<usize> = (0..4)
+        .map(|i| {
+            let a = -big / 2.0 + big * (i as f64) / 3.0 * 1.03;
+            k.point(2.0 * a.cos(), 2.0 * a.sin())
+        })
+        .collect();
+    for &p in &pts {
+        k.on(p, c);
+    }
+    let ab = k.line(pts[0], pts[1]);
+    let bc = k.line(pts[1], pts[2]);
+    let cd = k.line(pts[2], pts[3]);
+    k.equal(ab, bc);
+    k.equal(bc, cd);
+    k.drive(DimKind::Distance(pts[0], pts[3]), "d");
+    let m = k.measure(DimKind::Length(ab));
+    k.check_value(m, 4.0 * ((3.0f64 / 4.0).asin() / 3.0).sin());
 }

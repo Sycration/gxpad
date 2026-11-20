@@ -1,0 +1,40 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    r1: r(k1) = 1
+  point B
+    d1: dist(A, B) = 10
+  k2 = circle(B)
+    r2: r(k2) = 2
+  point C
+    d2: dist(A, C) = 8.5
+    d3: dist(B, C) = 10.6
+  k3 = circle(C)
+    r3: r(k3) = 3
+  point D
+  k4 = circle(D)
+    k4 tan k1 inside
+    k4 tan k2 inside
+    k4 tan k3
+
+find
+  r4: r(k4)
+
+where
+  A (0.000613904539736118, 0.027749327465790865)
+  k1 r 1
+  B (10.000612513191177, 0.022474200050657346)
+  k2 r 2
+  C (2.9993098830832094, 7.981227964406183)
+  k3 r 3
+  D (5.519463699185875, -1.3814514919226315)
+  k4 r 6.695923981693464
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  r3 label (0.3, 0.3)
+  r4 label (0.3, 0.3)

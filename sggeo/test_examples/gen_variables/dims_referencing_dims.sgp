@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 3
+  segment OB
+    d2: |OB| = d1 + 1
+  segment AB
+    d3: |AB| = (d1 + d2)/2 + 1
+
+find
+  θ1: ∠AOB
+
+where
+  A (3, 3.5155176033503676e-24)
+  B (0.7916666666666665, 3.9208753982865727)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  θ1 label (0.386962, 0.316639)

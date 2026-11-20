@@ -1,0 +1,22 @@
+sgp 2
+
+construct
+  point A on xaxis
+  point B on yaxis
+  segment AB
+    d1: |AB| = 4
+  point C on AB
+    x_C: x(C) = 1
+    y_C: y(C) = 1
+
+find
+  y_B: y(B)
+
+where
+  A (1.3621999926632444, 1.7872629883913549e-31)
+  B (1.1709654061874394e-31, 3.760905632954416)
+  C (1, 1)
+  d1 label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  y_B label (0.3, 0.3)

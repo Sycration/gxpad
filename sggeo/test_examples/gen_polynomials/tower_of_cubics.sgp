@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  g1 = curve(x = y^3 + y)
+  g2 = curve(x^3 - x - 1 + y^4 + y^2 - x*y = 0)
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+  y_A: y(A)
+
+where
+  A (1.324717957244746, 0.8043399558154747)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

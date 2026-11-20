@@ -102,6 +102,7 @@ struct Comp {
     cols: Vec<usize>,
 }
 
+/// Residual tolerance, relative to the equation's scale (see `Sys::eq_scale`).
 pub const TOL: f64 = 1e-9;
 
 impl Sys {
@@ -167,25 +168,57 @@ impl Sys {
         v
     }
 
-    /// Maximum absolute residual over all equations.
-    pub fn max_residual(&self, vals: &[f64]) -> f64 {
+    /// The size of the unknowns in `cols` (their largest magnitude): the
+    /// length scale the residual tolerances are relative to.
+    fn length_scale(&self, vals: &[f64], cols: impl Iterator<Item = usize>) -> f64 {
+        cols.map(|k| vals[self.unknowns[k]].abs()).filter(|x| x.is_finite()).fold(1e-9, f64::max)
+    }
+
+    /// Scale of equation `k`'s residual: what a change of the unknowns by
+    /// `l` (the length scale) changes it by, |∇f|·l. Residuals measured
+    /// against it are the same at every scale of the construction: a length
+    /// equation |AB|² − d² grows with the square of the scale, an angle
+    /// equation not at all.
+    fn eq_scale(&self, k: usize, ld: &impl Fn(u32) -> f64, st: &mut Vec<f64>, l: f64) -> f64 {
+        let g: f64 = self.eqs[k].jac.iter().map(|(_, code)| code.eval(ld, st).powi(2)).sum::<f64>().sqrt();
+        if g.is_finite() { g * l } else { 0.0 }
+    }
+
+    /// Scales of the equations `eqs` (see `eq_scale`). An equation whose
+    /// gradient vanishes here (a double root) gets a small share of the
+    /// largest one instead; with no gradient at all, 1.
+    fn eq_scales(&self, eqs: &[usize], vals: &[f64], target: [f64; 2], cols: impl Iterator<Item = usize>) -> Vec<f64> {
+        let mut st = Vec::new();
+        let ld = loader(vals, target);
+        let l = self.length_scale(vals, cols);
+        let s: Vec<f64> = eqs.iter().map(|&k| self.eq_scale(k, &ld, &mut st, l)).collect();
+        let top = s.iter().copied().fold(0.0, f64::max);
+        let floor = if top > 0.0 { 1e-6 * top } else { 1.0 };
+        s.into_iter().map(|x| x.max(floor)).collect()
+    }
+
+    /// Residuals of all equations relative to their scales.
+    fn scaled_residuals(&self, vals: &[f64]) -> Vec<f64> {
+        let all: Vec<usize> = (0..self.eqs.len()).collect();
+        let scales = self.eq_scales(&all, vals, [0.0; 2], 0..self.unknowns.len());
         let mut st = Vec::new();
         let ld = loader(vals, [0.0; 2]);
-        self.eqs.iter().map(|e| e.f.eval(&ld, &mut st).abs()).fold(0.0, |a: f64, b| if b.is_nan() { f64::INFINITY } else { a.max(b) })
+        all.iter()
+            .map(|&k| {
+                let r = self.eqs[k].f.eval(&ld, &mut st);
+                if r.is_nan() { f64::INFINITY } else { r.abs() / scales[k] }
+            })
+            .collect()
+    }
+
+    /// Maximum residual over all equations, relative to their scales.
+    pub fn max_residual(&self, vals: &[f64]) -> f64 {
+        self.scaled_residuals(vals).into_iter().fold(0.0, f64::max)
     }
 
     /// Owners of equations that are violated.
     pub fn violated(&self, vals: &[f64]) -> Vec<Owner> {
-        let mut st = Vec::new();
-        let ld = loader(vals, [0.0; 2]);
-        self.eqs
-            .iter()
-            .filter(|e| {
-                let r = e.f.eval(&ld, &mut st);
-                !(r.abs() < 1e-6)
-            })
-            .map(|e| e.owner)
-            .collect()
+        self.scaled_residuals(vals).into_iter().enumerate().filter(|(_, r)| !(*r < 1e-6)).map(|(k, _)| self.eqs[k].owner).collect()
     }
 
     /// Solves all constraints, pulling drag equations toward zero.
@@ -199,11 +232,9 @@ impl Sys {
                 continue;
             }
             let need = !c.drags.is_empty() || {
+                let scales = self.eq_scales(&c.eqs, vals, target, c.cols.iter().copied());
                 let ld = loader(vals, target);
-                c.eqs.iter().any(|&i| {
-                    let r = self.eqs[i].f.eval(&ld, &mut st);
-                    !(r.abs() < TOL)
-                })
+                c.eqs.iter().zip(&scales).any(|(&i, s)| !(self.eqs[i].f.eval(&ld, &mut st).abs() / s < TOL))
             };
             if !need {
                 continue;
@@ -216,6 +247,16 @@ impl Sys {
             if !good {
                 // least-squares recovery, then project again
                 self.lm(vals, &c, drags, target, 1.0, 60);
+                good = self.project(vals, &c, target);
+            }
+            if !good {
+                // from a double root (the foci of an ellipse with a = b) the
+                // gradients give no direction to leave it by: start a little
+                // way off
+                let l = backup.iter().map(|x| x.abs()).filter(|x| x.is_finite()).fold(1e-9, f64::max);
+                for (j, &k) in c.cols.iter().enumerate() {
+                    vals[self.unknowns[k]] = backup[j] + 1e-4 * l * ((k as f64 + 1.0) * 78.233).sin();
+                }
                 good = self.project(vals, &c, target);
             }
             if !good {
@@ -261,6 +302,8 @@ impl Sys {
         if !cost.is_finite() {
             return;
         }
+        let cost0 = cost;
+        let l = self.length_scale(vals, c.cols.iter().copied());
         for _ in 0..iters {
             jm.iter_mut().for_each(|x| *x = 0.0);
             {
@@ -295,7 +338,7 @@ impl Sys {
             for _ in 0..12 {
                 let mut aa = a.clone();
                 for p in 0..n {
-                    aa[p * n + p] += lambda * (a[p * n + p] + 0.1 * mean_diag + 1e-6);
+                    aa[p * n + p] += lambda * (a[p * n + p] + 0.1 * mean_diag + (1e-6 * mean_diag).max(1e-300));
                 }
                 let mut d: Vec<f64> = g.iter().map(|x| -x).collect();
                 if !spd_solve(&mut aa, n, &mut d) {
@@ -314,7 +357,7 @@ impl Sys {
                     lambda = (lambda * 0.3).max(1e-12);
                     improved = true;
                     let step: f64 = d.iter().map(|x| x * x).sum::<f64>().sqrt();
-                    if step < 1e-13 {
+                    if step < 1e-13 * l {
                         return;
                     }
                     break;
@@ -324,7 +367,7 @@ impl Sys {
                 }
                 lambda *= 8.0;
             }
-            if !improved || cost < 1e-28 {
+            if !improved || cost < 1e-28 * cost0 {
                 return;
             }
         }
@@ -340,6 +383,15 @@ impl Sys {
         let local: HashMap<usize, usize> = c.cols.iter().enumerate().map(|(j, k)| (*k, j)).collect();
         let mut st = Vec::new();
         let mut r = vec![0.0; m];
+        // the equations' scales at the start (mx is relative to them)
+        let scales = self.eq_scales(&c.eqs, vals, target, c.cols.iter().copied());
+        // far from unit size, length equations (|AB|² − d², scale ~ size²)
+        // and angle equations (scale ~ 1) differ by orders of magnitude, and
+        // the damping drowns the small rows: then the Newton rows are scaled
+        // to their equations' scales. At ordinary sizes they are not, which
+        // finds the nearer solution after a large move.
+        let size = self.length_scale(vals, c.cols.iter().copied());
+        let rows: Vec<f64> = if (1e-2..=1e2).contains(&size) { vec![1.0; m] } else { scales.clone() };
         let eval_r = |vals: &[f64], r: &mut [f64], st: &mut Vec<f64>| -> (f64, f64) {
             let ld = loader(vals, target);
             let mut s = 0.0;
@@ -348,23 +400,27 @@ impl Sys {
                 let v = self.eqs[k].f.eval(&ld, st);
                 r[i] = v;
                 s += v * v;
-                mx = if v.is_nan() { f64::INFINITY } else { mx.max(v.abs()) };
+                mx = if v.is_nan() { f64::INFINITY } else { mx.max(v.abs() / scales[i]) };
             }
             (s, mx)
         };
         let (mut cost, mut mx) = eval_r(vals, &mut r, &mut st);
         let mut jm = vec![0.0; m * n];
         // after reaching TOL, a few more Newton steps reach machine precision
-        // whatever the scale of the construction
+        // whatever the scale of the construction; at a double root (a
+        // tangency, a discriminant 0) Newton only halves the error per step,
+        // so the polishing goes on while the steps still halve the residual
         let mut polish = 0;
-        for _ in 0..80 {
+        let mut polished_cost = f64::INFINITY;
+        for _ in 0..120 {
             // (numeric work advances the work clock too)
             charge((m * n / 4 + m * m * m / 200 + 20) as u64);
             if mx < TOL {
                 polish += 1;
-                if polish > 3 || mx == 0.0 {
+                if mx == 0.0 || (polish > 3 && !(cost < 0.5 * polished_cost)) || polish > 60 {
                     return true;
                 }
+                polished_cost = cost;
             }
             if !cost.is_finite() {
                 return false;
@@ -375,7 +431,7 @@ impl Sys {
                 for (i, &k) in c.eqs.iter().enumerate() {
                     for (col, code) in &self.eqs[k].jac {
                         if let Some(&j) = local.get(col) {
-                            jm[i * n + j] = code.eval(&ld, &mut st);
+                            jm[i * n + j] = code.eval(&ld, &mut st) / rows[i];
                         }
                     }
                 }
@@ -393,8 +449,9 @@ impl Sys {
                 }
                 trace += mm[i * m + i];
             }
-            let mu = 1e-13 * (trace / m as f64) + 1e-300;
-            let mut y = r.clone();
+            let mu = 1e-16 * (trace / m as f64) + 1e-300;
+            let ys: Vec<f64> = r.iter().zip(&rows).map(|(x, s)| x / s).collect();
+            let mut y = ys.clone();
             let mut ok = false;
             let mut damp = mu;
             for _ in 0..8 {
@@ -402,12 +459,12 @@ impl Sys {
                 for i in 0..m {
                     a[i * m + i] += damp;
                 }
-                y.copy_from_slice(&r);
+                y.copy_from_slice(&ys);
                 if spd_solve(&mut a, m, &mut y) {
                     ok = true;
                     break;
                 }
-                damp = damp * 1e3 + 1e-12;
+                damp = damp * 1e3 + 1e-12 * (trace / m as f64);
             }
             if !ok {
                 return false;
@@ -472,6 +529,25 @@ impl Sys {
                     }
                 }
             }
+            // a gradient that vanishes here (a double root, which the solver
+            // reaches only to about √ε) is tiny next to the same gradient a
+            // little way off, where an ordinary one barely changes: it is
+            // taken as 0, not normalized into a full row
+            let l = self.length_scale(vals, c.cols.iter().copied());
+            let mut off = vals.to_vec();
+            let w: Vec<f64> = (0..cn).map(|j| ((j as f64 + 1.0) * 12.9898).sin()).collect();
+            let wn = w.iter().map(|x| x * x).sum::<f64>().sqrt();
+            for (j, &k) in c.cols.iter().enumerate() {
+                off[self.unknowns[k]] += 1e-3 * l * w[j] / wn;
+            }
+            let ld_off = loader(&off, [0.0; 2]);
+            for (i, &k) in c.eqs.iter().enumerate() {
+                let s: f64 = a[i * cn..(i + 1) * cn].iter().map(|x| x * x).sum::<f64>().sqrt();
+                let s_off: f64 = self.eqs[k].jac.iter().filter(|(col, _)| local.contains_key(col)).map(|(_, code)| code.eval(&ld_off, &mut st).powi(2)).sum::<f64>().sqrt();
+                if s < 1e-2 * s_off {
+                    a[i * cn..(i + 1) * cn].iter_mut().for_each(|x| *x = 0.0);
+                }
+            }
             // normalize rows
             for i in 0..cm {
                 let s: f64 = a[i * cn..(i + 1) * cn].iter().map(|x| x * x).sum::<f64>().sqrt();
@@ -517,12 +593,32 @@ impl Sys {
                 pivots.push(col);
                 row += 1;
             }
-            let rank = pivots.len();
-            dof += cn - rank;
             let is_pivot: Vec<bool> = (0..cn).map(|j| pivots.contains(&j)).collect();
+            // with dependent rows, a column without a pivot can still be fixed
+            // to higher order: at a double root (|BC|² = 0, the foci of an
+            // ellipse with a = b) the gradients vanish, at a triple one (a
+            // tangent at an inflection) the Jacobian loses rank. Held at a
+            // value 2% of the size away, a free column leaves the others
+            // solvable to rounding; a fixed one leaves a residual of the
+            // order of the move squared or cubed.
+            let mut pinned = vec![false; cn];
+            if cm > pivots.len() {
+                for j in (0..cn).filter(|&j| !is_pivot[j]) {
+                    let held = Comp { eqs: c.eqs.clone(), drags: vec![], cols: c.cols.iter().copied().filter(|&k| k != c.cols[j]).collect() };
+                    let mut v = vals.to_vec();
+                    v[self.unknowns[c.cols[j]]] += 2e-2 * l;
+                    self.project(&mut v, &held, [0.0; 2]);
+                    let scales = self.eq_scales(&c.eqs, &v, [0.0; 2], c.cols.iter().copied());
+                    let ld_v = loader(&v, [0.0; 2]);
+                    let worst = c.eqs.iter().zip(&scales).map(|(&k, sc)| self.eqs[k].f.eval(&ld_v, &mut st).abs() / sc).fold(0.0, |a: f64, b| if b.is_nan() { f64::INFINITY } else { a.max(b) });
+                    pinned[j] = worst > 1e2 * TOL;
+                }
+            }
+            let rank = pivots.len() + pinned.iter().filter(|p| **p).count();
+            dof += cn - rank;
             let mut f = vec![false; cn];
             for j in 0..cn {
-                if !is_pivot[j] {
+                if !is_pivot[j] && !pinned[j] {
                     f[j] = true;
                     // pivot variables depending on this free column are free too
                     for (r, &pc) in pivots.iter().enumerate() {

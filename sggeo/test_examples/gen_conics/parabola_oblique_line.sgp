@@ -1,0 +1,26 @@
+sgp 2
+
+given
+  p1 = parabola(O)
+    a1: a(p1) = 1
+  line AB
+    x_A: x(A) = 0
+    y_A: y(A) = 1
+    θ1: angle(xaxis, AB) = 26.56505117707799°
+
+construct
+  C = meet(AB, p1)
+
+find
+  x_C: x(C)
+
+where
+  p1 a 1 angle 0° [fixed angle]
+  A (-3.697785493223493e-32, 1)
+  B (2, 2)
+  C (0.3431457505076198, 1.17157287525381)
+  a1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  θ1 label (0.486624, 0.114876)
+  x_C label (0.3, 0.3)

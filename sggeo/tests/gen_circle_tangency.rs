@@ -673,3 +673,464 @@ fn ring_of_four_around_unit_circle() {
     let r = k.measure(DimKind::Radius(a));
     k.check_value(r, 1.0 + 2.0f64.sqrt());
 }
+
+/// Apollonius' problem: circle touching three given circles externally.
+#[test]
+fn apollonius_three_circles() {
+    let mut k = Kit::new();
+    let (p1, c1) = disc(&mut k, 0.0, 0.0, 1.0);
+    let (p2, c2) = disc(&mut k, 10.0, 0.0, 2.0);
+    let (p3, c3) = disc(&mut k, 3.0, 8.0, 3.0);
+    k.drive(DimKind::Radius(c1), "1");
+    k.drive(DimKind::Radius(c2), "2");
+    k.drive(DimKind::Radius(c3), "3");
+    k.drive(DimKind::Distance(p1, p2), "10");
+    k.drive(DimKind::Distance(p1, p3), "sqrt(73)");
+    k.drive(DimKind::Distance(p2, p3), "sqrt(113)");
+    let (_, s) = disc(&mut k, 4.48, 1.46, 3.7);
+    k.tangent(s, c1);
+    k.tangent(s, c2);
+    k.tangent(s, c3);
+    assert_eq!(k.dof(), 3);
+    let r = k.measure(DimKind::Radius(s));
+    k.check_value(r, 3.70958454);
+}
+
+/// Point with both coordinates driven.
+fn placed(k: &mut Kit, x: f64, y: f64) -> usize {
+    let p = k.point(x + 0.01, y - 0.01);
+    k.drive(DimKind::CoordX(p), &format!("{x}"));
+    k.drive(DimKind::CoordY(p), &format!("{y}"));
+    p
+}
+
+/// Circle touching a line and two circles (all externally).
+#[test]
+fn circle_tangent_line_and_two_circles() {
+    let mut k = Kit::new();
+    let xa = k.xaxis();
+    let p1 = placed(&mut k, 0.0, 3.0);
+    let c1 = k.circle(p1, 1.0);
+    let p2 = placed(&mut k, 6.0, 2.0);
+    let c2 = k.circle(p2, 1.5);
+    k.drive(DimKind::Radius(c1), "1");
+    k.drive(DimKind::Radius(c2), "1.5");
+    let (_, s) = disc(&mut k, 2.63, 1.87, 1.87);
+    k.tangent(s, xa);
+    k.tangent(s, c1);
+    k.tangent(s, c2);
+    assert_eq!(k.dof(), 0);
+    let r = k.measure(DimKind::Radius(s));
+    k.check_value(r, 1.86778133);
+}
+
+/// Malfatti circles in the 3-4-5 right triangle (closed form by Malfatti's
+/// formulas with half-angle tangents): the radius at the right angle.
+#[test]
+#[ignore = "an octic that is a tower of quadratics is not solved (SHORTCOMINGS 2.6)"]
+fn malfatti_circles() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let (xa, ya) = (k.xaxis(), k.yaxis());
+    let b = k.point(4.0, 0.0);
+    let c = k.point(0.0, 3.0);
+    k.on(b, xa);
+    k.on(c, ya);
+    k.drive(DimKind::Distance(o, b), "4");
+    k.drive(DimKind::Distance(o, c), "3");
+    let hyp = k.inf_line(b, c);
+    let (_, m0) = disc(&mut k, 0.508, 0.508, 0.508);
+    let (_, m1) = disc(&mut k, 1.744, 0.752, 0.752);
+    let (_, m2) = disc(&mut k, 0.665, 1.670, 0.665);
+    k.tangent(m0, xa);
+    k.tangent(m0, ya);
+    k.tangent(m1, xa);
+    k.tangent(m1, hyp);
+    k.tangent(m2, ya);
+    k.tangent(m2, hyp);
+    k.tangent(m0, m1);
+    k.tangent(m1, m2);
+    k.tangent(m2, m0);
+    assert_eq!(k.dof(), 0);
+    let r = k.measure(DimKind::Radius(m0));
+    k.check_value(r, 0.5079339623521082);
+}
+
+/// Second circle of the Pappus chain in the arbelos with radii 5 = 3 + 2.
+#[test]
+fn pappus_chain_second_circle() {
+    let mut k = Kit::new();
+    let xa = k.xaxis();
+    let o = k.point(0.0, 0.0);
+    k.on(o, xa);
+    let big = k.circle(o, 5.0);
+    let p1 = k.point(-2.0, 0.0);
+    let p2 = k.point(3.0, 0.0);
+    k.on(p1, xa);
+    k.on(p2, xa);
+    let c1 = k.circle(p1, 3.0);
+    let c2 = k.circle(p2, 2.0);
+    k.tangent(big, c1);
+    k.tangent(big, c2);
+    k.tangent(c1, c2);
+    k.drive(DimKind::Radius(c1), "3");
+    k.drive(DimKind::Radius(c2), "2");
+    let (_, s1) = disc(&mut k, 1.316, 3.158, 1.579);
+    k.tangent(s1, big);
+    k.tangent(s1, c1);
+    k.tangent(s1, c2);
+    let (_, s2) = disc(&mut k, -1.129, 3.871, 0.968);
+    k.tangent(s2, big);
+    k.tangent(s2, c1);
+    k.tangent(s2, s1);
+    assert!(k.dof() > 0);
+    let r = k.measure(DimKind::Radius(s2));
+    k.check_value(r, 30.0 / 31.0);
+}
+
+/// Outer Soddy circle of three touching circles with radii 2, 3, 4:
+/// curvature 1/2 + 1/3 + 1/4 - 2 sqrt(1/6 + 1/12 + 1/8).
+#[test]
+fn soddy_outer_general() {
+    let mut k = Kit::new();
+    // 2-3-4 radii: centre distances 5, 6, 7
+    let (_, c1) = disc(&mut k, 0.0, 0.0, 2.0);
+    let (_, c2) = disc(&mut k, 5.0, 0.05, 3.0);
+    let (_, c3) = disc(&mut k, 1.0, 5.9, 4.0);
+    let kk = 1.0 / 2.0 + 1.0 / 3.0 + 1.0 / 4.0 - 2.0 * (1.0f64 / 6.0 + 1.0 / 12.0 + 1.0 / 8.0).sqrt();
+    let r4 = -1.0 / kk;
+    let (_, c4) = disc(&mut k, 2.0, 2.0, r4);
+    k.tangent(c1, c2);
+    k.tangent(c1, c3);
+    k.tangent(c2, c3);
+    k.tangent(c4, c1);
+    k.tangent(c4, c2);
+    k.tangent(c4, c3);
+    k.drive(DimKind::Radius(c1), "2");
+    k.drive(DimKind::Radius(c2), "3");
+    k.drive(DimKind::Radius(c3), "4");
+    assert_eq!(k.dof(), 3);
+    let r = k.measure(DimKind::Radius(c4));
+    k.check_value(r, r4);
+}
+
+/// Circle through two points touching a circle (Apollonius PPC).
+#[test]
+fn apollonius_ppc() {
+    let mut k = Kit::new();
+    let p = placed(&mut k, 1.0, 0.0);
+    let q = placed(&mut k, 3.0, 1.0);
+    let ctr = placed(&mut k, 5.0, 4.0);
+    let circ = k.circle(ctr, 1.5);
+    k.drive(DimKind::Radius(circ), "1.5");
+    let (_, s) = disc(&mut k, 0.84, 2.82, 2.82);
+    k.on(p, s);
+    k.on(q, s);
+    k.tangent(s, circ);
+    assert_eq!(k.dof(), 0);
+    let r = k.measure(DimKind::Radius(s));
+    k.check_value(r, 2.82401243);
+}
+
+/// Circle in a 70 degree wedge touching a circle (Apollonius LLC).
+#[test]
+fn apollonius_llc() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    let q = k.point(1.0, 2.75);
+    let l2 = k.inf_line(o, q);
+    k.drive_angle(xa, l2, "70");
+    let ctr = placed(&mut k, 4.0, 1.5);
+    let circ = k.circle(ctr, 1.0);
+    k.drive(DimKind::Radius(circ), "1");
+    let (_, s) = disc(&mut k, 1.77, 1.24, 1.24);
+    k.tangent(s, xa);
+    k.tangent(s, l2);
+    k.tangent(s, circ);
+    assert_eq!(k.dof(), 1);
+    let r = k.measure(DimKind::Radius(s));
+    k.check_value(r, 1.24166066);
+}
+
+/// Malfatti circles in an equilateral triangle of side a: r = (sqrt 3 - 1) a / 4.
+#[test]
+fn malfatti_equilateral() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    let b = k.point(4.0, 0.0);
+    k.on(b, xa);
+    let c = k.point(2.0, 3.46);
+    let ab = k.line(o, b);
+    let bc = k.inf_line(b, c);
+    let ca = k.inf_line(c, o);
+    k.drive(DimKind::Length(ab), "4");
+    k.equal(ab, bc);
+    k.equal(bc, ca);
+    let r = 3f64.sqrt() - 1.0;
+    let rr = r * 3f64.sqrt();
+    let (_, m0) = disc(&mut k, rr, r, r);
+    let (_, m1) = disc(&mut k, 4.0 - rr, r, r);
+    let (_, m2) = disc(&mut k, 2.0, 3.46 - 2.0 * r, r);
+    k.tangent(m0, xa);
+    k.tangent(m0, ca);
+    k.tangent(m1, xa);
+    k.tangent(m1, bc);
+    k.tangent(m2, bc);
+    k.tangent(m2, ca);
+    k.tangent(m0, m1);
+    k.tangent(m1, m2);
+    k.tangent(m2, m0);
+    assert_eq!(k.dof(), 0);
+    let rad = k.measure(DimKind::Radius(m0));
+    k.check_value(rad, r);
+}
+
+/// Circle tangent to the x-axis, through a point and touching a circle (LCP).
+#[test]
+fn apollonius_lcp() {
+    let mut k = Kit::new();
+    let xa = k.xaxis();
+    let p = placed(&mut k, 1.0, 3.0);
+    let ctr = placed(&mut k, 5.0, 2.0);
+    let circ = k.circle(ctr, 1.0);
+    k.drive(DimKind::Radius(circ), "1");
+    let (_, s) = disc(&mut k, 2.25, 1.76, 1.76);
+    k.tangent(s, xa);
+    k.on(p, s);
+    k.tangent(s, circ);
+    assert_eq!(k.dof(), 0);
+    let r = k.measure(DimKind::Radius(s));
+    k.check_value(r, 1.76041667);
+}
+
+/// Circle through a point touching two circles (CCP).
+#[test]
+fn apollonius_ccp() {
+    let mut k = Kit::new();
+    let p = placed(&mut k, 0.0, 4.0);
+    let c1 = placed(&mut k, 0.0, 0.0);
+    let c2 = placed(&mut k, 6.0, 0.0);
+    let k1 = k.circle(c1, 1.0);
+    let k2 = k.circle(c2, 2.0);
+    k.drive(DimKind::Radius(k1), "1");
+    k.drive(DimKind::Radius(k2), "2");
+    let (_, s) = disc(&mut k, 2.314, 2.779, 2.616);
+    k.on(p, s);
+    k.tangent(s, k1);
+    k.tangent(s, k2);
+    assert_eq!(k.dof(), 0);
+    let r = k.measure(DimKind::Radius(s));
+    k.check_value(r, 2.61629951);
+}
+
+/// LCP as above with P moved off the special height y_P = y_C + r (where
+/// the quadratic's leading coefficient vanishes).
+#[test]
+fn apollonius_lcp_generic() {
+    let mut k = Kit::new();
+    let xa = k.xaxis();
+    let p = placed(&mut k, 1.0, 3.3);
+    let ctr = placed(&mut k, 5.0, 2.0);
+    let circ = k.circle(ctr, 1.0);
+    k.drive(DimKind::Radius(circ), "1");
+    let (_, s) = disc(&mut k, 2.3, 1.8, 1.8);
+    k.tangent(s, xa);
+    k.on(p, s);
+    k.tangent(s, circ);
+    assert_eq!(k.dof(), 0);
+    let r = k.measure(DimKind::Radius(s));
+    k.check(r);
+}
+
+/// Steiner chain of three circles between a circle of radius R = 10 and an
+/// inner circle of radius r = 0.5: the offset of the centres is
+/// d = sqrt((R - r)^2 - 4 R r tan^2(pi/3)) = 5.5.
+#[test]
+fn steiner_chain_three() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let outer = k.circle(o, 10.0);
+    k.drive(DimKind::Radius(outer), "10");
+    let (ic, inner) = disc(&mut k, 5.5, 0.05, 0.5);
+    k.drive(DimKind::Radius(inner), "0.5");
+    let (_, s0) = disc(&mut k, -2.5, 0.0, 7.5);
+    let (_, s1) = disc(&mut k, 7.14, 2.45, 2.45);
+    let (_, s2) = disc(&mut k, 7.14, -2.45, 2.45);
+    for &s in &[s0, s1, s2] {
+        k.tangent(s, outer);
+        k.tangent(s, inner);
+    }
+    k.tangent(s0, s1);
+    k.tangent(s1, s2);
+    k.tangent(s2, s0);
+    assert_eq!(k.dof(), 2);
+    let d = k.measure(DimKind::Distance(o, ic));
+    k.check_value(d, 5.5);
+}
+
+/// Sangaku: square of side a with quarter circles of radius a about two
+/// adjacent corners; the circle touching both arcs and the base: r = 3a/8.
+#[test]
+fn sangaku_quarter_circles() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    let b = k.point(4.0, 0.0);
+    k.on(b, xa);
+    let base = k.line(o, b);
+    k.drive(DimKind::Length(base), "4");
+    let q1 = k.circle(o, 4.0);
+    let q2 = k.circle(b, 4.0);
+    k.equal(q1, base);
+    k.equal(q2, base);
+    let (_, s) = disc(&mut k, 2.0, 1.52, 1.48);
+    k.tangent(s, xa);
+    k.tangent(s, q1);
+    k.tangent(s, q2);
+    assert_eq!(k.dof(), 0);
+    let r = k.measure(DimKind::Radius(s));
+    k.check_value(r, 1.5);
+}
+
+/// Apollonius with mixed tangency: enclosing two circles, touching the
+/// third from outside.
+#[test]
+fn apollonius_mixed_tangency() {
+    let mut k = Kit::new();
+    let (p1, c1) = disc(&mut k, 0.0, 0.0, 1.0);
+    let (p2, c2) = disc(&mut k, 10.0, 0.0, 2.0);
+    let (p3, c3) = disc(&mut k, 3.0, 8.0, 3.0);
+    k.drive(DimKind::Radius(c1), "1");
+    k.drive(DimKind::Radius(c2), "2");
+    k.drive(DimKind::Radius(c3), "3");
+    k.drive(DimKind::Distance(p1, p2), "10");
+    k.drive(DimKind::Distance(p1, p3), "8.5");
+    k.drive(DimKind::Distance(p2, p3), "10.6");
+    let (_, s) = disc(&mut k, 5.52, -1.35, 6.68);
+    k.tangent(s, c1);
+    k.tangent(s, c2);
+    k.tangent(s, c3);
+    assert_eq!(k.dof(), 3);
+    let r = k.measure(DimKind::Radius(s));
+    k.check(r);
+}
+
+/// Circle inscribed in a circular sector of radius R and angle 70 degrees:
+/// r = R sin(t/2) / (1 + sin(t/2)).
+#[test]
+fn circle_in_sector() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    let a = k.point(3.0, 0.0);
+    k.on(a, xa);
+    let t = 70f64.to_radians();
+    let b = k.point(3.0 * t.cos(), 3.0 * t.sin());
+    let arc = k.arc(o, a, b);
+    let oa = k.line(o, a);
+    let ob = k.line(o, b);
+    k.drive(DimKind::Length(oa), "3");
+    k.drive_angle(oa, ob, "70");
+    let rr = 1.0935149188197835;
+    let dc = 3.0 - rr;
+    let (_, s) = disc(&mut k, dc * (t / 2.0).cos(), dc * (t / 2.0).sin(), rr);
+    k.tangent(s, oa);
+    k.tangent(s, ob);
+    k.tangent(s, arc);
+    assert_eq!(k.dof(), 0);
+    let r = k.measure(DimKind::Radius(s));
+    k.check_value(r, rr);
+}
+
+/// Incircle via tangency to three lines of a 3-4-5 triangle with a
+/// variable scale: r = (a+b−c)/2.
+#[test]
+fn incircle_tangent_three_lines() {
+    let mut k = Kit::new();
+    let a = k.origin();
+    let b = k.point(4.0, 0.1);
+    let c = k.point(0.1, 3.0);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    k.horizontal(ab);
+    k.perpendicular(ab, ac);
+    k.drive(DimKind::Length(ab), "4");
+    k.drive(DimKind::Length(ac), "3");
+    let i = k.point(1.0, 1.0);
+    let circ = k.circle(i, 1.0);
+    k.hint = [1.0, 0.0];
+    k.tangent(circ, ab);
+    k.hint = [0.0, 1.0];
+    k.tangent(circ, ac);
+    k.hint = [1.6, 1.8];
+    k.tangent(circ, bc);
+    let r = k.measure(DimKind::Radius(circ));
+    k.check_value(r, 1.0);
+}
+
+/// Tangent from P = (r, y_P) to a circle touches at (r, 0) for every y_P.
+/// The formula for the contact's y must still hold once x_P ≠ r and y_P moves.
+#[test]
+fn circle_tangent_contact_on_vertical_tangent() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let c = k.circle(o, 3.0);
+    let dr = k.drive(DimKind::Radius(c), "3");
+    let p = k.point(3.0, 4.0);
+    let dx = k.drive(DimKind::CoordX(p), "3");
+    let dy = k.drive(DimKind::CoordY(p), "4");
+    let (_seg, t) = k.tangent_line(p, c, [3.0, 0.0]);
+    let ty = k.measure(DimKind::CoordY(t));
+    let txt = k.check(ty);
+    println!("{txt}");
+    let f = k.formula(ty);
+    k.set(dx, "3.5");
+    println!("t = {:?}", k.doc().pval(t));
+    k.still(ty, &f, "x_P = 3.5");
+    k.set(dy, "6");
+    println!("t = {:?}", k.doc().pval(t));
+    k.still(ty, &f, "x_P = 3.5, y_P = 6");
+    k.set(dr, "2");
+    k.still(ty, &f, "x_P = 3.5, y_P = 6, r = 2");
+}
+
+/// Circle tangent to a line and to two circles (one Apollonius case).
+#[test]
+fn circle_tangent_two_circles_and_line() {
+    let mut k = Kit::new();
+    k.allow_inexact = true;
+    let a = k.origin();
+    let b = k.point(6.0, 0.1);
+    let ab = k.line(a, b);
+    k.horizontal(ab);
+    k.drive(DimKind::Length(ab), "6");
+    let c1 = k.circle(a, 2.0);
+    let c2 = k.circle(b, 1.0);
+    k.drive(DimKind::Radius(c1), "2");
+    k.drive(DimKind::Radius(c2), "1");
+    let p = k.point(-3.0, -3.0);
+    let q = k.point(9.0, -3.1);
+    let l = k.inf_line(p, q);
+    k.horizontal(l);
+    k.drive(DimKind::CoordY(p), "-3");
+    k.drive(DimKind::CoordX(p), "-3");
+    let x = k.point(3.5, -1.0);
+    let c3 = k.circle(x, 2.0);
+    k.hint = [3.5, -3.0];
+    k.tangent(c3, l);
+    k.hint = [1.8, -0.9];
+    k.tangent(c3, c1);
+    k.hint = [5.2, -0.5];
+    k.tangent(c3, c2);
+    println!("x = {:?}, r = {}", k.doc().pval(x), {
+        let r = k.measure(DimKind::Radius(c3));
+        k.value(r)
+    });
+    let r = k.doc().dims.len() - 1;
+    let t0 = std::time::Instant::now();
+    let t = k.check(r);
+    println!("{} chars {:.0} ms", t.len(), t0.elapsed().as_secs_f64() * 1e3);
+}

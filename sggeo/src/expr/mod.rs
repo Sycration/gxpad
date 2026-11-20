@@ -503,6 +503,18 @@ pub fn set_assumptions(pos: HashSet<u32>, ang: HashSet<u32>) {
     ANGLES.with(|p| *p.borrow_mut() = ang);
 }
 
+/// Declares symbol `s` non-negative (`on`), or withdraws that.
+pub fn assume_nonneg(s: u32, on: bool) {
+    POSITIVE.with(|p| {
+        let mut p = p.borrow_mut();
+        if on {
+            p.insert(s);
+        } else {
+            p.remove(&s);
+        }
+    });
+}
+
 pub fn is_nonneg(e: &Expr) -> bool {
     match e.node() {
         Node::Num(n) => !n.is_neg(),
@@ -737,11 +749,26 @@ fn leading_negative(e: &Expr) -> bool {
 
 pub fn mul(factors: Vec<Expr>) -> Expr {
     let mut flat: Vec<Expr> = Vec::with_capacity(factors.len());
+    // exp(a)·exp(b) = exp(a + b) (exp(a)^k is exp(k·a) already, see `pow`)
+    let mut exps: Vec<Expr> = Vec::new();
     for f in factors {
         match f.node() {
-            Node::Mul(fs) => flat.extend(fs.iter().cloned()),
+            Node::Mul(fs) => {
+                for g in fs {
+                    match g.node() {
+                        Node::Fun(Fun::Exp, a) => exps.push(a.clone()),
+                        _ => flat.push(g.clone()),
+                    }
+                }
+            }
+            Node::Fun(Fun::Exp, a) => exps.push(a.clone()),
             _ => flat.push(f),
         }
+    }
+    match exps.len() {
+        0 => {}
+        1 => flat.push(fun(Fun::Exp, exps.pop().unwrap())),
+        _ => flat.push(fun(Fun::Exp, add(exps))),
     }
     if flat.len() == 1 {
         return flat.pop().unwrap();
@@ -767,8 +794,32 @@ pub fn mul(factors: Vec<Expr>) -> Expr {
     if coeff.is_zero() {
         return zero();
     }
-    let mut out: Vec<Expr> = Vec::with_capacity(map.len());
     let mut redo: Vec<Expr> = Vec::new();
+    // roots of positive rational numbers of one index under one root, where
+    // `pow` takes out perfect powers: √2·√3 = √6, √6/√2 = √3, √2·√6 = 2√3
+    let mut by_index: BTreeMap<i128, Vec<(Expr, Rat, Rat)>> = BTreeMap::new();
+    for (b, es) in &map {
+        if let ([e], Some(Num::R(r))) = (es.as_slice(), b.as_num()) {
+            if let Some(q) = e.as_rat().filter(|q| q.d > 1 && r.n > 0) {
+                by_index.entry(q.d).or_default().push((b.clone(), r, q));
+            }
+        }
+    }
+    for (d, items) in by_index.into_iter().filter(|(_, v)| v.len() >= 2) {
+        let prod = items.iter().try_fold(Rat::int(1), |acc, (_, r, q)| r.powi(q.n as i64).and_then(|x| acc.mul(x)));
+        // (n/m)^(1/d) = (n·m^(d−1))^(1/d)/m: one root of an integer, which
+        // `pow` keeps whole (it would split a fraction into two roots again)
+        let Some((rad, den)) = prod.and_then(|p| Some((Rat::int(p.n).mul(Rat::int(p.d).powi(d as i64 - 1)?)?, p.d))) else { continue };
+        if rad.n.abs() >= 1 << 50 {
+            continue;
+        }
+        for (b, _, _) in &items {
+            map.remove(b);
+        }
+        coeff = coeff.mul(Num::R(Rat::new(1, den).unwrap()));
+        redo.push(pow(num(Num::R(rad)), num(Num::R(Rat::new(1, d).unwrap()))));
+    }
+    let mut out: Vec<Expr> = Vec::with_capacity(map.len());
     for (b, es) in map {
         let p = if es.len() == 1 && !es[0].is_one() {
             // unchanged single factor
@@ -1057,6 +1108,27 @@ fn pi_multiple(a: &Expr) -> Option<Rat> {
 pub fn fun(f: Fun, a: Expr) -> Expr {
     if let Some(Num::F(x)) = a.as_num() {
         return num(Num::F(f.apply(x)));
+    }
+    // inverse trigonometric functions of the exact values of the multiples
+    // of π/12 (acos(−1/2) = 2π/3, asin(√2/2) = π/4)
+    if matches!(f, Fun::Acos | Fun::Asin | Fun::Atan) && a.size() <= 16 && a.as_rat().is_none_or(|r| r.d == 2) && sym_set(&a).is_empty() && !has_float(&a) {
+        let v = eval(&a, &|_| f64::NAN);
+        let ks: std::ops::RangeInclusive<i64> = match f {
+            Fun::Acos => 0..=12,
+            Fun::Asin => -6..=6,
+            _ => -5..=5,
+        };
+        for k in ks {
+            let t = k as f64 * std::f64::consts::PI / 12.0;
+            let w = match f {
+                Fun::Acos => t.cos(),
+                Fun::Asin => t.sin(),
+                _ => t.tan(),
+            };
+            if (w - v).abs() <= 1e-14 {
+                return mul(vec![rat(k, 12), pi()]);
+            }
+        }
     }
     if let Some(r) = a.as_rat() {
         let z = r.n == 0;

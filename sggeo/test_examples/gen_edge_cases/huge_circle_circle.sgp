@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 500000
+  segment OB
+    d2: |OB| = 300000
+  segment AB
+    d3: |AB| = 400000
+
+find
+  y_B: y(B)
+
+where
+  A (500000, 5.053968264940244e-175)
+  B (180000, 240000)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  y_B label (0.3, 0.3)

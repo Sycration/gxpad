@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  a = 0
+  g1 = curve(y = a*x^3 + x^2)
+
+construct
+  point A on g1
+    y_A: y(A) = 2
+
+find
+  x_A: x(A)
+
+where
+  A (1.4142135623730951, 2)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

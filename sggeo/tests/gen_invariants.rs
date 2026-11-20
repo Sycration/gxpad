@@ -518,6 +518,8 @@ fn ladder_ratio_point() {
 #[test]
 fn midline_theorem() {
     let mut k = Kit::new();
+    // (the angle is an acos, measured to about √ε near 0)
+    k.value_tol = 1e-7;
     let a = k.point(0.0, 0.0);
     let b = k.point(6.0, 0.5);
     let c = k.point(2.0, 4.0);
@@ -533,8 +535,10 @@ fn midline_theorem() {
     k.check_value(l, 3.5);
     let ang = k.measure(DimKind::Angle(mn, bc));
     println!("midline angle {}", k.value(ang).to_degrees());
+    // (the angle is an acos, which near 0 turns one rounding of the cosine
+    // into √ε ≈ 1.5e-8)
     let v = k.value(ang);
-    assert!(v.abs() < 1e-9 || (v - PI).abs() < 1e-9);
+    assert!(v.abs() < 1e-7 || (v - PI).abs() < 1e-7);
     k.check(ang);
 }
 

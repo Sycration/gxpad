@@ -1,0 +1,16 @@
+sgp 2
+
+given
+  c = 3
+  g1 = curve(y = ln(c - x))
+  g2 = curve(y = ln(x))
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+
+where
+  A (1.5, 0.4054651081081644)
+  x_A label (0.3, 0.3)

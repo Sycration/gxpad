@@ -1,0 +1,33 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 1
+  point A
+    x_A: x(A) = 2
+    y_A: y(A) = 0.5
+
+construct
+  point C on k1
+  line OC
+  D = reflect(A, OC)
+  line CB
+    D on CB
+    x_B: x(B) = 0.3
+    y_B: y(B) = 2.2
+
+find
+  x_C: x(C)
+
+where
+  k1 r 1
+  A (2, 0.5)
+  C (0.6791085472639447, 0.7340378607626821)
+  D (0.34324506112706044, 2.0327771220701694)
+  B (0.3, 2.2)
+  r1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_C label (0.3, 0.3)

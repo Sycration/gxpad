@@ -960,7 +960,7 @@ impl Doc {
         }
     }
 
-    fn dim_points(&self, k: &DimKind) -> Option<(Pt, Pt)> {
+    pub(crate) fn dim_points(&self, k: &DimKind) -> Option<(Pt, Pt)> {
         match *k {
             DimKind::Distance(a, b) | DimKind::HDist(a, b) | DimKind::VDist(a, b) => Some((self.pexpr(a), self.pexpr(b))),
             DimKind::Length(l) => Some(self.line_expr(l)),

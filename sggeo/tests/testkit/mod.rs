@@ -11,7 +11,8 @@
 //! 3. evaluates to the measured value;
 //! 4. keeps evaluating to the measured value while the construction is
 //!    articulated: free points are dragged and driving dimensions and free
-//!    variables are perturbed, then the same formula is re-evaluated.
+//!    variables are perturbed, one at a time and all together, then the same
+//!    formula is re-evaluated (an exact formula only).
 //!
 //! When a `Kit` is dropped at the end of a test, its construction is saved
 //! as an example file `test_examples/<test file>/<test name>.sgp` (the app's
@@ -47,6 +48,9 @@ pub struct Kit {
     pub drag_scale: f64,
     /// Relative size of driving value perturbations.
     pub value_scale: f64,
+    /// Relative tolerance between the formula's value and the measurement
+    /// (a measurement at a double root is only accurate to about √ε).
+    pub value_tol: f64,
     /// Upper bound for one derivation, in milliseconds of real time. The
     /// derivation's own budgets are counted in work done, so this is only a
     /// guard against a runaway computation; it is generous because real
@@ -121,6 +125,7 @@ impl Kit {
             trials: 12,
             drag_scale: 0.04,
             value_scale: 0.03,
+            value_tol: 1e-8,
             max_ms: 30000.0,
         }
     }
@@ -513,7 +518,7 @@ impl Kit {
         assert!(ms <= self.max_ms, "derivation took {ms:.0} ms: {text}");
         assert!(der.exact || self.allow_inexact, "formula is not exact: {text}");
         assert!(
-            close(der.value, der.actual, 1e-8),
+            close(der.value, der.actual, self.value_tol),
             "formula value {} differs from measured {}: {text}",
             der.value,
             der.actual
@@ -524,7 +529,10 @@ impl Kit {
             let free: Vec<String> = sym_set(&der.expr).into_iter().filter(|s| !named.contains(s)).map(|s| sym_name(&names, s)).collect();
             assert!(free.is_empty(), "formula depends on undetermined quantities {free:?}: {text}");
         }
-        self.articulate(d, &der.expr, &text);
+        // (a numeric formula, accepted with `allow_inexact`, cannot follow the construction)
+        if der.exact {
+            self.articulate(d, &der.expr, &text);
+        }
         text
     }
 
@@ -535,9 +543,32 @@ impl Kit {
         self.check(d)
     }
 
-    fn eval_now(&self, e: &Expr) -> f64 {
+    /// Value of a formula at the current configuration.
+    pub fn eval_now(&self, e: &Expr) -> f64 {
         let p = &self.sk().doc.params;
         eval(e, &|s| p.get(s as usize).map(|x| x.v).unwrap_or(f64::NAN))
+    }
+
+    /// The exact formula of dimension `d` at the current configuration, to
+    /// test with [`still`] after the construction has moved far away (which
+    /// the articulation of [`check`] does not do).
+    pub fn formula(&self, d: usize) -> Expr {
+        let doc = numeric_doc(&self.sk().doc, Target::Dim(d));
+        let (name, target, _) = target_expr(&doc, Target::Dim(d)).expect("bad target");
+        let der = derive::derive(&doc, &target).unwrap_or_else(|e| panic!("derivation of {name} failed: {e}"));
+        let text = format!("{name} = {}", self.formula_text(&der.expr));
+        println!("{text}");
+        assert!(der.exact, "formula is not exact: {text}");
+        der.expr
+    }
+
+    /// Asserts that `e`, derived earlier by [`formula`], still gives the
+    /// measured value of `d`; `what` describes the configuration.
+    pub fn still(&self, d: usize, e: &Expr, what: &str) {
+        let m = self.value(d);
+        let f = self.eval_now(e);
+        println!("{what}: measured {m}, formula {f}");
+        assert!(close(m, f, 1e-7), "{what}: the earlier formula gives {f}, but the measurement is {m}");
     }
 
     fn scale(&self) -> f64 {
@@ -578,7 +609,8 @@ impl Kit {
             }
         }
         let scale = self.scale();
-        for _ in 0..self.trials {
+        let dof0 = self.sk().dof;
+        for trial in 0..self.trials {
             let before = self.sk().doc.clone();
             let use_drag = !free_pts.is_empty() && (knobs.is_empty() || self.rand() < 0.55);
             let action = if use_drag {
@@ -593,16 +625,31 @@ impl Kit {
                 let ok = self.skm().solve_full();
                 (ok, format!("dragged {} by {:.3} toward {:.0}°", self.sk().doc.ent(e).map(|x| x.name.clone()).unwrap_or_default(), r, ang.to_degrees()))
             } else if !knobs.is_empty() {
-                let (p, name) = knobs[(self.rand() * knobs.len() as f64) as usize % knobs.len()].clone();
-                let v0 = self.sk().doc.params[p].v;
-                let f = 1.0 + self.value_scale * (2.0 * self.rand() - 1.0);
-                let nv = if v0.abs() < 1e-9 { self.value_scale * (2.0 * self.rand() - 1.0) } else { v0 * f };
-                let ok = self.skm().set_values(&[(p, nv)], false);
-                (ok, format!("set {name} from {v0} to {nv}"))
+                // one value, or (every third trial) all of them together: a
+                // value can leave the target unchanged until another one moves
+                let chosen: Vec<(usize, String)> = if knobs.len() > 1 && trial % 3 == 2 {
+                    knobs.clone()
+                } else {
+                    vec![knobs[(self.rand() * knobs.len() as f64) as usize % knobs.len()].clone()]
+                };
+                let mut sets = Vec::new();
+                let mut what = Vec::new();
+                for (p, name) in chosen {
+                    let v0 = self.sk().doc.params[p].v;
+                    let f = 1.0 + self.value_scale * (2.0 * self.rand() - 1.0);
+                    let nv = if v0.abs() < 1e-9 { self.value_scale * (2.0 * self.rand() - 1.0) } else { v0 * f };
+                    sets.push((p, nv));
+                    what.push(format!("{name} from {v0} to {nv}"));
+                }
+                let ok = self.skm().set_values(&sets, false);
+                (ok, format!("set {}", what.join(", ")))
             } else {
                 break;
             };
-            if !action.0 || !self.sk().conflicts.is_empty() {
+            // a move that frees part of the construction (a distance
+            // driven to 0 that becomes a small circle) leaves the target
+            // undetermined, and the measurement arbitrary
+            if !action.0 || !self.sk().conflicts.is_empty() || self.sk().dof > dof0 {
                 self.skm().doc = before;
                 self.skm().dirty = true;
                 self.skm().solve_full();

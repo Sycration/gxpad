@@ -1,0 +1,35 @@
+sgp 2
+
+given
+  segment OB
+
+construct
+  point A on xaxis
+  segment OA
+    d1: |OA| = 1
+    θ1: ∠AOB = 80°
+  segment AB
+    θ2: angle(OA, AB) = 100°
+  point C on AB
+  point D on OB
+  l1 = segment OC
+    θ3: angle(OA, l1) = 60°
+  segment AD
+    θ4: angle(OA, AD) = 130°
+  l2 = segment CO
+  segment CD
+
+find
+  θ5: angle(l2, CD)
+
+where
+  B (0.5000000000000001, 2.8356409098088546)
+  A (1, 1.9721522630525295e-31)
+  C (0.7660444431189781, 1.3268278963378766)
+  D (0.1736481776669304, 0.9848077530122079)
+  d1 label (0.3, 0.3)
+  θ1 label (0.383077, 0.321329)
+  θ2 label (0.321267, 0.383128)
+  θ3 label (0.433003, 0.250016)
+  θ4 label (0.211307, 0.453155)
+  θ5 label (-0.353553, -0.353553)

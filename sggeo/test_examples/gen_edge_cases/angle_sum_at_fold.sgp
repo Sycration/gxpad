@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  segment OA
+    θ1: angle(xaxis, OA) = 100°
+    d1: |OA| = 4
+  segment OB
+    θ2: ∠AOB = 80°
+    d2: |OB| = 4
+
+find
+  y_B: y(B)
+
+where
+  A (-0.6945927106677212, 3.939231012048832)
+  B (-4, 4.408809389776282e-16)
+  θ1 label (0.307706, 0.394103)
+  d1 label (0.3, 0.3)
+  θ2 label (-0.370727, 0.335502)
+  d2 label (0.3, 0.3)
+  y_B label (0.3, 0.3)

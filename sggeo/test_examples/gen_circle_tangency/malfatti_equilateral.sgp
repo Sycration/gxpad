@@ -1,0 +1,42 @@
+sgp 2
+
+given
+  point C
+  k1 = circle(C)
+    xaxis tan k1
+  point D
+  k2 = circle(D)
+    xaxis tan k2
+    k1 tan k2
+  point E
+  k3 = circle(E)
+    k2 tan k3
+    k3 tan k1
+
+construct
+  point A on xaxis
+  segment OA
+    d1: |OA| = 4
+  line AB
+    |OA| == |AB|
+    AB tan k2
+    AB tan k3
+  line BO
+    |AB| == |BO|
+    BO tan k1
+    BO tan k3
+
+find
+  r1: r(k1)
+
+where
+  C (1.2679491924311226, 0.7320508075688773)
+  k1 r 0.7320508075688773
+  D (2.732050807568877, 0.7320508075688773)
+  k2 r 0.7320508075688773
+  E (2, 2)
+  k3 r 0.7320508075688773
+  A (4, -1.5576916688226672e-30)
+  B (2, 3.4641016151377544)
+  d1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)

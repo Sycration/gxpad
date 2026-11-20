@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  d = 2
+  g1 = curve(y = x^4 + x)
+
+construct
+  point A on g1
+    y_A: y(A) = sqrt(2)*d
+
+find
+  x_A: x(A)
+
+where
+  A (1.1399230338005963, 2.8284271247461903)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

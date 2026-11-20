@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  h1 = hyperbola(O)
+    a1: a(h1) = 3
+    b1: b(h1) = 4
+  k1 = circle(O)
+    r1: r(k1) = 5
+
+construct
+  A = meet(h1, k1)
+
+find
+  x_A: x(A)
+
+where
+  h1 a 3 b 4 angle 0° [fixed angle]
+  k1 r 5
+  A (3.8418745424597094, 3.1999999999999997)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)

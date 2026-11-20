@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  p1 = parabola(O)
+    a1: a(p1) = 1.5
+
+construct
+  A = focus(p1)
+  point B on p1
+    y_B: y(B) = 0
+
+find
+  d1: dist(B, A)
+
+where
+  p1 a 1.5 angle 0° [fixed angle]
+  A (1.5, 0)
+  B (0, 2.543745517141431e-167)
+  a1 label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  d1 label (0.3, 0.3)

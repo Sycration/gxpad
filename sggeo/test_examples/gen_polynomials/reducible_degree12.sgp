@@ -1,0 +1,15 @@
+sgp 2
+
+given
+  a = 1
+  g1 = curve(y = (x^4 + a*x - 1)*(x^4 + x^2 + 2)*(x^4 - a*x^2 + 3))
+
+construct
+  A = meet(g1, xaxis)
+
+find
+  x_A: x(A)
+
+where
+  A (0.7244919590005156, -4.3140830754274083e-32)
+  x_A label (0.3, 0.3)

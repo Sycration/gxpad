@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  c = 1.5
+  g1 = curve(y = sinh(x))
+
+construct
+  point A on g1
+    y_A: y(A) = c
+
+find
+  x_A: x(A)
+
+where
+  A (1.1947632172871092, 1.5)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

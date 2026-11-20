@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  w = 60
+  g1 = curve(y = exp(x))
+
+construct
+  point A on g1
+  segment AB
+    AB tan g1
+    θ1: angle(xaxis, AB) = w*deg
+
+find
+  x_A: x(A)
+
+where
+  A (0.5493061443340546, 1.7320508075688767)
+  B (1.5789561921203494, 3.5154570043504614)
+  θ1 label (0.432461, 0.250954)
+  x_A label (0.3, 0.3)

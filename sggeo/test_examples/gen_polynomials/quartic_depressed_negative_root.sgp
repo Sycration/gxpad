@@ -1,0 +1,16 @@
+sgp 2
+
+given
+  g1 = curve(y = x^4 - 4*x)
+
+construct
+  point A on g1
+    y_A: y(A) = 2
+
+find
+  x_A: x(A)
+
+where
+  A (-0.4860474183835158, 2)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

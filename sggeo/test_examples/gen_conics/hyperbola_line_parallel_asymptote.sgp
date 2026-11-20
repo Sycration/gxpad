@@ -1,0 +1,28 @@
+sgp 2
+
+given
+  h1 = hyperbola(O)
+    a1: a(h1) = 3
+    b1: b(h1) = 4
+  line AB
+    x_A: x(A) = 0
+    y_A: y(A) = -2
+    θ1: angle(xaxis, AB) = 53.13010235415598°
+
+construct
+  C = meet(AB, h1)
+
+find
+  x_C: x(C)
+
+where
+  h1 a 3 b 4 angle 0° [fixed angle]
+  A (0, -2)
+  B (3, 2)
+  C (3.75, 3)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  θ1 label (0.447214, 0.223607)
+  x_C label (0.3, 0.3)

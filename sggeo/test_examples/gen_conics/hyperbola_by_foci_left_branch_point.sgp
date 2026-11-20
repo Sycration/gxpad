@@ -1,0 +1,33 @@
+sgp 2
+
+given
+  segment AB
+    horiz A B
+    x_A: x(A) = -5
+    y_A: y(A) = 0
+    d1: |AB| = 10
+  point C
+    x_C: x(C) = -4
+    y_C: y(C) = 3
+
+construct
+  D = mid(A, B)
+  h1 = hyperbola(D)
+    A == focus(h1)
+    C on h1
+
+find
+  a1: a(h1)
+
+where
+  A (-5, 2.6497349136889905e-168)
+  B (5, 3.7096288791645866e-168)
+  C (-4, 3)
+  D (0, 3.1796818964267885e-168)
+  h1 a 3.162277660168379 b 3.872983346207417 angle -180°
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  a1 label (0.3, 0.3)

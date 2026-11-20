@@ -16,7 +16,7 @@ closed-form formula for that dimension in terms of the driving dimensions and va
 | File | Content |
 |---|---|
 | `sggeo/src/model.rs` | `Doc`: entities, parameters, constraints, dimensions. `Doc::equations`, `Doc::con_eqs`: constraints as expressions equal to 0. |
-| `sggeo/src/solver.rs` | Numeric solver (`Sys::build`, `Sys::solve`), used by the app, by the fit and by checks inside the derivation. |
+| `sggeo/src/solver.rs` | Numeric solver (`Sys::build`, `Sys::solve`), used by the app, by the fit and by checks inside the derivation; `Sys::analyze` counts the degrees of freedom (Jacobian rank, and at a double or triple root, where rows look dependent, whether a column held 2% away leaves the rest solvable). |
 | `sggeo/src/derive.rs` | The derivation: structure, block solving, target, checks. |
 | `sggeo/src/nf.rs` | Normal form of formulas with nested square roots: exact arithmetic in the tower of roots. |
 | `sggeo/src/fit.rs` | Formula discovery from samples: a polynomial relation fitted to numeric solutions. |
@@ -48,7 +48,11 @@ samples (1.3) looks for a simpler relation; the smallest formula is kept.
    grounding strategies (`strategy` 0 and 1); strategy 1 runs only when strategy 0's result is
    not exact, or has complexity ≥ 300 and is not in normal form (a normal form comes out the
    same from the other grounding), and consists of one block pass.
-3. **Structure.** `rank_select` picks independent equations and unknowns numerically.
+3. **Structure.** `rank_select` picks independent equations and unknowns numerically; where
+   the rows look dependent, `generic_rank_select` takes the rank at a nearby configuration
+   (known parameters moved a little and the unknowns re-solved), so a double root (the foci of
+   an ellipse with a = b) does not leave its unknowns free. A distance that is 0 here (driven
+   by a vanishing expression) becomes the two coordinate equations of a coincidence.
    `fix_free` gives remaining free unknowns simple values when the target does not depend on
    them. `matching` + `tarjan` give a block-triangular order of square blocks (a
    Dulmage–Mendelsohn decomposition).
@@ -84,7 +88,17 @@ samples (1.3) looks for a simpler relation; the smallest formula is kept.
      (`half_angles`, and the normal form again when the formula then has θ and θ/2),
      `divided` again (a normal form much smaller than the substituted formula has not been
      through `simplify_result`), `factor_sums` (polynomial sums replaced by products, with
-     multiplicities, when at most 70% of the size), `settle_zero_abs`, `settle_branch`.
+     multiplicities, when at most 70% of the size; otherwise collected, `collected`: the sum
+     in powers of one variable with each coefficient factored or collected again, two
+     levels deep, when clearly shorter, `clearly_shorter`), `resubstituted` (a sum written
+     as c·S + R through a sum S that is a denominator or occurs twice, R factored: the
+     radicand of a four-bar joint becomes (L² − (d2 + d3)²)(L² − (d2 − d3)²) with L² the
+     law of cosines of its denominator), `settle_zero_abs`, `settle_branch`.
+   - `with_atoms`: the steps on rational functions (`factored_root`, `collected` from
+     `factor_sums`, `coef_form`) see roots and trigonometric functions as symbols, so a
+     radicand a² + (√H₁·√H₂ − b²)/c² goes over one denominator. Cardano's and Ferrari's
+     quantities (p, q, r, discriminants) take the factored quotient (`coef_form`) where it
+     is clearly shorter than `best_form`.
    - `divided` (`divide_out`): square roots multiplied together go under one root, and each
      rational function N/D becomes Q + R/D with N = Q·D + R from the division with one
      variable leading (each tried; R and D factored by `factor_sums`). A rational function
@@ -109,16 +123,21 @@ searched for numerically:
   f64 Jacobian. Samples near a singular configuration are rejected.
 - **Atoms.** Parameters that occur outside sin/cos are polynomial atoms; arguments of sin/cos
   that are free of unknowns are angle atoms (cos and sin of the argument, of half the argument,
-  and their second harmonics). Parameters the target does not depend on are dropped. Scaling
-  all lengths tells whether the relation is homogeneous, which removes most monomials.
+  and their second harmonics). Parameters the target does not depend on are dropped: each is
+  moved alone, and those that leave the target unchanged are moved again with all the others
+  moved too (P on a tangent line x = r leaves the contact point where it is until x_P moves).
+  Scaling all lengths tells whether the relation is homogeneous, which removes most monomials.
 - **Relation.** A polynomial `Σ c·T^k·monomial·trig = 0` is the null vector of the matrix of
   basis functions at the samples (Householder QR with column pivoting, in double-double).
   Bases are tried from small to large: T or T² equal to a polynomial ("monic"), T or T² as a
-  rational function, then quadratic and biquadratic relations in T; within each, total degree
-  0..8, up to 170 columns (400 with extra search time).
+  rational function, then quadratic and biquadratic relations in T, then cubic relations in T
+  and in T²; within each, total degree 0..8, up to 170 columns (400 with extra search time).
 - **Coefficients.** The null vector is refitted on its support and each coefficient is
   recognized as a fraction, a square root of one, or a quadratic irrational (`nice_coef`), with
-  a required agreement of 1e-19. An exact relation leaves a residual near 1e-28; a good
+  a required agreement of 1e-19. A relation T·m₁ = r·m₀ whose ratio r is none of these is
+  tried as m·sin(kπ/n) or m·cos(kπ/n) (`trig_constant`, n ≤ 30), then as an algebraic number of
+  degree 3 to 6 whose minimal polynomial is found by LLL reduction (`algebraic_relation`); a
+  constant target likewise. The side of a regular heptagon, 2r·sin(π/7), comes from there. An exact relation leaves a residual near 1e-28; a good
   approximation leaves one many orders larger. In f64 the two cannot be told apart (a smooth
   function is approximated to 1e-10 by a few dozen basis functions), which is the reason for
   double-double.
@@ -126,7 +145,9 @@ searched for numerically:
   first; otherwise cos T is fitted and the result is `acos(…)`.
 - **Checks.** The relation must hold at samples that took no part in the fit. `derive.rs`
   solves it for T (`candidates` / `pick`), and the formula must reproduce the measurement, the
-  check samples (`fit::agrees`) and small perturbations (`agrees_when_perturbed`).
+  check samples (`fit::agrees`) and small perturbations (`agrees_when_perturbed`: each of its
+  parameters alone, and all parameters of the construction together, so a parameter it lost
+  shows).
 - **|a| over the sample range.** When the form with |a| resolved by the current sign fails the
   check samples, the form with |a| is checked instead.
 
@@ -141,11 +162,27 @@ Each block is solved in terms of the earlier blocks' results:
   `d2·cos θ1 + d3·cos(θ1 + θ2) + …` without radicals.
 - Otherwise two methods with shared time:
   - substitution search (`search`, `candidates`, `isolate`): isolates one unknown per
-    equation (linear, quadratic formula, inverse trig, harmonic forms), with branch choice by
-    the current numeric values (`pick`);
+    equation, with branch choice by the current numeric values (`pick`):
+    - polynomials: linear, quadratic formula, Cardano (trigonometric form for three real roots)
+      and Ferrari; above degree 4, the factors that vanish, then (`poly_roots`) a polynomial in
+      vᵍ (also after a shift of v), a reciprocal polynomial (in v + 1/v), a composition f(g(v))
+      of lower degrees, or a Dickson polynomial (x⁵ − 5x³ + 5x = h). A leading coefficient
+      that is 0 at the configuration (a variable left at 0) gives the roots as reciprocals of
+      the reversed polynomial's, which stay finite there;
+    - changes of variable: u = v^(1/L) for fractional powers, u = e^(κv) for exponentials with
+      rational rates, Π Aᵢ^qᵢ = e^R for sums of logarithms, and cos κv, sin κv for sin, cos and
+      tan of rational multiples of v plus constants (a polynomial in them is solved by the
+      harmonic forms, or reduced to one in sin or cos alone);
+    - inverse trigonometric and other elementary functions, harmonic forms;
+    - an equation in one unknown and nothing else (`find_constant_root`): a fraction with
+      denominator ≤ 12, or such a multiple of π, within 1e-3 of the numeric value that makes it
+      exactly 0 (a multiple root, such as the contact point of the tangent at an inflection, is
+      known numerically only to a power of the rounding error);
   - polynomial elimination (`solve_block_poly_trig` → `solve_block_poly` → `solve_polys`):
     - the equations become `MPoly`s over the block unknowns plus "atoms" (named parameters,
       `sqrt(...)` of known things, `sin θ`, `cos θ`);
+    - an unknown angle θ becomes the unknowns cos κθ and sin κθ, κ the unit of the multiples
+      of θ that occur (sin 3t and sin t: κ = 1, by the multiple-angle formulas);
     - `merge_trig` replaces `sin θ, cos θ` of a known angle by one atom: `tan(θ/2)` (kept as a
       symbol through elimination, `HalfTan`, converted back by `untrig_atom` /
       `half_tan_form`), or `tan θ` / `cot θ` when every polynomial is homogeneous in the pair;
@@ -153,8 +190,9 @@ Each block is solved in terms of the earlier blocks' results:
       keep only factors that vanish at the current numeric point), then set aside a variable
       that occurs in one equation, substitute a linear one, or eliminate one by a resultant;
     - the last variable comes from its lowest-degree vanishing factor; the others come by
-      back-substitution through subresultants; `resolve_smaller` re-solves variables from
-      degree ≤ 2 equations when that halves the size.
+      back-substitution through subresultants (only when the target or a later block uses
+      them); `resolve_smaller` re-solves variables from degree ≤ 2 equations when that halves
+      the size.
 
 `solve_circle_circle`: a block of two unknowns on two circles whose centres already carry
 square roots (a joint hung from two computed joints) is c1 + (k·d ± h·d⊥)/D², with d = c2 − c1,
@@ -242,7 +280,9 @@ The app's cancel flag (`set_cancel`) stops a derivation at once.
 
 - `Kit::check` (generated tests): a derived formula must be exact (no numeric fallback), contain
   only named quantities, match the measured value, and keep matching while points are dragged
-  and driving values perturbed (each time the construction is re-solved numerically). Tests run
+  and driving values perturbed (each time the construction is re-solved numerically; a move
+  that leaves part of the construction free, such as a distance driven to 0 that becomes a
+  small circle, is skipped). Tests run
   with the app's own budgets (`set_time_scale(1.0)`). `Kit::max_ms` (30 s of real time) only
   guards against a runaway computation.
 - `known_short_formulas_stay_short` (`tests/examples.rs`): an upper length for every reference
@@ -294,14 +334,20 @@ Lengths in characters, times single-threaded (release build):
 |---|---:|---:|---|
 | `peaucellier_inversor_rotating` d8 | 2,233 | 1.1 s | See below. |
 | `peaucellier_inversor_fixed_axis` x_B | 990 | 0.2 s | See below. |
-| `four_bar_coupler_triangle_point` x_D, y_D | 824 / 699 | 0.3 s | Two-circle joints (1.4). |
-| `fermat_point` d5–d7 | 370–371 | 0.2 s | Normal form. |
-| `pedal_triangle_sides` d6 | 330 | 0.2 s | Normal form. |
-| `four_bar_floating_distances` d6 | 324 | 0.2 s | Normal form. |
+| `four_bar_coupler_triangle_point` x_D, y_D | 588 / 532 | 0.7 s | Two-circle joints (1.4). |
+| `fermat_point` d5–d7 | 298 | 0.3 s | Normal form, its radicand collected (`collected`). |
+| `pedal_triangle_sides` d6 | 304 | 0.5 s | Normal form. |
+| `four_bar_floating_distances` d6 | 292 | 0.2 s | Normal form. |
 | `quadratic_fit_solved_coefficients` d1 | 226 | 0.2 s | Normal form; a root of a discriminant. |
-| `simson_feet_distance` d5, d7 | 291 / 292 | 0.5 s | Normal form. |
+| `simson_feet_distance` d7 | 263 | 0.6 s | Normal form. |
 | `confocal_orthogonal` θ1 | 264 | 0.4 s | Normal form of the cosine; the angle is π/2 (not recognized). |
+| `long_truss_chain` (6 joints) | 145,993 | 0.9 s | Joints at given distances from the two before, unequal bars: each nests the roots of the earlier ones (4 joints: 282, 5: 895; 7: numeric after 1.9 s). |
+| `ellipse_ellipse_rotated_quartic` d1 | 217,072 | 0.4 s | A rotated ellipse (angle locked, so sin and cos of it are constants) meets an offset one. |
+| `elliptic_chord_third_point_symbolic` x_C | 1,189 | 0.7 s | Vieta gives m² − x_P − x_Q; (x − x_P)(x − x_Q) is not divided out because √(x_P³ + a·x_P + b) is an atom of its own. |
+| `morley_triangle_side` d2 | 1,034 | 1.4 s | 8R·sin(A/3)·sin(B/3)·sin(C/3) is not found. |
+| `symmetric_system_cubic` y_D | 916 | 1.0 s | The other variables come from a quadratic over the first one's root, not as the cubic's other trigonometric branches. |
 | `varignon_other_diagonal` d6 | 142 | 0.1 s | Normal form. |
+| `alhazen_reflection` x_C | 17,994 | 0.6 s | Ferrari's formula from elimination; `factor_sums` alone halves it but runs out of its slice. |
 | `rotated_ellipse_by_radial_point` d2 | 246 | 0.5 s | `acos` and `atan2` inside; the answer is 1/√(sin²φ/a² + cos²φ/b²). |
 
 The Peaucellier tests dimension the six bars separately (d1…d6) and `Kit::check` perturbs each
@@ -395,8 +441,8 @@ What is left for these formulas is their arrangement, not their normal form:
   function of degree 5) and its samples only reach ±5%.
 - Angle atoms are the arguments as they stand in the equations. A relation that is short only in
   a combination (θ1 − θ2) is found only through its expansion.
-- Relations of degree 3 in T, or above 4, are not tried; nor are targets that are not algebraic
-  in the atoms (curves with exp, ln; arc lengths).
+- Relations of degree 5 in T, of degree 6 with odd powers, and full quartics are not tried; nor
+  are targets that are not algebraic in the atoms (curves with exp, ln; arc lengths).
 - A null space of dimension above 1 is skipped.
 - Sampling follows one branch by continuation. A construction that cannot move by 5% gives no
   samples.
@@ -411,7 +457,13 @@ What is left for these formulas is their arrangement, not their normal form:
 ### 2.3 Local validity
 
 |a|, roots and factors in the block path are chosen at the current configuration, and the app
-shows one formula with no domain of validity. The same construction can show different formulas
+shows one formula with no domain of validity. A cubic's roots are Cardano's form where it has
+one real root and the trigonometric form where it has three, and no formula in real radicals and
+trigonometric functions holds on both sides of the discriminant's zero
+(`gen_polynomials::cubic_near_double_root` stays on one side). Likewise the focus of an
+ellipse is √(a² − b²) along the first axis for a > b and √(b² − a²) along the second for a < b;
+at a = b the formula is that of one side, and which focus the point becomes when a and b part
+is open (`gen_conics::ellipse_degenerate_circle_focus`). The same construction can show different formulas
 after dragging across a branch boundary. A fitted formula is checked over the sample range
 (±40% or what could be sampled), and |a| is kept where the sign changes inside that range, but
 the final `resolve_abs` resolves it by the current sign for display. `acos(cos u)` within 0.1
@@ -444,7 +496,10 @@ This is what produces the long formulas of 2.1 when the fit finds nothing:
   construction. Canonical ordering undoes chosen signs (`d2 + d3 − d1` comes back as
   `−(d1 − d2 − d3)`); only the display chooses them again (1.5).
 - **Numeric identity tests** (`fold_constants`, `same_function`, `Env::is_zero`) use a few
-  perturbations in f64 with fixed tolerances.
+  perturbations in f64 (`Env::perturbed`: each symbol moved by up to 2.5% of its value, so a
+  construction at scale 1e-5 or 1e4 is moved as one at scale 1), with tolerances relative to
+  the values and a floor at the rounding of the expression's parts. A test against the sum of
+  the parts alone would let a large cancelling formula pass with a part that varies.
 
 ### 2.5 Work clock calibration
 
@@ -460,10 +515,16 @@ normal form, on the same machine); the slowest single derivation takes 1.1 s.
 
 ### 2.6 Ignored tests
 
-- `gen_functions::sine_inflection_tangent_unpinned`: tangency at an inflection is a triple
-  contact; in f64 the numeric solver reaches about 1e-7 there (the residual x·cos x − sin x loses
-  its digits near 0). This is a limit of the numeric solver, not of the derivation.
 - `alg::tests::factor_dump`, `derive_file` (`tests/examples.rs`): debugging helpers (section 3).
+- Constructions with a closed form the derivation does not reach in its time:
+  - `gen_conics::common_tangent_ellipse_circle`, `common_tangent_two_ellipses`: the four
+    unknowns of the two contact points give a resultant of about 450 terms whose factoring runs
+    out of time; with 15 s of extra time the result is exact but has 20,000 nodes, where the
+    tangent line's slope is the root of a quartic.
+  - `gen_conics::steiner_inellipse`: each tangency to a conic is a contact-point block with
+    trigonometric atoms; the problem is linear in the dual conic, which nothing uses.
+  - `gen_circle_tangency::malfatti_circles`: the last polynomial is an irreducible octic that
+    is a tower of quadratics (Malfatti's formulas), not one of the shapes `poly_roots` solves.
 
 ## 3. Tools
 
@@ -474,6 +535,11 @@ Environment variables:
   reason of a failure), the stages after the blocks with real time and ticks (`stage`),
   and ticks against real time per strategy (`work:`).
 - `SGGEO_DUMP=<file>`: write the last polynomial of a polynomial block, for `factor_dump`.
+- `SGGEO_SIMPLIFY_FILE=<file>` with `cargo test --release --lib simplify_file -- --nocapture`:
+  each line (`name = formula` or a formula) through `simplify_result`, with complexity before
+  and after; `SGGEO_SIMPLIFY_FACTOR=1` uses `factor_sums` instead, `SGGEO_SIMPLIFY_RESUB=1`
+  `resubstituted`, and `SGGEO_SIMPLIFY_CSE=1` also prints the named form the app shows. The
+  parser multiplies a number into a sum (2(a + b) is read as 2a + 2b).
 - `SGGEO_FACTOR_FILE=<file>` (with optional `SGGEO_MAIN=<var>|cheapest`): factor a dumped
   polynomial and report timings (`alg::tests::factor_dump`).
 - `SGGEO_DERIVE_FILE=<file.sgp>` (with optional `SGGEO_DERIVE_LEVEL=<n>`): derive every reference

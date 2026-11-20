@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  g1 = curve(y^2 = x^3 - 2*x + 2)
+
+construct
+  point A on g1
+    x_A: x(A) = 1
+  point B on g1
+    x_B: x(B) = 2
+  line AB
+  C = meet(g1, AB)
+
+find
+  x_C: x(C)
+
+where
+  A (1, 1)
+  B (2, 2.4494897427831783)
+  C (-0.8989794855663564, -1.7525512860841095)
+  x_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  x_C label (0.3, 0.3)

@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  line OA
+    θ1: angle(xaxis, OA) = 175°
+  point B
+    x_B: x(B) = 4
+    y_B: y(B) = 1
+
+construct
+  C = reflect(B, OA)
+
+find
+  x_C: x(C)
+
+where
+  A (-4.377378536842397, 0.3829709979354061)
+  B (4, 1)
+  C (3.765582834381902, -1.6794004636799296)
+  θ1 label (0.478546, 0.144892)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_C label (0.3, 0.3)
