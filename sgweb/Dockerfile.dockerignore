@@ -1,7 +1,7 @@
-# The build context of sgweb/Dockerfile is the whole repository; the image build needs its sources only.
+# The build context of sgweb/Dockerfile is the whole repository; the image build needs its sources only
+# (and sggeo/test_examples, which sgweb bundles as examples).
 .git
 target
 build
 sgpad/winxp
-sggeo/test_examples
 docs/*.png
