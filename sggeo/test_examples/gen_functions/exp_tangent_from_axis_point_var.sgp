@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  a = 0.5
+  g1 = curve(y = exp(x))
+  point A
+    x_A: x(A) = a
+    y_A: y(A) = 0
+
+construct
+  B = tangent(A, g1)
+  segment AB
+
+find
+  y_B: y(B)
+
+where
+  A (0.5, -3.7986599722645367e-165)
+  B (1.5, 4.4816890703380645)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  y_B label (0.3, 0.3)

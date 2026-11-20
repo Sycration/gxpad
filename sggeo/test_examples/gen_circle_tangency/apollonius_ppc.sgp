@@ -1,0 +1,38 @@
+sgp 2
+
+given
+  point A
+    x_A: x(A) = 1
+    y_A: y(A) = 0
+  point B
+    x_B: x(B) = 3
+    y_B: y(B) = 1
+  point C
+    x_C: x(C) = 5
+    y_C: y(C) = 4
+  k1 = circle(C)
+    r1: r(k1) = 1.5
+  point D
+  k2 = circle(D)
+    A on k2
+    B on k2
+    k2 tan k1
+
+find
+  r2: r(k2)
+
+where
+  A (1, 7.59972163870748e-23)
+  B (3, 1)
+  C (5, 4)
+  k1 r 1.5
+  D (0.8402546630868104, 2.819490673826379)
+  k2 r 2.824012434898161
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)

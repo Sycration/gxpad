@@ -1,5 +1,6 @@
-//! Collects the web app into the binary: the files of `web/`, the example constructions of `examples/`
-//! and the sggeo Wasm module with its wasm-bindgen glue under `pkg/`.
+//! Collects the web app into the binary: the files of `web/`, the example constructions of `examples/`,
+//! the constructions of sggeo's generated tests (`sggeo/test_examples/gen_<folder>/` as
+//! `examples/<folder>/`) and the sggeo Wasm module with its wasm-bindgen glue under `pkg/`.
 //!
 //! The sggeo module comes from the directory that `SGWEB_SGGEO_PKG` names (the output of
 //! `wasm-bindgen --target web`, as `./build.sh web` writes it to build/web/wasm32/lib). Without it, this
@@ -7,8 +8,9 @@
 //! (`WASM_BINDGEN`, or wasm-bindgen on PATH) on it.
 //!
 //! Every file is stored as is and, when that is smaller, gzip-compressed; `$OUT_DIR/assets.rs` lists them.
-//! The service worker `web/sw.js` gets the list of the other files and a version, a hash of all of them, in
-//! place of its placeholders `__SGWEB_FILES__` and `__SGWEB_VERSION__`.
+//! The service worker `web/sw.js` gets the list of the other files (but the test constructions, which it
+//! keeps as they are opened) and a version, a hash of all of them, in place of its placeholders
+//! `__SGWEB_FILES__` and `__SGWEB_VERSION__`.
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -28,6 +30,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed=web");
     println!("cargo:rerun-if-changed=examples");
+    println!("cargo:rerun-if-changed={}", ws.join("sggeo/test_examples").display());
     println!("cargo:rerun-if-env-changed=SGWEB_SGGEO_PKG");
     println!("cargo:rerun-if-env-changed=WASM_BINDGEN");
 
@@ -51,6 +54,21 @@ fn main() {
     examples.retain(|(n, _)| n.ends_with(".sgp"));
     examples.sort();
     files.extend(examples.iter().cloned());
+    // the constructions of sggeo's generated tests, a folder for each test file: (path, file, folder)
+    let mut tests: Vec<(String, PathBuf, String)> = Vec::new();
+    let mut dirs: Vec<PathBuf> = fs::read_dir(ws.join("sggeo/test_examples")).map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect()).unwrap_or_default();
+    dirs.sort();
+    for d in dirs {
+        let name = d.file_name().unwrap().to_string_lossy().to_string();
+        let folder = name.strip_prefix("gen_").unwrap_or(&name).to_string();
+        let mut found = Vec::new();
+        walk(&d, &format!("examples/{folder}/"), &mut found);
+        found.retain(|(n, _)| n.ends_with(".sgp"));
+        found.sort();
+        tests.extend(found.into_iter().map(|(n, p)| (n, p, folder.clone())));
+    }
+    files.extend(tests.iter().map(|(n, p, _)| (n.clone(), p.clone())));
+    let in_folder = |path: &str| tests.iter().any(|(n, _, _)| n == path);
 
     let dir = out.join("assets");
     fs::create_dir_all(&dir).unwrap();
@@ -89,19 +107,26 @@ fn main() {
         }
         let bytes = fs::read(src).unwrap();
         (path, &bytes).hash(&mut version);
-        if path != "index.html" {
+        if path != "index.html" && !in_folder(path) {
             kept.push(path.clone());
         }
         add(path, &bytes, k);
         k += 1;
     }
-    // the list of examples the app offers, with a title from the first comment line of each
+    // the list of examples the app offers, with a title from the first comment line of each (or for the
+    // test constructions, which have none, from the file name), and the folder of a test construction
     let mut index = String::from("[");
-    for (i, (path, src)) in examples.iter().enumerate() {
+    let all = examples.iter().map(|(n, p)| (n, p, None)).chain(tests.iter().map(|(n, p, f)| (n, p, Some(f))));
+    for (i, (path, src, folder)) in all.enumerate() {
         let text = fs::read_to_string(src).unwrap();
-        let title = text.lines().find_map(|l| l.trim().strip_prefix('#')).map(str::trim).unwrap_or(path);
+        let stem = path.rsplit('/').next().unwrap().trim_end_matches(".sgp").replace('_', " ");
+        let title = text.lines().find_map(|l| l.trim().strip_prefix('#')).map(|t| t.trim().to_string()).unwrap_or_else(|| capitalized(&stem));
         let sep = if i == 0 { "" } else { "," };
-        write!(index, "{sep}\n  {{\"path\": {}, \"title\": {}}}", json(path), json(title)).unwrap();
+        write!(index, "{sep}\n  {{\"path\": {}, \"title\": {}", json(path), json(&title)).unwrap();
+        if let Some(f) = folder {
+            write!(index, ", \"folder\": {}", json(f)).unwrap();
+        }
+        index.push('}');
     }
     index.push_str("\n]\n");
     add("examples/index.json", index.as_bytes(), k);
@@ -178,6 +203,12 @@ fn walk(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) {
             out.push((format!("{prefix}{name}"), p));
         }
     }
+}
+
+/// `s` with its first letter in upper case.
+fn capitalized(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
 }
 
 fn gzip(bytes: &[u8]) -> Vec<u8> {

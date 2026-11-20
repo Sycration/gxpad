@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  a = 50
+  L = 2
+  segment OA
+    d1: |OA| = L
+    θ1: angle(xaxis, OA) = (a + 10)°
+
+find
+  y_A: y(A)
+
+where
+  A (1.0000000000000002, 1.7320508075688772)
+  d1 label (0.3, 0.3)
+  θ1 label (0.425325, 0.262866)
+  y_A label (0.3, 0.3)

@@ -707,3 +707,380 @@ fn quadrilateral_angle_sum() {
     let g = ameas(&mut k, cb, cd);
     k.check_value(g, rad(80.0));
 }
+
+/// Triangle with sides a = BC, b = CA and angle A = 3·angle B (solved
+/// variable t = B): cos t = √((a + b)/(4b)), c = 4b·cos t·cos 2t.
+#[test]
+fn triangle_angle_triple() {
+    let mut k = Kit::new();
+    // b = 2, a = 4: cos t = √(6/8), t = 30°, A = 90°, C = 60°, c = 2√3
+    k.solved_var("t", 0.5);
+    let a = k.point(0.0, 0.0);
+    let b = k.point(3.4, 0.05);
+    let c = k.point(0.05, 2.1);
+    let ab = k.line(a, b);
+    let ac = k.line(a, c);
+    let bc = k.line(b, c);
+    let ba = k.line(b, a);
+    k.drive(DimKind::Length(bc), "4");
+    k.drive(DimKind::Length(ac), "2");
+    k.drive_angle(ab, ac, "3*t");
+    k.drive_angle(ba, bc, "t");
+    let d = k.measure(DimKind::Length(ab));
+    k.check_value(d, 2.0 * 3f64.sqrt());
+}
+
+/// Triangle with angle B = 2·angle C (solved variable t = C) and sides
+/// b = CA = 3, c = AB = 2: a = (b² − c²)/c = 5/2.
+#[test]
+fn triangle_angle_double() {
+    let mut k = Kit::new();
+    k.solved_var("t", 0.72);
+    // C = acos(3/4) ≈ 0.7227, B = 2C, A = π − 3C
+    let cc = (0.75f64).acos();
+    let bpt = k.point(0.0, 0.0);
+    let cpt = k.point(2.5, 0.03);
+    let apt = k.point(2.0 * (2.0 * cc).cos() + 0.02, 2.0 * (2.0 * cc).sin());
+    let bc = k.line(bpt, cpt);
+    let ba = k.line(bpt, apt);
+    let cb = k.line(cpt, bpt);
+    let ca = k.line(cpt, apt);
+    k.drive(DimKind::Length(ca), "3");
+    k.drive(DimKind::Length(ba), "2");
+    k.drive_angle(bc, ba, "2*t");
+    k.drive_angle(ca, cb, "t");
+    let a = k.measure(DimKind::Length(bc));
+    k.check_value(a, 2.5);
+}
+
+/// Angle of OP to the x axis is fixed by P's coordinates and driven as 3t
+/// (t solved); Q at unit distance at angle t: y_Q = sin(atan2(2, 3)/3).
+
+#[test]
+fn triple_angle_solved_var() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    
+    k.solved_var("t", 0.25);
+    let a: f64 = (2.0f64).atan2(3.0) / 3.0;
+    let q = k.point(a.cos() * 1.1, a.sin());
+    let oq = k.line(o, q);
+    k.drive(DimKind::Length(oq), "1");
+    k.drive_angle(xa, oq, "t");
+    let p = k.point(3.0 * 1.05, 2.0);
+    let op = k.line(o, p);
+    k.drive_angle(xa, op, "3*t");
+    k.drive(DimKind::CoordX(p), "3");
+    k.drive(DimKind::CoordY(p), "2");
+    assert_eq!(k.dof(), 0);
+    let y = k.measure(DimKind::CoordY(q));
+    k.check_value(y, a.sin());
+}
+
+/// Same with factor 2 (half angle): y_Q = sin(atan2(2, a)/2).
+
+#[test]
+fn double_angle_solved_var() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("a", 3.0);
+    k.solved_var("t", 0.25);
+    let a: f64 = (2.0f64).atan2(3.0) / 2.0;
+    let q = k.point(a.cos() * 1.1, a.sin());
+    let oq = k.line(o, q);
+    k.drive(DimKind::Length(oq), "1");
+    k.drive_angle(xa, oq, "t");
+    let p = k.point(3.0 * 1.05, 2.0);
+    let op = k.line(o, p);
+    k.drive_angle(xa, op, "2*t");
+    k.drive(DimKind::CoordX(p), "a");
+    k.drive(DimKind::CoordY(p), "2");
+    assert_eq!(k.dof(), 0);
+    let y = k.measure(DimKind::CoordY(q));
+    k.check_value(y, a.sin());
+}
+
+/// Angle t + 30° driven, t solved: y_Q = sin(atan2(2, a) − 30°).
+
+#[test]
+fn offset_angle_solved_var() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("a", 1.0);
+    k.solved_var("t", 0.25);
+    let a: f64 = (2.0f64).atan2(1.0) - rad(30.0);
+    let q = k.point(a.cos() * 1.1, a.sin());
+    let oq = k.line(o, q);
+    k.drive(DimKind::Length(oq), "1");
+    k.drive_angle(xa, oq, "t");
+    let p = k.point(1.0 * 1.05, 2.0);
+    let op = k.line(o, p);
+    k.drive_angle(xa, op, "t + 30°");
+    k.drive(DimKind::CoordX(p), "a");
+    k.drive(DimKind::CoordY(p), "2");
+    assert_eq!(k.dof(), 0);
+    let y = k.measure(DimKind::CoordY(q));
+    k.check_value(y, a.sin());
+}
+
+fn dim_name(k: &Kit, d: usize) -> String {
+    k.doc().dims[d].as_ref().unwrap().name.clone()
+}
+
+/// θ2 = θ1 / 3 driven by a dimension expression; leg y = L sin(θ1/3).
+#[test]
+fn angle_expression_of_dimension() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("L", 2.0);
+    let p = k.point(1.0, 2.0);
+    let op = k.line(o, p);
+    k.drive(DimKind::Length(op), "L");
+    let t1 = k.drive_angle(xa, op, "100");
+    let n1 = dim_name(&k, t1);
+    let q = k.point(2.0, 0.5);
+    let oq = k.line(o, q);
+    k.drive(DimKind::Length(oq), "L");
+    k.drive_angle(xa, oq, &format!("{n1}/3"));
+    assert_eq!(k.dof(), 0);
+    let d = k.measure(DimKind::Distance(p, q));
+    // chord between angles 100 and 100/3 deg
+    let ch = 2.0 * 2.0 * (rad(100.0 - 100.0 / 3.0) / 2.0).sin();
+    k.check_value(d, ch);
+}
+
+/// Inverse trig in a driven expression: angle acos(a/b), y = L sin(acos(a/b)).
+#[test]
+fn inverse_trig_driven_angle() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("a", 1.0);
+    k.var("b", 3.0);
+    k.var("L", 2.0);
+    let p = k.point(1.0, 2.0);
+    let op = k.line(o, p);
+    k.drive(DimKind::Length(op), "L");
+    k.drive_angle(xa, op, "acos(a/b)");
+    let y = k.measure(DimKind::CoordY(p));
+    let s = k.check_value(y, 2.0 * (1.0f64 - 1.0 / 9.0).sqrt());
+    assert!(!s.contains("acos"), "not simplified: {s}");
+}
+
+/// Angle driven by atan2 of vars, at a supplementary-quadrant value.
+#[test]
+fn atan2_driven_angle_obtuse() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("a", -2.0);
+    k.var("b", 1.0);
+    let p = k.point(-2.0, 1.2);
+    let op = k.line(o, p);
+    k.drive(DimKind::Length(op), "5");
+    k.drive_angle(xa, op, "atan2(b, a)");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, 5.0 * (-2.0 / 5.0f64.sqrt()));
+}
+
+/// Three rays at turning angles 150°, 150°: the outer rays are 60° apart
+/// (total turning 300°, wraps past 180 and 360 is not reached).
+#[test]
+fn turning_walk_wraps_past_pi() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let pts: Vec<usize> = [0.0f64, 150.0, 300.0].iter().map(|d| k.point(3.0 * rad(d + 5.0).cos(), 3.0 * rad(d + 5.0).sin())).collect();
+    let l: Vec<usize> = pts.iter().map(|&p| k.line(o, p)).collect();
+    k.horizontal(l[0]);
+    k.var("a", 150.0);
+    k.drive_angle(l[0], l[1], "a*deg");
+    k.drive_angle(l[1], l[2], "a*deg");
+    let m = k.measure_angle(l[0], l[2]);
+    k.check_value(m, rad(60.0));
+}
+
+/// Pentagon walk with turning angles a, b, c, d (vars) and unit sides; the
+/// distance from start to end.
+#[test]
+fn walk_symbolic_turns_distance() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let turns = [50.0f64, 70.0, 40.0];
+    let names = ["a", "b", "c"];
+    for (n, t) in names.iter().zip(turns) {
+        k.var(n, t);
+    }
+    let mut pts = vec![o];
+    let mut pos = [0.0, 0.0];
+    let mut h = 0.0;
+    for i in 0..4 {
+        if i > 0 {
+            h += turns[i - 1] + 4.0;
+        }
+        pos = [pos[0] + rad(h).cos(), pos[1] + rad(h).sin()];
+        pts.push(k.point(pos[0], pos[1]));
+    }
+    let l: Vec<usize> = (0..4).map(|i| k.line(pts[i], pts[i + 1])).collect();
+    k.horizontal(l[0]);
+    k.var("s", 1.0);
+    for i in 0..4 {
+        k.drive(DimKind::Length(l[i]), "s");
+    }
+    for i in 0..3 {
+        k.drive_angle(l[i], l[i + 1], &format!("{}*deg", names[i]));
+    }
+    let (mut x, mut y, mut hh) = (0.0, 0.0, 0.0f64);
+    for i in 0..4 {
+        if i > 0 {
+            hh += turns[i - 1];
+        }
+        x += rad(hh).cos();
+        y += rad(hh).sin();
+    }
+    let d = k.measure(DimKind::Distance(o, pts[4]));
+    k.check_value(d, x.hypot(y));
+}
+
+/// Arc of radius r with chord c: sector angle 2 asin(c/(2r)) between the radii.
+#[test]
+fn arc_sector_angle_from_chord() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    k.var("r", 2.0);
+    k.var("c", 3.0);
+    let ang = 2.0 * (0.75f64).asin();
+    let a = k.point(2.0, 0.1);
+    let b = k.point(2.0 * (ang * 1.05).cos(), 2.0 * (ang * 1.05).sin());
+    let arc = k.arc(o, a, b);
+    k.drive(DimKind::Radius(arc), "r");
+    let oa = k.line(o, a);
+    let ob = k.line(o, b);
+    k.horizontal(oa);
+    k.drive(DimKind::Distance(a, b), "c");
+    let m = k.measure_angle(oa, ob);
+    k.check_value(m, ang);
+}
+
+/// Two solved angles t and 2t: Q at angle t (unit), R at angle 2t (unit),
+/// with |QR| = d driven: chord QR = 2 sin(t/2) = d → y_Q = sin(2 asin(d/2)).
+#[test]
+fn solved_angles_t_and_2t_chord() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("d", 0.8);
+    k.solved_var("t", 0.9);
+    let t = 2.0 * (0.4f64).asin();
+    let q = k.point(t.cos() * 1.05, t.sin());
+    let r = k.point((2.0 * t).cos(), (2.0 * t).sin() * 1.05);
+    let oq = k.line(o, q);
+    let or = k.line(o, r);
+    k.drive(DimKind::Length(oq), "1");
+    k.drive(DimKind::Length(or), "1");
+    k.drive_angle(xa, oq, "t");
+    k.drive_angle(xa, or, "2*t");
+    k.drive(DimKind::Distance(q, r), "d");
+    assert_eq!(k.dof(), 0);
+    let y = k.measure(DimKind::CoordY(q));
+    k.check_value(y, t.sin());
+}
+
+/// Angle driven as θ1 + θ2 of other dimensions where the sum exceeds π:
+/// angles 120 and 100 driven, a third driven "2π − θ1 − θ2" closes the fan.
+#[test]
+fn angle_sum_expression_over_pi() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let p1 = k.point(3.0, 0.2);
+    let p2 = k.point(3.0 * rad(122.0).cos(), 3.0 * rad(122.0).sin());
+    let p3 = k.point(3.0 * rad(225.0).cos(), 3.0 * rad(225.0).sin());
+    let l1 = k.line(o, p1);
+    let l2 = k.line(o, p2);
+    let l3 = k.line(o, p3);
+    k.horizontal(l1);
+    k.var("u", 120.0);
+    k.var("v", 100.0);
+    k.drive_angle(l1, l2, "u*deg");
+    k.drive_angle(l2, l3, "v*deg");
+    k.drive(DimKind::Length(l3), "2");
+    let y = k.measure(DimKind::CoordY(p3));
+    k.check_value(y, 2.0 * rad(220.0).sin());
+}
+
+/// Angle driven by a degree-postfix expression of a var: "(a + 10)°".
+#[test]
+fn degree_postfix_expression() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("a", 50.0);
+    k.var("L", 2.0);
+    let p = k.point(1.0, 2.0);
+    let op = k.line(o, p);
+    k.drive(DimKind::Length(op), "L");
+    k.drive_angle(xa, op, "(a + 10)°");
+    let y = k.measure(DimKind::CoordY(p));
+    k.check_value(y, 2.0 * rad(60.0).sin());
+}
+
+/// Half of an obtuse angle near π: P = (a, 0.3) with a = −3, angle 2t.
+#[test]
+fn double_angle_solved_var_near_pi() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("a", -3.0);
+    k.solved_var("t", 1.5);
+    let a: f64 = (0.3f64).atan2(-3.0) / 2.0;
+    let q = k.point(a.cos() * 1.1, a.sin());
+    let oq = k.line(o, q);
+    k.drive(DimKind::Length(oq), "1");
+    k.drive_angle(xa, oq, "t");
+    let p = k.point(-3.1, 0.3);
+    let op = k.line(o, p);
+    k.drive_angle(xa, op, "2*t");
+    k.drive(DimKind::CoordX(p), "a");
+    k.drive(DimKind::CoordY(p), "0.3");
+    assert_eq!(k.dof(), 0);
+    let x = k.measure(DimKind::CoordX(q));
+    k.check_value(x, a.cos());
+}
+
+/// Walk O→A (p, horizontal) →B (q, turn α) →C (r) with C back on the x axis:
+/// the second turning angle β satisfies q sin α + r sin(α + β) = 0.
+#[test]
+fn walk_closing_turn_angle() {
+    let (p, q, r, al) = (3.0f64, 2.0f64, 2.5f64, rad(70.0));
+    let b = [p + q * al.cos(), q * al.sin()];
+    // C = B + r (cos h, sin h) with sin h = −q sin α / r, heading h in (180, 270)?
+    let h = PI + (q * al.sin() / r).asin();
+    let c = [b[0] + r * h.cos(), b[1] + r * h.sin()];
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("p", p);
+    k.var("q", q);
+    k.var("r", r);
+    k.var("al", 70.0);
+    let pa = k.point(p, 0.1);
+    let pb = k.point(b[0] + 0.05, b[1]);
+    let pc = k.point(c[0] + 0.05, 0.05);
+    let oa = k.line(o, pa);
+    let ab = k.line(pa, pb);
+    let bc = k.line(pb, pc);
+    k.horizontal(oa);
+    k.on(pc, xa);
+    k.drive(DimKind::Length(oa), "p");
+    k.drive(DimKind::Length(ab), "q");
+    k.drive(DimKind::Length(bc), "r");
+    k.drive_angle(oa, ab, "al*deg");
+    assert_eq!(k.dof(), 0);
+    let m = k.measure_angle(ab, bc);
+    let ex = h - al; // turning angle between directions
+    let ex = if ex > PI { 2.0 * PI - ex } else { ex };
+    k.check_value(m, ex);
+}

@@ -1,0 +1,36 @@
+sgp 2
+
+given
+  a = 50
+  b = 70
+  c = 40
+  s = 1
+  segment OA
+    horiz O A
+    d1: |OA| = s
+  segment AB
+    d2: |AB| = s
+    θ1: angle(OA, AB) = a*deg
+  segment BC
+    d3: |BC| = s
+    θ2: angle(AB, BC) = b*deg
+  segment CD
+    d4: |CD| = s
+    θ3: angle(BC, CD) = c*deg
+
+find
+  d5: dist(O, D)
+
+where
+  A (1, 4.4373425918681914e-29)
+  B (1.6427876096865395, 0.766044443118978)
+  C (1.1427876096865397, 1.6320698469034167)
+  D (0.2030949889006313, 1.9740899902290858)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  θ1 label (0.445503, 0.226995)
+  d3 label (0.3, 0.3)
+  θ2 label (-0.00148088, 0.499998)
+  d4 label (0.3, 0.3)
+  θ3 label (-0.423283, 0.266141)
+  d5 label (0.3, 0.3)

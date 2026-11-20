@@ -93,6 +93,7 @@
             </div>
             <h3>Or explore an example</h3>
             <ul class="examples"></ul>
+            <button type="button" class="link all-examples">All examples…</button>
           </div>
 
           <div class="status">
@@ -156,6 +157,20 @@
           <section class="help-keys"></section>
         </div>
         <p id="about" class="about"></p>
+      </dialog>
+
+      <dialog id="examples" class="help examples">
+        <header>
+          <h2>Examples</h2>
+          <button type="button" class="ibtn close" aria-label="Close">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="examples-body">
+          <input type="search" class="examples-filter" placeholder="Filter by name" aria-label="Filter the examples" />
+          <nav class="examples-folders" aria-label="Folders"></nav>
+          <ul class="examples-list"></ul>
+        </div>
       </dialog>
 
       <div class="boot">

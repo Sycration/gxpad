@@ -1,0 +1,28 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 6
+  segment OB
+    y_B: y(B) = 4
+  segment AB
+    |OB| == |AB|
+
+construct
+  C = mid(O, A)
+  e1 = ellipse(C)
+    O == focus(e1)
+    B on e1
+
+find
+  a1: a(e1)
+
+where
+  A (6, 0)
+  B (3, 4)
+  C (3, 0)
+  e1 a 5 b 4 angle 180°
+  d1 label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  a1 label (0.3, 0.3)

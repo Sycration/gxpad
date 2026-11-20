@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  a = 0.25
+  b = 1
+  c = 1
+  d = 0.5
+  h = -0.5
+  g1 = curve(a*x^2 + b*y^2 = 1)
+  g2 = curve(y = c*x^2 + d*x + h)
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+  y_A: y(A)
+
+where
+  A (0.9509306636639455, 0.8797344589283247)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

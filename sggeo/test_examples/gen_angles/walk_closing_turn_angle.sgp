@@ -1,0 +1,31 @@
+sgp 2
+
+given
+  p = 3
+  q = 2
+  r = 2.5
+  al = 70
+  segment OA
+    horiz O A
+    d1: |OA| = p
+  segment AB
+    d2: |AB| = q
+    θ1: angle(OA, AB) = al*deg
+
+construct
+  point C on xaxis
+  segment BC
+    d3: |BC| = r
+
+find
+  θ2: angle(AB, BC)
+
+where
+  A (3, 9.564938475804768e-30)
+  B (3.6840402866513378, 1.8793852415718169)
+  C (2.03543144469942, 5.9164567891575885e-31)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  θ1 label (0.413605, 0.280946)
+  d3 label (0.3, 0.3)
+  θ2 label (-0.430243, 0.254736)

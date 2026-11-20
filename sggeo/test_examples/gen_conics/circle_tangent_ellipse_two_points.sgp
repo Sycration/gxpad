@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  e1 = ellipse(O)
+    a1: a(e1) = 5
+    b1: b(e1) = 3
+  point A
+    y_A: y(A) = 0
+    x_A: x(A) = 1
+  k1 = circle(A)
+    k1 tan e1 near (1.5625, -2.8497532787944997)
+
+find
+  r1: r(k1)
+
+where
+  e1 a 5 b 3 angle 0° [fixed angle]
+  A (1, 7.974021570500751e-22)
+  k1 r 2.9047375096555625
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  r1 label (0.3, 0.3)

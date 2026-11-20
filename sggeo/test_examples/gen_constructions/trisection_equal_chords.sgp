@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  R = 2
+  d = 3
+  k1 = circle(O)
+    r1: r(k1) = R
+
+construct
+  point A on k1
+  point B on k1
+  point C on k1
+  point D on k1
+    d1: dist(A, D) = d
+  segment AB
+  segment BC
+    |AB| == |BC|
+  segment CD
+    |BC| == |CD|
+
+find
+  d2: |AB|
+
+where
+  k1 r 2
+  A (1.3606062142507616, -1.465861770339281)
+  B (1.9341888803595952, -0.5088353123489907)
+  C (1.9058052000731385, 0.6065529979929076)
+  D (1.2842888609866348, 1.5331673494911284)
+  r1 label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

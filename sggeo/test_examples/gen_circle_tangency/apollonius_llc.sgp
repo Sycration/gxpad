@@ -1,0 +1,30 @@
+sgp 2
+
+given
+  line OA
+    θ1: angle(xaxis, OA) = 70°
+  point B
+    x_B: x(B) = 4
+    y_B: y(B) = 1.5
+  k1 = circle(B)
+    r1: r(k1) = 1
+  point C
+  k2 = circle(C)
+    xaxis tan k2
+    OA tan k2
+    k2 tan k1
+
+find
+  r2: r(k2)
+
+where
+  A (1.0008107815228964, 2.74970502338089)
+  B (4, 1.5)
+  k1 r 1
+  C (1.7732752029082186, 1.241660664396687)
+  k2 r 1.241660664396687
+  θ1 label (0.409534, 0.286849)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)

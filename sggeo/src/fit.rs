@@ -11,7 +11,8 @@
 //!
 //! with exact coefficients c is fitted to the samples (the one-dimensional
 //! null space of the matrix of basis functions). Candidate bases are tried
-//! from small to large: degree of T first (1, 2, 4), then total degree.
+//! from small to large: degree of T first (1, 2, 4, then 3 and 6), then
+//! total degree.
 //!
 //! A smooth function is approximated very well by a modest basis, so in f64
 //! an exact relation and a good approximation look alike. The samples are
@@ -498,6 +499,138 @@ fn quadratic_irrational(y: Dd) -> Option<Expr> {
     None
 }
 
+/// x as m·sin(kπ/n) or m·cos(kπ/n) (m = 1 or 2, n ≤ 30) to double-double
+/// precision: the algebraic numbers of regular polygons, written as such
+/// rather than by their minimal polynomials (2·sin(π/7), the side of a
+/// regular heptagon in a unit circle).
+fn trig_constant(x: Dd) -> Option<Expr> {
+    let xf = x.to_f64();
+    if !(xf.abs() > 1e-9 && xf.abs() <= 2.0 + 1e-9) {
+        return None;
+    }
+    for n in 2..=30i64 {
+        for k in 1..n {
+            if gcd_i64(k, n) != 1 {
+                continue;
+            }
+            let (sn, cs) = (crate::dd::PI * Dd::from(k as f64) / Dd::from(n as f64)).sin_cos();
+            for m in [1i64, 2] {
+                for (f, v) in [(Fun::Sin, sn), (Fun::Cos, cs)] {
+                    if (x - Dd::from(m as f64) * v).abs().hi <= 1e-27 {
+                        return Some(mul(vec![int(m), fun(f, mul(vec![rat(k, n), pi()]))]));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn gcd_i64(a: i64, b: i64) -> i64 {
+    if b == 0 { a.abs() } else { gcd_i64(b, a % b) }
+}
+
+/// Integer coefficients a₀ … a_d (a_d > 0, d from 3 to `max_deg`, small)
+/// of a polynomial that vanishes at x to double-double precision: x is an
+/// algebraic number of low degree that `nice_coef` does not recognize, such
+/// as the side 2·sin(π/7) of a regular heptagon in a unit circle (a cubic
+/// in its square). The relation is the shortest vector of the lattice
+/// spanned by (eᵢ, ⌊K·xⁱ⌉) after LLL reduction.
+fn algebraic_relation(x: Dd, max_deg: usize) -> Option<Vec<i64>> {
+    let xf = x.to_f64();
+    if !(xf.abs() > 1e-6 && xf.abs() < 1e3) {
+        return None;
+    }
+    for d in 3..=max_deg {
+        let n = d + 1;
+        let powers: Vec<Dd> = (0..n).map(|i| x.powi(i as i32)).collect();
+        // K·xⁱ: large enough that a true relation is the shortest vector by
+        // far, small enough for the double-double Gram–Schmidt
+        let k = 1e16 / powers.iter().map(|p| p.hi.abs()).fold(1.0, f64::max);
+        let mut b: Vec<Vec<i128>> = (0..n)
+            .map(|i| {
+                let mut row = vec![0i128; n + 1];
+                row[i] = 1;
+                let v = powers[i] * Dd::from(k);
+                row[n] = v.hi.round() as i128 + v.lo.round() as i128;
+                row
+            })
+            .collect();
+        lll(&mut b);
+        for row in &b {
+            let a = &row[..n];
+            if a[d] == 0 || a.iter().any(|c| c.abs() > 1000) {
+                continue;
+            }
+            let (mut sum, mut mag) = (Dd::ZERO, 0.0);
+            for (c, p) in a.iter().zip(&powers) {
+                let t = Dd::from(*c as f64) * *p;
+                sum = sum + t;
+                mag += t.hi.abs();
+            }
+            if sum.abs().hi <= 1e-27 * mag {
+                let sign = if a[d] < 0 { -1 } else { 1 };
+                return Some(a.iter().map(|c| (c * sign) as i64).collect());
+            }
+        }
+    }
+    None
+}
+
+/// LLL reduction (δ = 3/4) of an integer basis, Gram–Schmidt recomputed in
+/// double-double arithmetic from the integer basis (entries up to about
+/// 1e16, so that the dot products keep their digits).
+fn lll(b: &mut [Vec<i128>]) {
+    let n = b.len();
+    let dot = |u: &[Dd], v: &[Dd]| u.iter().zip(v).fold(Dd::ZERO, |s, (x, y)| s + *x * *y);
+    let to_dd = |x: i128| {
+        let h = x as f64;
+        Dd::from(h) + Dd::from((x - h as i128) as f64)
+    };
+    let gso = |b: &[Vec<i128>]| -> (Vec<Vec<Dd>>, Vec<Dd>) {
+        let bd: Vec<Vec<Dd>> = b.iter().map(|r| r.iter().map(|&x| to_dd(x)).collect()).collect();
+        let mut bs: Vec<Vec<Dd>> = Vec::new();
+        let mut mu = vec![vec![Dd::ZERO; n]; n];
+        let mut nb: Vec<Dd> = Vec::new();
+        for i in 0..n {
+            let mut v = bd[i].clone();
+            for j in 0..i {
+                mu[i][j] = if nb[j].hi > 0.0 { dot(&bd[i], &bs[j]) / nb[j] } else { Dd::ZERO };
+                for (x, y) in v.iter_mut().zip(&bs[j]) {
+                    *x = *x - mu[i][j] * *y;
+                }
+            }
+            nb.push(dot(&v, &v));
+            bs.push(v);
+        }
+        (mu, nb)
+    };
+    let (mut mu, mut nb) = gso(b);
+    let mut k = 1;
+    let mut iters = 0;
+    while k < n && iters < 10_000 {
+        iters += 1;
+        for j in (0..k).rev() {
+            let q = mu[k][j].to_f64().round();
+            if q != 0.0 && q.abs() < 1e30 {
+                let q = q as i128;
+                let bj = b[j].clone();
+                for (x, y) in b[k].iter_mut().zip(&bj) {
+                    *x -= q * y;
+                }
+                (mu, nb) = gso(b);
+            }
+        }
+        if nb[k].to_f64() >= (0.75 - mu[k][k - 1].to_f64().powi(2)) * nb[k - 1].to_f64() {
+            k += 1;
+        } else {
+            b.swap(k, k - 1);
+            (mu, nb) = gso(b);
+            k = (k - 1).max(1);
+        }
+    }
+}
+
 /// A coefficient as an exact number: a fraction, a square root of one, a
 /// quadratic irrational, or a square root of one.
 fn nice_coef(x: Dd) -> Option<Expr> {
@@ -520,6 +653,8 @@ enum Shape {
     Sq,
     Quad,
     Biq,
+    Cub,
+    Hex,
 }
 
 impl Shape {
@@ -529,6 +664,9 @@ impl Shape {
             Shape::Sq => &[0, 2],
             Shape::Quad => &[0, 1, 2],
             Shape::Biq => &[0, 2, 4],
+            // (solved by Cardano, and as a cubic in T²: a regular heptagon)
+            Shape::Cub => &[0, 1, 2, 3],
+            Shape::Hex => &[0, 2, 4, 6],
         }
     }
 }
@@ -764,10 +902,54 @@ pub fn fit(pb: &Problem) -> Option<Fit> {
             return None;
         }
     }
+    // a parameter can leave the target unchanged here and still matter once
+    // the others move (P on the tangent x = r: the contact does not depend on
+    // y_P while x_P = r), so the rest is tried again with all parameters moved
+    for _ in 0..2 {
+        let rest: Vec<u32> = params.iter().copied().filter(|p| !relevant.contains(p)).collect();
+        if rest.is_empty() {
+            break;
+        }
+        let jb: Vec<(u32, f64)> = params.iter().map(|&p| (p, val(p) + (2.0 * sm.rand() - 1.0) * step_of(p, 0.03))).collect();
+        let Some(tb) = sm.at(&jb) else { continue };
+        for p in rest {
+            let d = step_of(p, 0.03);
+            let i = params.iter().position(|q| *q == p).unwrap();
+            let moved = [1.0, -1.0].iter().find_map(|s| {
+                let mut pv = jb.clone();
+                pv[i].1 = val(p) + s * d;
+                sm.at(&pv)
+            });
+            if moved.is_some_and(|t| (t - tb).abs() > 1e-9 * (1.0 + tb.abs())) {
+                relevant.push(p);
+            }
+        }
+        sm.states.clear();
+        if past_deadline() {
+            return None;
+        }
+    }
+    relevant.sort();
     if relevant.is_empty() {
         // the target is the same whatever the parameters
         let c = nice_const(t0);
-        return (!stuck && !has_float(&c)).then(|| Fit { found: Found::Formula(c), checks: vec![Sample { params: vec![], value: t0, exact: Dd::from(t0) }] });
+        if stuck {
+            return None;
+        }
+        if !has_float(&c) {
+            return Some(Fit { found: Found::Formula(c), checks: vec![Sample { params: vec![], value: t0, exact: Dd::from(t0) }] });
+        }
+        // an algebraic number of higher degree (the side of a regular heptagon)
+        let (_, td) = sm.exact_at(&[])?;
+        if !is_angle {
+            if let Some(c) = trig_constant(td) {
+                return Some(Fit { found: Found::Formula(c), checks: vec![Sample { params: vec![], value: t0, exact: td }] });
+            }
+        }
+        let x = if is_angle { td.sin_cos().1 } else { td };
+        let a = algebraic_relation(x, 6)?;
+        let p = add(a.iter().enumerate().map(|(i, c)| mul(vec![int(*c), pow(sym(pb.t), int(i as i64))])).collect());
+        return Some(Fit { found: Found::Relation { p, cos: is_angle }, checks: vec![Sample { params: vec![], value: t0, exact: td }] });
     }
     let all_args = &args;
     let args: Vec<Expr> = all_args.iter().filter(|a| sym_set(a).iter().any(|s| relevant.contains(s))).cloned().collect();
@@ -926,7 +1108,7 @@ pub fn fit(pb: &Problem) -> Option<Fit> {
     };
 
     // T or T² as a polynomial first, then as a rational function, then the
-    // quadratic and biquadratic relations
+    // quadratic and biquadratic relations, then cubic ones in T and in T²
     let shapes = [
         (Shape::Lin, true),
         (Shape::Sq, true),
@@ -936,6 +1118,10 @@ pub fn fit(pb: &Problem) -> Option<Fit> {
         (Shape::Biq, true),
         (Shape::Quad, false),
         (Shape::Biq, false),
+        (Shape::Cub, true),
+        (Shape::Hex, true),
+        (Shape::Cub, false),
+        (Shape::Hex, false),
     ];
     // (half angles, harmonics)
     let levels: &[(bool, u8)] = if at.args.is_empty() { &[(false, 1)] } else { &[(false, 1), (true, 1), (false, 2), (true, 2)] };
@@ -1017,6 +1203,54 @@ pub fn fit(pb: &Problem) -> Option<Fit> {
                     }
                 }
                 let Some(coefs) = coefs else {
+                    // T·m₁ + x·m₀ = 0 with an algebraic ratio r = T·m₁/m₀ of
+                    // higher degree: the relation Σ aᵢ (T·m₁)ⁱ m₀^(d−i) = 0
+                    if kc == 2 && shape == Shape::Lin && terms[keep[0]].k != terms[keep[1]].k {
+                        let (jt, j0) = if terms[keep[0]].k == 1 { (0, 1) } else { (1, 0) };
+                        // (the ratio at a sample is more accurate than the null vector's)
+                        let r = match checks.first().map(|s| row_of(s, half)) {
+                            Some(row) => term_value(&terms[keep[jt]], &row) / term_value(&terms[keep[j0]], &row),
+                            None => -x2[j0] / x2[jt],
+                        };
+                        if let Some(c) = trig_constant(r) {
+                            let ok = checks.iter().all(|s| {
+                                let row = row_of(s, half);
+                                let rs = term_value(&terms[keep[jt]], &row) / term_value(&terms[keep[j0]], &row);
+                                (rs - r).abs().hi <= 1e-20 * (1.0 + r.hi.abs())
+                            });
+                            if ok {
+                                let (et, e0) = (term_expr(&terms[keep[jt]], &at, pb.t, half), term_expr(&terms[keep[j0]], &at, pb.t, half));
+                                return Some(Fit { found: Found::Relation { p: et - c * e0, cos: is_angle }, checks });
+                            }
+                        }
+                        if let Some(a) = algebraic_relation(r, 6) {
+                            let ok = checks.iter().all(|s| {
+                                let row = row_of(s, half);
+                                let rs = term_value(&terms[keep[jt]], &row) / term_value(&terms[keep[j0]], &row);
+                                let (mut sum, mut mag) = (Dd::ZERO, 0.0);
+                                for (i, c) in a.iter().enumerate() {
+                                    let t = Dd::from(*c as f64) * rs.powi(i as i32);
+                                    sum = sum + t;
+                                    mag += t.hi.abs();
+                                }
+                                sum.abs().hi <= 1e-10 * mag
+                            });
+                            if dbg {
+                                eprintln!("fit: {shape:?} half {half} w {w}: ratio of degree {} {a:?}, checks {ok}", a.len() - 1);
+                            }
+                            if ok {
+                                let (et, e0) = (term_expr(&terms[keep[jt]], &at, pb.t, half), term_expr(&terms[keep[j0]], &at, pb.t, half));
+                                let d = a.len() - 1;
+                                let p = add(
+                                    a.iter()
+                                        .enumerate()
+                                        .map(|(i, c)| mul(vec![int(*c), pow(et.clone(), int(i as i64)), pow(e0.clone(), int((d - i) as i64))]))
+                                        .collect(),
+                                );
+                                return Some(Fit { found: Found::Relation { p: expand(&p), cos: is_angle }, checks });
+                            }
+                        }
+                    }
                     if dbg {
                         eprintln!("fit: {shape:?} half {half} w {w}: null vector of {kc} terms has no exact coefficients");
                     }
@@ -1050,6 +1284,18 @@ pub fn fit(pb: &Problem) -> Option<Fit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn heptagon_side_is_algebraic() {
+        // 2·sin(π/7): x⁶ − 7x⁴ + 14x² − 7 = 0
+        let x = Dd::from(2.0) * (crate::dd::PI / Dd::from(7.0)).sin_cos().0;
+        assert_eq!(algebraic_relation(x, 6), Some(vec![-7, 0, 14, 0, -7, 0, 1]));
+        // 2·cos(2π/7): x³ + x² − 2x − 1 = 0
+        let y = Dd::from(2.0) * (crate::dd::PI * Dd::from(2.0) / Dd::from(7.0)).sin_cos().1;
+        assert_eq!(algebraic_relation(y, 6), Some(vec![-1, -2, 1, 1]));
+        // π is not
+        assert_eq!(algebraic_relation(crate::dd::PI, 6), None);
+    }
 
     #[test]
     fn null_vector_of_a_relation() {

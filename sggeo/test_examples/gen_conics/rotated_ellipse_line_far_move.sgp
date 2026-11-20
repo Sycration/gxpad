@@ -1,0 +1,35 @@
+sgp 2
+
+given
+  e1 = ellipse(O)
+    a1: a(e1) = 5
+    b1: b(e1) = 3
+  point B
+  line CD
+    horiz C D
+    y_C: y(C) = -3
+    x_C: x(C) = -6
+
+construct
+  A = focus(e1)
+    O == mid(A, B)
+  segment OA
+    θ1: angle(xaxis, OA) = 30°
+  E = meet(CD, e1)
+
+find
+  x_E: x(E)
+
+where
+  e1 a 5 b 3 angle 30°
+  B (-3.4641016151377544, -1.9999999999999996)
+  C (-6, -3)
+  D (5.999999999999305, -3)
+  A (3.4641016151377544, 1.9999999999999996)
+  E (0.7088761776287287, -3)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  θ1 label (0.482963, 0.12941)
+  x_E label (0.3, 0.3)

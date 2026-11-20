@@ -16,9 +16,9 @@ find
   d1: dist(C, D)
 
 where
-  A (1, 9.95108931369775e-54)
+  A (1, 0)
   p1 a 2 angle 0° [fixed angle]
-  B (3, 9.95108931369775e-54)
+  B (3, 0)
   C (3, 4)
   D (3, -4)
   a1 label (0.3, 0.3)

@@ -1,0 +1,29 @@
+sgp 2
+
+given
+  k1 = circle(O)
+  point B
+  k3 = circle(B)
+    xaxis tan k3
+    k3 tan k1 inside
+
+construct
+  point A on xaxis
+  segment OA
+    r(k1) == |OA|
+    d1: |OA| = 4
+  k2 = circle(A)
+    r(k2) == |OA|
+    k3 tan k2 inside
+
+find
+  r1: r(k3)
+
+where
+  k1 r 4
+  B (2, 1.5)
+  k3 r 1.5
+  A (4, 0)
+  k2 r 4
+  d1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)

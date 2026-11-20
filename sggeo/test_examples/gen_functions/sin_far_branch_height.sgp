@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  c = 0.4
+  g1 = curve(y = sin(x))
+
+construct
+  point A on g1
+    y_A: y(A) = c
+
+find
+  x_A: x(A)
+
+where
+  A (9.013261114701892, 0.4)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

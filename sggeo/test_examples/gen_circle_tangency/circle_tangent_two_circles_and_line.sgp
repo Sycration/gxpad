@@ -1,0 +1,37 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 6
+  k1 = circle(O)
+    r1: r(k1) = 2
+  k2 = circle(A)
+    r2: r(k2) = 1
+  line BC
+    horiz B C
+    y_B: y(B) = -3
+    x_B: x(B) = -3
+  point D
+  k3 = circle(D)
+    BC tan k3
+    k3 tan k1
+    k3 tan k2
+
+find
+  r3: r(k3)
+
+where
+  A (6, 3.2201548670154583e-31)
+  k1 r 2
+  k2 r 1
+  B (-3, -3)
+  C (9, -3)
+  D (3.542486889354094, -1.2450786638754354)
+  k3 r 1.7549213361245646
+  d1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  r3 label (0.3, 0.3)

@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  g1 = curve(x^4 + y^4 = 1)
+  g2 = curve(y = x + 0.5)
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+  y_A: y(A)
+
+where
+  A (0.4857778107932194, 0.9857778107932194)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

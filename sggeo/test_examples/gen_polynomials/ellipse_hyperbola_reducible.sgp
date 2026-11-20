@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  g1 = curve((x-1)^2 + 4*y^2 = 4)
+  g2 = curve(x*y = 1)
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+  y_A: y(A)
+
+where
+  A (2.875129794162779, 0.34781038477993104)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

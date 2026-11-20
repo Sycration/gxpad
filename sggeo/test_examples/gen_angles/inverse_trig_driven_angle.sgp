@@ -1,0 +1,18 @@
+sgp 2
+
+given
+  a = 1
+  b = 3
+  L = 2
+  segment OA
+    d1: |OA| = L
+    θ1: angle(xaxis, OA) = acos(a/b)
+
+find
+  y_A: y(A)
+
+where
+  A (0.6666666666666666, 1.8856180831641267)
+  d1 label (0.3, 0.3)
+  θ1 label (0.425325, 0.262866)
+  y_A label (0.3, 0.3)

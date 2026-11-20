@@ -1,0 +1,15 @@
+sgp 2
+
+given
+  line OA
+    θ1: angle(xaxis, OA) = 40°
+  g1 = curve(y = x^3 - 1)
+    A on g1
+
+find
+  x_A: x(A)
+
+where
+  A (1.2743011714044687, 1.0692656429342655)
+  θ1 label (0.469675, 0.171481)
+  x_A label (0.3, 0.3)

@@ -1,0 +1,25 @@
+sgp 2
+
+given
+  p1 = parabola(O)
+    a1: a(p1) = 1
+  line AB
+    horiz A B
+    y_A: y(A) = 3
+    x_A: x(A) = -1
+
+construct
+  C = meet(AB, p1)
+
+find
+  x_C: x(C)
+
+where
+  p1 a 1 angle 0° [fixed angle]
+  A (-1, 3)
+  B (5, 3)
+  C (2.25, 3)
+  a1 label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  x_C label (0.3, 0.3)

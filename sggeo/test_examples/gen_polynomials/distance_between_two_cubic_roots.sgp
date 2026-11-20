@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  g1 = curve(y = x^3 + x)
+  g2 = curve(y = x^3 + 2*x)
+
+construct
+  point A on g1
+    y_A: y(A) = 3
+  point B on g2
+    y_B: y(B) = 2
+
+find
+  d1: dist(A, B)
+
+where
+  A (1.2134116627622296, 3)
+  B (0.7709169970592481, 2)
+  y_A label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  d1 label (0.3, 0.3)

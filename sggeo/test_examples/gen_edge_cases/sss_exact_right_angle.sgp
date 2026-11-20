@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 5
+  segment BO
+    d2: |BO| = 3
+  segment BA
+    d3: |BA| = 4
+
+find
+  θ1: ∠OBA
+
+where
+  A (5, -8.874685183736383e-31)
+  B (1.8, 2.4)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  θ1 label (0.0707107, -0.494975)

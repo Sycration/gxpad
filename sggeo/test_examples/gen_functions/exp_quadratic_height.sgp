@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  c = 2.5
+  g1 = curve(y = exp(2*x) - exp(x))
+
+construct
+  point A on g1
+    y_A: y(A) = c
+
+find
+  x_A: x(A)
+
+where
+  A (0.7693266177944669, 2.5)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

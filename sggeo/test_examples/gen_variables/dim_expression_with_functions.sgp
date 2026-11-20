@@ -1,0 +1,19 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 3
+  segment OB
+    OA ⟂ OB
+    d2: |OB| = sqrt(d1^2 + 7)
+
+find
+  d3: dist(A, B)
+
+where
+  A (3, 1.712351053912815e-194)
+  B (6.421316452173056e-194, 4)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

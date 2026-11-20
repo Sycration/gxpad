@@ -588,9 +588,10 @@ fn sine_inflection_tangent_angle() {
 }
 
 /// Line through the origin tangent to sin x: only the inflection tangent y = x
-/// has contact there; the constraint is valid but degenerate (order-3 contact).
+/// has contact there; the constraint is valid but degenerate (order-3 contact:
+/// the contact point is a triple root of sin t = t·cos t, known numerically
+/// only to about 1e-5, and recognized as t = 0).
 #[test]
-#[ignore = "limitation: tangency at an inflection is a triple contact; the solver only reaches ~1e-7 accuracy there"]
 fn sine_inflection_tangent_unpinned() {
     let mut k = Kit::new();
     let o = k.origin();
@@ -679,4 +680,562 @@ fn amplitude_frequency_variables_peak_big_step() {
     k.check_value(x, PI / 2.0);
     k.set_var(w, 2.0);
     k.check_value(x, PI / 4.0);
+}
+
+/// Point on y = cos(3x) at height c: x = acos(c)/3.
+#[test]
+fn cos3x_curve_height() {
+    let mut k = Kit::new();
+    k.var("c", 0.3);
+    let f = k.curve("y = 4*cos(x)^3 - 3*cos(x)");
+    let p = k.point(0.42, 0.3);
+    k.on(p, f);
+    k.drive(DimKind::CoordY(p), "c");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, 0.3f64.acos() / 3.0);
+}
+
+/// Point on y = sin(x)^3 - sin(x) at height c (a genuine cubic in sin x,
+/// three real roots): x = asin(2/√3 cos(acos(...)/3 ...)).
+#[test]
+fn cubic_in_sin_curve_height() {
+    let mut k = Kit::new();
+    k.var("c", -0.2);
+    let f = k.curve("y = sin(x)^3 - sin(x)");
+    // s^3 - s + 0.2 = 0 root near 0.2
+    let mut s = 0.2f64;
+    for _ in 0..50 {
+        s -= (s * s * s - s + 0.2) / (3.0 * s * s - 1.0);
+    }
+    let x0 = s.asin();
+    let p = k.point(x0 + 0.01, -0.2);
+    k.on(p, f);
+    k.drive(DimKind::CoordY(p), "c");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+fn height_probe(src: &str, c: f64, x0: f64, vars: &[(&str, f64)]) {
+    let mut k = Kit::new();
+    for (n, v) in vars {
+        k.var(n, *v);
+    }
+    k.var("c", c);
+    let f = k.curve(src);
+    let p = k.point(x0 + 0.01, c);
+    k.on(p, f);
+    k.drive(DimKind::CoordY(p), "c");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+/// y = a cos x + b sin x at height c, symbolic a, b, c, a root in each quadrant range.
+#[test]
+fn harmonic_symbolic_all_quadrants() {
+    let (a, b, c) = (1.0f64, 2.0f64, 0.7f64);
+    let f = |x: f64| a * x.cos() + b * x.sin() - c;
+    let r = (a * a + b * b).sqrt();
+    let phi = b.atan2(a);
+    let w = (c / r).acos();
+    for x0 in [phi + w, phi - w, phi + w - 2.0 * PI, phi - w + 2.0 * PI] {
+        assert!(f(x0).abs() < 1e-12);
+        height_probe("y = a*cos(x) + b*sin(x)", c, x0, &[("a", a), ("b", b)]);
+    }
+}
+
+/// y = cos x + sin 2x at height c: a quartic in sin x (mixed harmonics).
+/// Horizontal tangent: -sin x + 2 cos 2x = 0 → sin x = (√33 − 1)/8.
+#[test]
+fn mixed_harmonic_horizontal_tangent() {
+    let mut k = Kit::new();
+    let f = k.curve("y = cos(x) + sin(2*x)");
+    let x0 = ((33.0f64.sqrt() - 1.0) / 8.0).asin();
+    let p = k.point(x0 + 0.02, 1.7);
+    let q = k.point(x0 + 1.0, 1.7);
+    k.on(p, f);
+    let pq = k.line(p, q);
+    k.horizontal(pq);
+    k.tangent(pq, f);
+    let x = k.measure(DimKind::CoordX(p));
+    let y = k.measure(DimKind::CoordY(p));
+    k.check_value(x, x0);
+    k.check_value(y, x0.cos() + (2.0 * x0).sin());
+}
+
+fn newton(f: impl Fn(f64) -> f64, mut x: f64) -> f64 {
+    for _ in 0..100 {
+        let h = 1e-7;
+        let d = (f(x + h) - f(x - h)) / (2.0 * h);
+        x -= f(x) / d;
+    }
+    x
+}
+
+/// y = cos x + sin 2x at height 1: cos x(1 + 2 sin x) = 1 → quartic in sin x
+/// that factors? x = 0 is a root; take a nontrivial root.
+#[test]
+fn mixed_harmonic_height() {
+    let c = 1.2;
+    let x0 = newton(|x| x.cos() + (2.0 * x).sin() - c, 0.3);
+    height_probe("y = cos(x) + sin(2*x)", c, x0, &[]);
+}
+
+/// Even-quadratic form: y = cos(x)^2 + 2 sin(x) cos(x) at height c:
+/// (1 + cos 2x)/2 + sin 2x = c.
+#[test]
+fn even_quadratic_trig_height() {
+    let c = 1.1;
+    let x0 = newton(|x| x.cos().powi(2) + 2.0 * x.sin() * x.cos() - c, 0.3);
+    height_probe("y = cos(x)^2 + 2*sin(x)*cos(x)", c, x0, &[]);
+}
+
+/// y = tan(x) at height c on the branch x ∈ (π/2, 3π/2): x = atan(c) + π.
+#[test]
+fn tan_other_branch_height() {
+    let c = 0.8f64;
+    height_probe("y = tan(x)", c, c.atan() + PI, &[]);
+}
+
+/// y = 1/tan(x) (cot) at height c: x = atan(1/c).
+#[test]
+fn cot_height() {
+    let c = 0.8f64;
+    height_probe("y = 1/tan(x)", c, (1.0 / c).atan(), &[]);
+}
+
+/// y = sin(x) at height c on a far branch x ≈ 2π + π − asin c.
+#[test]
+fn sin_far_branch_height() {
+    let c = 0.4f64;
+    height_probe("y = sin(x)", c, 3.0 * PI - c.asin(), &[]);
+}
+
+/// y = sin(x)/cos(x)^2? no: y = sin(x) + cos(x)^2 at height c (quadratic in sin x).
+#[test]
+fn sin_plus_cos2_height() {
+    let c = 1.1f64;
+    // s + 1 - s^2 = c → s^2 - s + (c-1) = 0, s = (1 - √(1 - 4(c-1)))/2... take s = (1+√(5-4c))/2
+    let s = (1.0 - (5.0 - 4.0 * c).sqrt()) / 2.0 * -1.0 + 0.0;
+    let s = if s.abs() <= 1.0 { s } else { (1.0 - (5.0 - 4.0 * c).sqrt()) / 2.0 };
+    let s2 = (1.0 + (5.0f64 - 4.0 * c).sqrt()) / 2.0;
+    let _ = s;
+    height_probe("y = sin(x) + cos(x)^2", c, s2.asin(), &[]);
+}
+
+/// y = e^x + e^(-x) at height c: x = ln((c + √(c² − 4))/2).
+#[test]
+fn exp_sum_height() {
+    let c = 3.0f64;
+    height_probe("y = exp(x) + exp(-x)", c, ((c + (c * c - 4.0).sqrt()) / 2.0).ln(), &[]);
+}
+
+/// Negative branch of the same.
+#[test]
+fn exp_sum_height_negative_branch() {
+    let c = 3.0f64;
+    height_probe("y = exp(x) + exp(-x)", c, -((c + (c * c - 4.0).sqrt()) / 2.0).ln(), &[]);
+}
+
+/// y = sinh(x) at height c: asinh(c).
+#[test]
+fn sinh_height() {
+    let c = 1.5f64;
+    height_probe("y = sinh(x)", c, c.asinh(), &[]);
+}
+
+/// y = cosh(x) at height c on the negative branch.
+#[test]
+fn cosh_height_negative() {
+    let c = 2.0f64;
+    height_probe("y = cosh(x)", c, -c.acosh(), &[]);
+}
+
+/// y = exp(2x) − exp(x) at height c: e^x = (1 + √(1 + 4c))/2.
+#[test]
+fn exp_quadratic_height() {
+    let c = 2.5f64;
+    height_probe("y = exp(2*x) - exp(x)", c, ((1.0 + (1.0 + 4.0 * c).sqrt()) / 2.0).ln(), &[]);
+}
+
+/// y = 2^x at height c: x = ln c / ln 2.
+#[test]
+fn power_base_height() {
+    let c = 5.0f64;
+    height_probe("y = 2^x", c, c.ln() / 2.0f64.ln(), &[]);
+}
+
+/// y = ln(x) + ln(x + 1) at height c: x(x+1) = e^c.
+#[test]
+fn log_sum_height() {
+    let c = 1.0f64;
+    height_probe("y = ln(x) + ln(x + 1)", c, (-1.0 + (1.0 + 4.0 * c.exp()).sqrt()) / 2.0, &[]);
+}
+
+fn min_probe(src: &str, x0: f64, y0: f64) {
+    let mut k = Kit::new();
+    let f = k.curve(src);
+    let p = k.point(x0 + 0.03, y0);
+    let q = k.point(x0 + 1.0, y0);
+    k.on(p, f);
+    let pq = k.line(p, q);
+    k.horizontal(pq);
+    k.tangent(pq, f);
+    let x = k.measure(DimKind::CoordX(p));
+    let y = k.measure(DimKind::CoordY(p));
+    k.check_value(x, x0);
+    k.check_value(y, y0);
+}
+
+/// Minimum of x e^x at x = −1, y = −1/e.
+#[test]
+fn x_exp_x_minimum() {
+    min_probe("y = x*exp(x)", -1.0, -1.0 / E);
+}
+
+/// Minimum of x ln x at x = 1/e.
+#[test]
+fn x_ln_x_minimum() {
+    min_probe("y = x*ln(x)", 1.0 / E, -1.0 / E);
+}
+
+/// Minimum of e^x / x at x = 1.
+#[test]
+fn exp_over_x_minimum() {
+    min_probe("y = exp(x)/x", 1.0, E);
+}
+
+/// Minimum of x^x at x = 1/e.
+#[test]
+fn x_pow_x_minimum() {
+    min_probe("y = x^x", 1.0 / E, (-1.0 / E).exp());
+}
+
+/// Maximum of e^x sin x at x = 3π/4.
+#[test]
+fn exp_sin_extremum() {
+    let x0 = 0.75 * PI;
+    min_probe("y = exp(x)*sin(x)", x0, x0.exp() * x0.sin());
+}
+
+/// Maximum of ln(x)/x at x = e.
+#[test]
+fn ln_over_x_maximum() {
+    min_probe("y = ln(x)/x", E, 1.0 / E);
+}
+
+/// Tangent from (0, b) to y = ln x touches at x = e^(b+1).
+#[test]
+fn ln_tangent_from_axis_point_var() {
+    let mut k = Kit::new();
+    k.var("b", 0.5);
+    let f = k.curve("y = ln(x)");
+    let a = k.point(0.0, 0.5);
+    k.drive(DimKind::CoordX(a), "0");
+    k.drive(DimKind::CoordY(a), "b");
+    let x0 = 1.5f64.exp();
+    k.hint = [x0, 1.5];
+    let (_seg, t) = k.tangent_line(a, f, [x0 * 1.05, 1.5]);
+    let tx = k.measure(DimKind::CoordX(t));
+    k.check_value(tx, x0);
+}
+
+/// Tangent from (a, 0) to y = e^x touches at x = a + 1.
+#[test]
+fn exp_tangent_from_axis_point_var() {
+    let mut k = Kit::new();
+    k.var("a", 0.5);
+    let f = k.curve("y = exp(x)");
+    let p = k.point(0.5, 0.0);
+    k.drive(DimKind::CoordX(p), "a");
+    k.drive(DimKind::CoordY(p), "0");
+    let (_seg, t) = k.tangent_line(p, f, [1.55, 4.4]);
+    let ty = k.measure(DimKind::CoordY(t));
+    k.check_value(ty, 1.5f64.exp());
+}
+
+/// Intersection of y = e^x and y = e^(−x) + 1: e^x = φ (golden ratio).
+#[test]
+fn exp_curves_intersection() {
+    let mut k = Kit::new();
+    let f = k.curve("y = exp(x)");
+    let g = k.curve("y = exp(-x) + 1");
+    let phi = (1.0 + 5.0f64.sqrt()) / 2.0;
+    let p = k.intersect(f, g, [phi.ln() + 0.02, phi]);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, phi.ln());
+}
+
+/// Intersection of y = sin x and y = cos x on the far branch x = 5π/4.
+#[test]
+fn sin_cos_intersection_far() {
+    let mut k = Kit::new();
+    let f = k.curve("y = sin(x)");
+    let g = k.curve("y = cos(x)");
+    let p = k.intersect(f, g, [3.95, -0.7]);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, 1.25 * PI);
+}
+
+/// Intersection of y = sin(2x) and y = sin(x): 2 sin x cos x = sin x,
+/// cos x = 1/2 → x = π/3.
+#[test]
+fn sin2x_sinx_intersection() {
+    let mut k = Kit::new();
+    let f = k.curve("y = sin(2*x)");
+    let g = k.curve("y = sin(x)");
+    let p = k.intersect(f, g, [1.0, 0.86]);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, PI / 3.0);
+}
+
+/// Intersection of y = a sin(x) and y = cos(2x) with var a:
+/// 1 − 2s² = a s → s = (−a + √(a² + 8))/4.
+#[test]
+fn sin_cos2x_intersection_var() {
+    let mut k = Kit::new();
+    k.var("a", 1.0);
+    let f = k.curve("y = a*sin(x)");
+    let g = k.curve("y = cos(2*x)");
+    let s = (-1.0 + 9.0f64.sqrt()) / 4.0;
+    let p = k.intersect(f, g, [s.asin() + 0.02, s]);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, s.asin());
+}
+
+fn rad(d: f64) -> f64 {
+    d.to_radians()
+}
+
+/// Tangent to y = e^x making angle θ with the x axis: x = ln(tan θ).
+#[test]
+fn exp_tangent_given_angle() {
+    let mut k = Kit::new();
+    let f = k.curve("y = exp(x)");
+    let xa = k.xaxis();
+    let x0 = rad(60.0).tan().ln();
+    let p = k.point(x0 + 0.02, x0.exp());
+    let q = k.point(x0 + 1.0, x0.exp() + 1.8);
+    k.on(p, f);
+    let pq = k.line(p, q);
+    k.tangent(pq, f);
+    k.var("w", 60.0);
+    k.drive_angle(xa, pq, "w*deg");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+/// Tangent to y = sin x making angle θ with the x axis: x = acos(tan θ).
+#[test]
+fn sin_tangent_given_angle() {
+    let mut k = Kit::new();
+    let f = k.curve("y = sin(x)");
+    let xa = k.xaxis();
+    let x0 = rad(30.0).tan().acos();
+    let p = k.point(x0 + 0.02, x0.sin());
+    let q = k.point(x0 + 1.0, x0.sin() + 0.577);
+    k.on(p, f);
+    let pq = k.line(p, q);
+    k.tangent(pq, f);
+    k.var("w", 30.0);
+    k.drive_angle(xa, pq, "w*deg");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+/// Intersection of y = sin(x + a) and y = cos(x): x = (π/2 − a)/2.
+#[test]
+fn shifted_sin_cos_intersection() {
+    let mut k = Kit::new();
+    k.var("a", 0.4);
+    let f = k.curve("y = sin(x + a)");
+    let g = k.curve("y = cos(x)");
+    let x0 = (PI / 2.0 - 0.4) / 2.0;
+    let p = k.intersect(f, g, [x0 + 0.02, x0.cos()]);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+/// y = sin(x/2) + cos(x) at height c: with s = sin(x/2), s + 1 − 2s² = c.
+#[test]
+fn half_angle_curve_height() {
+    let c = 1.05f64;
+    let s = (1.0 + (1.0f64 + 8.0 * (1.0 - c)).sqrt()) / 4.0;
+    height_probe("y = sin(x/2) + cos(x)", c, 2.0 * s.asin(), &[]);
+}
+
+/// ln(c − x) = ln(x): x = c/2.
+#[test]
+fn ln_equal_intersection() {
+    let mut k = Kit::new();
+    k.var("c", 3.0);
+    let f = k.curve("y = ln(c - x)");
+    let g = k.curve("y = ln(x)");
+    let p = k.intersect(f, g, [1.55, 0.4]);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, 1.5);
+}
+
+/// y = acos(x) meets y = asin(x) at x = √2/2.
+#[test]
+fn acos_asin_intersection() {
+    let mut k = Kit::new();
+    let f = k.curve("y = acos(x)");
+    let g = k.curve("y = asin(x)");
+    let p = k.intersect(f, g, [0.72, 0.78]);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, 0.5f64.sqrt());
+}
+
+/// y = asin(x) at height c: x = sin c.
+#[test]
+fn asin_curve_height() {
+    height_probe("y = asin(x)", 0.6, 0.6f64.sin(), &[]);
+}
+
+/// y = atan(x) with a tangent at angle w to the x axis: 1/(1+x²) = tan w.
+#[test]
+fn atan_tangent_given_angle() {
+    let mut k = Kit::new();
+    let f = k.curve("y = atan(x)");
+    let xa = k.xaxis();
+    let w = rad(30.0);
+    let x0 = (1.0 / w.tan() - 1.0).sqrt();
+    let p = k.point(x0 + 0.02, x0.atan());
+    let q = k.point(x0 + 1.0, x0.atan() + w.tan());
+    k.on(p, f);
+    let pq = k.line(p, q);
+    k.tangent(pq, f);
+    k.var("w", 30.0);
+    k.drive_angle(xa, pq, "w*deg");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+/// Tangent to y = tan x at angle w: cos² x = 1/tan w (here w = 70°).
+#[test]
+fn tan_tangent_given_angle() {
+    let mut k = Kit::new();
+    let f = k.curve("y = tan(x)");
+    let xa = k.xaxis();
+    let w = rad(70.0);
+    let x0 = (1.0 / w.tan().sqrt()).acos();
+    let p = k.point(x0 + 0.02, x0.tan());
+    let q = k.point(x0 + 0.5, x0.tan() + 0.5 * w.tan());
+    k.on(p, f);
+    let pq = k.line(p, q);
+    k.tangent(pq, f);
+    k.var("w", 70.0);
+    k.drive_angle(xa, pq, "w*deg");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+fn meet_probe(f_src: &str, g_src: &str, x0: f64, y0: f64, vars: &[(&str, f64)]) {
+    let mut k = Kit::new();
+    for (n, v) in vars {
+        k.var(n, *v);
+    }
+    let f = k.curve(f_src);
+    let g = k.curve(g_src);
+    let p = k.intersect(f, g, [x0 + 0.02, y0]);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+/// sin(2x) = a sin(x) with var a: cos x = a/2 (the a = 1 constant case passes).
+#[test]
+fn sin2x_a_sinx_intersection_var() {
+    let x0 = (0.6f64).acos();
+    meet_probe("y = sin(2*x)", "y = a*sin(x)", x0, 1.2 * x0.sin(), &[("a", 1.2)]);
+}
+
+/// a sin x = cos x: x = atan(1/a) (plain harmonic, var).
+#[test]
+fn a_sin_cos_intersection_var() {
+    let x0 = (1.0f64 / 1.3).atan();
+    meet_probe("y = a*sin(x)", "y = cos(x)", x0, x0.cos(), &[("a", 1.3)]);
+}
+
+/// tan x = a sin x: cos x = 1/a.
+#[test]
+fn tan_a_sin_intersection_var() {
+    let x0 = (1.0f64 / 2.5).acos();
+    meet_probe("y = tan(x)", "y = a*sin(x)", x0, x0.tan(), &[("a", 2.5)]);
+}
+
+/// a sin x = cos² x: s² + a s − 1 = 0.
+#[test]
+fn sin_cos_squared_intersection_var() {
+    let a = 0.7f64;
+    let s = (-a + (a * a + 4.0).sqrt()) / 2.0;
+    meet_probe("y = a*sin(x)", "y = cos(x)^2", s.asin(), a * s, &[("a", a)]);
+}
+
+/// Implicit sin x + sin y = 1, point with x = c: y = asin(1 − sin c).
+#[test]
+fn implicit_sin_sum_curve() {
+    let mut k = Kit::new();
+    k.var("c", 0.4);
+    let f = k.curve("sin(x) + sin(y) = 1");
+    let y0 = (1.0 - 0.4f64.sin()).asin();
+    let p = k.point(0.42, y0 + 0.01);
+    k.on(p, f);
+    k.drive(DimKind::CoordX(p), "c");
+    let y = k.measure(DimKind::CoordY(p));
+    k.check_value(y, y0);
+}
+
+/// Minimum of x − a sin x: cos x = 1/a → x = acos(1/a).
+#[test]
+fn x_minus_a_sin_minimum() {
+    let mut k = Kit::new();
+    k.var("a", 2.0);
+    let f = k.curve("y = x - a*sin(x)");
+    let x0 = PI / 3.0;
+    let y0 = x0 - 2.0 * x0.sin();
+    let p = k.point(x0 + 0.03, y0);
+    let q = k.point(x0 + 1.0, y0);
+    k.on(p, f);
+    let pq = k.line(p, q);
+    k.horizontal(pq);
+    k.tangent(pq, f);
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+/// Maximum of x e^(−x²) at x = 1/√2.
+#[test]
+fn gaussian_x_maximum() {
+    let x0 = 0.5f64.sqrt();
+    min_probe("y = x*exp(-x^2)", x0, x0 * (-0.5f64).exp());
+}
+
+/// Tangent to y = ln x at angle w: x = cot w.
+#[test]
+fn ln_tangent_given_angle() {
+    let mut k = Kit::new();
+    let f = k.curve("y = ln(x)");
+    let xa = k.xaxis();
+    let w = rad(35.0);
+    let x0 = 1.0 / w.tan();
+    let p = k.point(x0 + 0.02, x0.ln());
+    let q = k.point(x0 + 1.0, x0.ln() + w.tan());
+    k.on(p, f);
+    let pq = k.line(p, q);
+    k.tangent(pq, f);
+    k.var("w", 35.0);
+    k.drive_angle(xa, pq, "w*deg");
+    let x = k.measure(DimKind::CoordX(p));
+    k.check_value(x, x0);
+}
+
+/// Expression layer: exp(x)·exp(−x) should be 1.
+#[test]
+fn expr_exp_product_cancels() {
+    use sggeo::expr::*;
+    let x = sym(7);
+    let e = mul(vec![fun(Fun::Exp, x.clone()), fun(Fun::Exp, neg(x.clone()))]);
+    let b = deep_best(&e);
+    println!("exp(x)*exp(-x) -> {:?} / deep_best {:?}", e, b);
+    assert!(b.is_one(), "not cancelled: {b:?}");
 }

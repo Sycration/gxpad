@@ -1,0 +1,23 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 4
+  segment OB
+    d2: |OB| = 3
+  segment AB
+    d3: |AB| = 6
+
+find
+  x_B: x(B)
+  θ1: ∠AOB
+
+where
+  A (4, 9.071900410041636e-30)
+  B (-1.3749999999999996, 2.666341125962693)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  θ1 label (0.353553, 0.353553)

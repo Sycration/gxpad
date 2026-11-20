@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  line AB
+    AB ∥ xaxis
+    d1: dist(O, AB) = 2
+  line CD
+    CD ∥ xaxis
+    d2: dist(A, CD) = 3
+
+construct
+  point E on xaxis
+  point F on AB
+  point G on CD
+  triangle EFG
+    |EF| == |FG|
+    |FG| == |GE|
+
+find
+  d3: |EF|
+
+where
+  A (0.9999999999999998, 2)
+  B (3, 2)
+  C (1, 5)
+  D (3, 5)
+  E (-0.5987174742355441, 3.3526588471893e-30)
+  F (4.020084679281462, 2)
+  G (-0.021367205045918304, 5)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)

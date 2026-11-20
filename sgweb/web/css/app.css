@@ -1338,6 +1338,63 @@ dialog.help h2 {
   margin: 0;
 }
 
+dialog.examples {
+  width: min(820px, calc(100% - 24px));
+  height: min(640px, calc(100dvh - 40px));
+}
+
+dialog.examples[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.examples-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 10px 16px;
+  padding: 6px 22px 22px;
+}
+
+.examples-filter {
+  grid-column: 1 / -1;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.examples-folders,
+.examples-list {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.examples-folders [aria-current="true"] {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.examples-body .note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.examples-list .empty {
+  padding: 8px 10px;
+  color: var(--muted);
+}
+
+.welcome .all-examples {
+  margin-top: 6px;
+}
+
 /* ---------------------------------------------------------------- loading */
 
 .boot {
@@ -1539,6 +1596,24 @@ dialog.help h2 {
   .help-body {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+
+  /* the folders as a row above the list */
+  .examples-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+  }
+
+  .examples-folders {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .examples-folders .menu-item {
+    width: auto;
+    flex: none;
   }
 
   .toasts {

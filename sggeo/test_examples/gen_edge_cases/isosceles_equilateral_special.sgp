@@ -1,0 +1,19 @@
+sgp 2
+
+given
+  segment OA
+    d1: |OA| = 4
+  segment OB
+    |OA| == |OB|
+    θ1: ∠BOA = 150°
+  segment AB
+
+find
+  d2: |AB|
+
+where
+  A (1.035276180410083, 3.8637033051562732)
+  B (1.035276180410083, -3.8637033051562732)
+  d1 label (0.3, 0.3)
+  θ1 label (0.5, 0)
+  d2 label (0.3, 0.3)

@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  segment OA
+    θ1: angle(xaxis, OA) = 30°
+    d1: |OA| = 5
+  segment OB
+    d2: |OB| = 3.2
+  segment AB
+    d3: |AB| = 7.5
+
+find
+  y_B: y(B)
+  x_B: x(B)
+
+where
+  A (4.330127018922194, 2.4999999999999996)
+  B (-3.026353972623102, 1.039798842271124)
+  θ1 label (0.482766, 0.130141)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_B label (0.3, 0.3)

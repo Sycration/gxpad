@@ -1,0 +1,33 @@
+sgp 2
+
+given
+  a = 2
+  b = 4
+  c = 3
+  g = 4
+  t = 60
+  segment OA
+    d1: |OA| = a
+    θ1: angle(xaxis, OA) = t*deg
+  segment AB
+    d2: |AB| = b
+
+construct
+  point C on xaxis
+    x_C: x(C) = g
+  segment CB
+    d3: |CB| = c
+
+find
+  θ2: angle(xaxis, CB)
+
+where
+  A (1.0000000000000002, 1.7320508075688772)
+  B (4.830950434138012, 2.882624043472518)
+  C (4, -7.087422195345028e-32)
+  d1 label (0.3, 0.3)
+  θ1 label (0.435114, 0.246324)
+  d2 label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  θ2 label (0.399528, 0.300628)

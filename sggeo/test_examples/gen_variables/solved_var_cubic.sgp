@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  s ~ 1.2134116627622296
+  point A
+    x_A: x(A) = s
+    y_A: y(A) = 3
+  g1 = curve(y = x^3 + x)
+    A on g1
+  point B
+    x_B: x(B) = s
+  g2 = curve(y = x)
+    B on g2
+
+find
+  y_B: y(B)
+
+where
+  A (1.2134116627622296, 3)
+  B (1.2134116627622296, 1.2134116627622296)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)

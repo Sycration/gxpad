@@ -1,0 +1,40 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 10
+  point A
+  k2 = circle(A)
+    r2: r(k2) = 0.5
+  point B
+  k3 = circle(B)
+    k3 tan k1 inside
+    k3 tan k2
+  point C
+  k4 = circle(C)
+    k4 tan k1 inside
+    k4 tan k2
+    k3 tan k4
+  point D
+  k5 = circle(D)
+    k5 tan k1 inside
+    k5 tan k2
+    k4 tan k5
+    k5 tan k3
+
+find
+  d1: dist(O, A)
+
+where
+  k1 r 10
+  A (5.499981741569585, 0.014171887707047904)
+  k2 r 0.5
+  B (-2.500000529388261, 0.008767650602643378)
+  k3 r 7.499984096322851
+  C (7.139722678606495, 2.463229138198459)
+  k4 r 2.4473092401000667
+  D (7.145958000137713, -2.4347300562359697)
+  k5 r 2.4506539232546105
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

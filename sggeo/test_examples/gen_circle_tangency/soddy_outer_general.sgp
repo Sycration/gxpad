@@ -1,0 +1,37 @@
+sgp 2
+
+given
+  point A
+  k1 = circle(A)
+    r1: r(k1) = 2
+  point B
+  k2 = circle(B)
+    k1 tan k2
+    r2: r(k2) = 3
+  point C
+  k3 = circle(C)
+    k1 tan k3
+    k2 tan k3
+    r3: r(k3) = 4
+  point D
+  k4 = circle(D)
+    k4 tan k1 inside
+    k4 tan k2 inside
+    k4 tan k3 inside
+
+find
+  r4: r(k4)
+
+where
+  A (-0.32218768761729305, -0.49832443856021974)
+  k1 r 2
+  B (4.67504621861398, -0.3320316653783117)
+  k2 r 3
+  C (0.6816288776183468, 5.417108960892311)
+  k3 r 4
+  D (2.9655125913849663, 3.3632471430462214)
+  k4 r 7.07155875490189
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  r3 label (0.3, 0.3)
+  r4 label (0.3, 0.3)

@@ -1,0 +1,28 @@
+sgp 2
+
+given
+  e1 = ellipse(O)
+    a1: a(e1) = 3
+    b1: b(e1) = 3
+  point B
+
+construct
+  A = focus(e1)
+    O == mid(A, B)
+  point C on e1
+    x_C: x(C) = 1
+
+find
+  d1: dist(C, A)
+  d2: dist(C, B)
+
+where
+  e1 a 2.9999999999999534 b 3.0000000000000466 angle 0° [fixed angle]
+  B (-3.2653365231889804e-41, 7.582899409302634e-7)
+  A (3.265336523188393e-41, -7.582899409302567e-7)
+  C (1, 2.8284271247462285)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

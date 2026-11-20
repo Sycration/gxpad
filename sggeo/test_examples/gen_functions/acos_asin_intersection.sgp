@@ -1,0 +1,15 @@
+sgp 2
+
+given
+  g1 = curve(y = acos(x))
+  g2 = curve(y = asin(x))
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+
+where
+  A (0.7071067811865476, 0.7853981633974483)
+  x_A label (0.3, 0.3)

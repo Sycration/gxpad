@@ -14,17 +14,21 @@ import { TOOLS } from "../js/tools.js";
 
 const dir = new URL("../examples/", import.meta.url);
 
-test("every example opens and solves, and its first measurement derives", () => {
+test("every example opens and solves, and the first measurement of each featured one derives", () => {
   const index = JSON.parse(readFileSync(new URL("index.json", dir), "utf8"));
   const files = readdirSync(dir).filter((f) => f.endsWith(".sgp"));
-  assert.equal(index.length, files.length);
-  for (const { path, title } of index) {
+  assert.equal(index.filter((x) => !x.folder).length, files.length);
+  // the constructions of sggeo's tests, in folders named after their test files without gen_
+  const folders = new Set(index.filter((x) => x.folder).map((x) => x.folder));
+  assert.ok(folders.has("conics") && folders.has("linkages"), [...folders].join(" "));
+  for (const { path, title, folder } of index) {
     assert.ok(title && !title.startsWith("examples/"), `${path} has a title`);
+    if (folder) assert.ok(!folder.startsWith("gen_") && path.startsWith(`examples/${folder}/`), path);
     const d = Doc.fromSgp(readFileSync(new URL("../" + path, dir), "utf8"));
     const s = d.solve();
     assert.ok(s.ok, `${path} solves: ${s.errors}`);
     const measured = [...Array(d.dimCount).keys()].find((i) => d.dimKind(i) && !d.dimDriving(i));
-    if (measured !== undefined) {
+    if (measured !== undefined && !folder) {
       const f = d.deriveDim(measured);
       assert.ok(Math.abs(f.value - f.actual) <= 1e-6 * (1 + Math.abs(f.actual)), `${path}: ${f.plain}`);
     }

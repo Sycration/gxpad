@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  g1 = curve(y = cos(x) + sin(2*x))
+
+construct
+  point A on g1
+  segment AB
+    horiz A B
+    AB tan g1
+
+find
+  x_A: x(A)
+  y_A: y(A)
+
+where
+  A (0.6348668711335707, 1.760172593046087)
+  B (1.6348668711335708, 1.760172593046087)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)

@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  segment OA
+    horiz O A
+    d1: |OA| = 3
+  segment OC
+    d3: |OC| = 4
+  segment BC
+    d2: dist(A, B) = d1 - 3
+    d4: |BC| = 5
+
+find
+  y_C: y(C)
+
+where
+  A (3, -3.3583532869652924e-22)
+  C (9.32345168694753e-8, 3.999999999999999)
+  B (3.0000000338355597, -4.4549217857242113e-8)
+  d1 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  y_C label (0.3, 0.3)

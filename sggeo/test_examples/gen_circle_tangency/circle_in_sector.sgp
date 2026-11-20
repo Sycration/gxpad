@@ -1,0 +1,29 @@
+sgp 2
+
+given
+  point B
+  segment OB
+  point C
+  k1 = circle(C)
+    OB tan k1
+
+construct
+  point A on xaxis
+  w1 = arc(O, A, B)
+    k1 tan w1 inside
+  segment OA
+    OA tan k1
+    d1: |OA| = 3
+    θ1: ∠AOB = 70°
+
+find
+  r1: r(k1)
+
+where
+  B (1.0260604299770064, 2.819077862357725)
+  C (1.5617011516552388, 1.0935149188197832)
+  k1 r 1.0935149188197835
+  A (3, 0)
+  d1 label (0.3, 0.3)
+  θ1 label (0.409576, 0.286788)
+  r1 label (0.3, 0.3)

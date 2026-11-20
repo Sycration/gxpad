@@ -133,7 +133,7 @@ fn examples_are_listed() {
 }
 
 #[test]
-fn the_service_worker_keeps_every_file() {
+fn the_service_worker_keeps_the_files() {
     let sw = std::str::from_utf8(sgweb::asset("sw.js").unwrap().raw).unwrap();
     assert!(!sw.contains("__SGWEB_"), "placeholders left in sw.js");
     let version = sw.split("const VERSION = \"").nth(1).unwrap().split('"').next().unwrap();
@@ -143,8 +143,11 @@ fn the_service_worker_keeps_every_file() {
     assert!(files.contains(&"./"));
     for a in sgweb::ASSETS {
         let kept = files.contains(&a.path);
+        // (the test constructions, in folders of examples/, are kept as they are opened)
+        let in_folder = a.path.strip_prefix("examples/").is_some_and(|p| p.contains('/'));
         match a.path {
             "sw.js" | "index.html" => assert!(!kept, "{} is in the list", a.path),
+            p if in_folder => assert!(!kept, "{p} is in the list"),
             p => assert!(kept, "{p} is not kept for offline use"),
         }
     }

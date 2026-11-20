@@ -1021,3 +1021,277 @@ fn symmetric_chain_supplementary_angles() {
     k.check_value(ex, pe[0]);
     k.check_value(ey, pe[1]);
 }
+
+/// Regular heptagon from equal chords of a circle of radius r: the side is
+/// 2r·sin(π/7), whose cosine-of-2π/7 is a root of 8c³ + 4c² − 4c − 1.
+fn polygon_equal_chords(n: usize) {
+    use std::f64::consts::PI;
+    let mut k = Kit::new();
+    let o = k.origin();
+    let mut pts = Vec::new();
+    for i in 0..n {
+        let a = 2.0 * PI * i as f64 / n as f64;
+        pts.push(k.point(2.0 * a.cos() + 0.03 * (i as f64 % 2.0), 2.0 * a.sin() - 0.02));
+    }
+    let c = k.circle(o, 2.0);
+    k.drive(DimKind::Radius(c), "2");
+    for &p in &pts {
+        k.on(p, c);
+    }
+    let xa = k.xaxis();
+    k.on(pts[0], xa);
+    let mut lines = Vec::new();
+    for i in 0..n {
+        lines.push(k.line(pts[i], pts[(i + 1) % n]));
+    }
+    for i in 1..n {
+        k.equal(lines[0], lines[i]);
+    }
+    assert_eq!(k.dof(), 0);
+    let side = k.measure(DimKind::Length(lines[0]));
+    k.check_value(side, 4.0 * (PI / n as f64).sin());
+}
+
+/// Pentagon (quadratic constants) for comparison.
+#[test]
+fn pentagon_equal_chords() {
+    polygon_equal_chords(5);
+}
+
+/// Enneagon? no: the triangle (n = 3) and square (n = 4) for comparison.
+#[test]
+fn square_equal_chords() {
+    polygon_equal_chords(4);
+}
+
+/// Regular heptagon by six equal chords of a circle: side 2 r sin(pi/7),
+/// a root of a cubic with three real roots.
+#[test]
+fn heptagon_equal_chords() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let circ = k.circle(o, 1.0);
+    k.drive(DimKind::Radius(circ), "1");
+    let mut pts = vec![];
+    for i in 0..7 {
+        let t = (90.0 + 360.0 / 7.0 * i as f64).to_radians();
+        let p = k.point(t.cos() * 1.02, t.sin() * 0.98);
+        k.on(p, circ);
+        pts.push(p);
+    }
+    let ls: Vec<usize> = (0..7).map(|i| k.line(pts[i], pts[(i + 1) % 7])).collect();
+    for i in 0..6 {
+        k.equal(ls[i], ls[i + 1]);
+    }
+    assert_eq!(k.dof(), 1);
+    let s = k.measure(DimKind::Length(ls[0]));
+    k.check_value(s, 2.0 * (PI / 7.0).sin());
+}
+
+/// Cyclic quadrilateral with sides 2, 3, 4, 5: circumradius by
+/// Parameshvara, sqrt((ab+cd)(ac+bd)(ad+bc)) / (4K), K by Brahmagupta.
+#[test]
+fn brahmagupta_cyclic_quadrilateral() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let circ = k.circle(o, 2.6);
+    let init = [(2.6176, 0.05), (1.85, 1.85), (-1.1, 2.37), (-2.16, -1.48)];
+    let pts: Vec<usize> = init
+        .iter()
+        .map(|&(x, y)| {
+            let p = k.point(x, y);
+            k.on(p, circ);
+            p
+        })
+        .collect();
+    let ls: Vec<usize> = (0..4).map(|i| k.line(pts[i], pts[(i + 1) % 4])).collect();
+    for (i, v) in ["2", "3", "4", "5"].iter().enumerate() {
+        k.drive(DimKind::Length(ls[i]), v);
+    }
+    assert_eq!(k.dof(), 1);
+    let r = k.measure(DimKind::Radius(circ));
+    k.check_value(r, (26.0f64 * 23.0 * 22.0).sqrt() / (4.0 * 120f64.sqrt()));
+    let diag = k.measure(DimKind::Distance(pts[0], pts[2]));
+    // diagonal p^2 = (ac+bd)(ad+bc)/(ab+cd) with a..d = 2,3,4,5
+    k.check_value(diag, (23.0f64 * 22.0 / 26.0).sqrt());
+}
+
+/// Hexagon inscribed in a circle with sides alternately 1 and 2:
+/// R = sqrt((a^2 + a b + b^2) / 3).
+#[test]
+fn hexagon_alternating_sides() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let circ = k.circle(o, 1.5);
+    let init = [
+        (1.5275, 0.02),
+        (1.2002, 0.9449),
+        (-0.7638, 1.3229),
+        (-1.4184, 0.5669),
+        (-0.7638, -1.3229),
+        (0.2182, -1.5119),
+    ];
+    let pts: Vec<usize> = init
+        .iter()
+        .map(|&(x, y)| {
+            let p = k.point(x, y);
+            k.on(p, circ);
+            p
+        })
+        .collect();
+    let ls: Vec<usize> = (0..6).map(|i| k.line(pts[i], pts[(i + 1) % 6])).collect();
+    k.drive(DimKind::Length(ls[0]), "1");
+    k.drive(DimKind::Length(ls[1]), "2");
+    k.equal(ls[2], ls[0]);
+    k.equal(ls[3], ls[1]);
+    k.equal(ls[4], ls[0]);
+    k.equal(ls[5], ls[1]);
+    assert_eq!(k.dof(), 1);
+    let r = k.measure(DimKind::Radius(circ));
+    k.check_value(r, (7.0f64 / 3.0).sqrt());
+}
+
+/// Cyclic quadrilateral with three equal sides s and a fourth side d:
+/// R = sqrt(s^3 / (3 s - d)) (from sin 3x = 3 sin x - 4 sin^3 x).
+#[test]
+fn cyclic_three_equal_sides() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let (s, d) = (2.0f64, 3.0f64);
+    let rr = (s * s * s / (3.0 * s - d)).sqrt();
+    let th = 2.0 * (s / (2.0 * rr)).asin();
+    let circ = k.circle(o, rr);
+    let pts: Vec<usize> = (0..4)
+        .map(|i| {
+            let t = th * i as f64;
+            let p = k.point(rr * t.cos() * 1.01, rr * t.sin() * 0.99 + 0.01);
+            k.on(p, circ);
+            p
+        })
+        .collect();
+    let ls: Vec<usize> = (0..4).map(|i| k.line(pts[i], pts[(i + 1) % 4])).collect();
+    k.drive(DimKind::Length(ls[0]), "2");
+    k.equal(ls[1], ls[0]);
+    k.equal(ls[2], ls[0]);
+    k.drive(DimKind::Length(ls[3]), "3");
+    assert_eq!(k.dof(), 1);
+    let r = k.measure(DimKind::Radius(circ));
+    k.check_value(r, rr);
+}
+
+fn rad(d: f64) -> f64 {
+    d.to_radians()
+}
+
+/// Reflex sector: the chord endpoint beyond 180°: angle between radii is
+/// 2 asin(c/2r) measured the other way? Use a chord giving 150° then the
+/// angle via the arc's midpoint.
+#[test]
+fn four_bar_output_angle() {
+    // ground O(0,0)–D(4,0) fixed, crank OA = 2 at angle t, coupler AB = 4,
+    // rocker DB = 3; angle of DB with the x axis.
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("a", 2.0);
+    k.var("b", 4.0);
+    k.var("c", 3.0);
+    k.var("g", 4.0);
+    k.var("t", 60.0);
+    let t = rad(60.0);
+    let a = [2.0 * t.cos(), 2.0 * t.sin()];
+    // B on circle(A,4) ∩ circle(D,3), upper
+    let dpt = [4.0, 0.0];
+    let dx = dpt[0] - a[0];
+    let dy = dpt[1] - a[1];
+    let dd = (dx * dx + dy * dy).sqrt();
+    let kk = (16.0 - 9.0 + dd * dd) / (2.0 * dd);
+    let h = (16.0 - kk * kk).sqrt();
+    let bpt = [a[0] + (kk * dx - h * dy) / dd, a[1] + (kk * dy + h * dx) / dd];
+    let bpt = if bpt[1] > 0.0 { bpt } else { [a[0] + (kk * dx + h * dy) / dd, a[1] + (kk * dy - h * dx) / dd] };
+    let pa = k.point(a[0] * 1.02, a[1]);
+    let pb = k.point(bpt[0] + 0.05, bpt[1]);
+    let pd = k.point(4.0, 0.0);
+    k.on(pd, xa);
+    k.drive(DimKind::CoordX(pd), "g");
+    let oa = k.line(o, pa);
+    let ab = k.line(pa, pb);
+    let db = k.line(pd, pb);
+    k.drive(DimKind::Length(oa), "a");
+    k.drive(DimKind::Length(ab), "b");
+    k.drive(DimKind::Length(db), "c");
+    k.drive_angle(xa, oa, "t*deg");
+    assert_eq!(k.dof(), 0);
+    let m = k.measure_angle(xa, db);
+    let expected = (bpt[1]).atan2(bpt[0] - 4.0);
+    k.check_value(m, expected);
+}
+
+/// Transmission angle of a four-bar (between coupler and rocker):
+/// acos((b² + c² − a² − g² + 2ag cos t)/(2bc)).
+#[test]
+fn four_bar_transmission_angle() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    let xa = k.xaxis();
+    k.var("a", 2.0);
+    k.var("b", 4.0);
+    k.var("c", 3.0);
+    k.var("g", 4.0);
+    k.var("t", 60.0);
+    let t = rad(60.0);
+    let a = [2.0 * t.cos(), 2.0 * t.sin()];
+    let dx = 4.0 - a[0];
+    let dy = -a[1];
+    let dd = (dx * dx + dy * dy).sqrt();
+    let kk = (16.0 - 9.0 + dd * dd) / (2.0 * dd);
+    let h = (16.0 - kk * kk).sqrt();
+    let b1 = [a[0] + (kk * dx - h * dy) / dd, a[1] + (kk * dy + h * dx) / dd];
+    let b2 = [a[0] + (kk * dx + h * dy) / dd, a[1] + (kk * dy - h * dx) / dd];
+    let bpt = if b1[1] > b2[1] { b1 } else { b2 };
+    let pa = k.point(a[0] * 1.02, a[1]);
+    let pb = k.point(bpt[0] + 0.05, bpt[1]);
+    let pd = k.point(4.0, 0.0);
+    k.on(pd, xa);
+    k.drive(DimKind::CoordX(pd), "g");
+    let oa = k.line(o, pa);
+    let ba = k.line(pb, pa);
+    let bd = k.line(pb, pd);
+    let db = k.line(pd, pb);
+    k.drive(DimKind::Length(oa), "a");
+    k.drive(DimKind::Length(ba), "b");
+    k.drive(DimKind::Length(db), "c");
+    k.drive_angle(xa, oa, "t*deg");
+    assert_eq!(k.dof(), 0);
+    let m = k.measure_angle(ba, bd);
+    let f2 = 4.0 + 16.0 - 16.0 * t.cos();
+    let expected = ((16.0 + 9.0 - f2) / 24.0).acos();
+    let s = k.check_value(m, expected);
+    assert!(s.len() < 120, "long: {} chars", s.len());
+}
+
+/// Regular heptagon by seven equal chords on a circle of radius R:
+/// side = 2R sin(π/7) (cos(2π/7) is a root of a cubic, casus irreducibilis).
+#[test]
+fn regular_heptagon_side() {
+    let mut k = Kit::new();
+    let o = k.origin();
+    k.var("R", 2.0);
+    let c = k.circle(o, 2.0);
+    k.drive(DimKind::Radius(c), "R");
+    let pts: Vec<usize> = (0..7)
+        .map(|i| {
+            let a = 2.0 * PI * i as f64 / 7.0 + 0.02 * (i as f64).sin();
+            k.point(2.0 * a.cos(), 2.0 * a.sin())
+        })
+        .collect();
+    for &p in &pts {
+        k.on(p, c);
+    }
+    let l: Vec<usize> = (0..7).map(|i| k.line(pts[i], pts[(i + 1) % 7])).collect();
+    for i in 1..7 {
+        k.equal(l[0], l[i]);
+    }
+    let m = k.measure(DimKind::Length(l[0]));
+    k.check_value(m, 4.0 * (PI / 7.0).sin());
+}

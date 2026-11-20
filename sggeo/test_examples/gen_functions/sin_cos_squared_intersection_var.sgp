@@ -1,0 +1,16 @@
+sgp 2
+
+given
+  a = 0.7
+  g1 = curve(y = a*sin(x))
+  g2 = curve(y = cos(x)^2)
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+
+where
+  A (0.7887614852465757, 0.4966367035145982)
+  x_A label (0.3, 0.3)

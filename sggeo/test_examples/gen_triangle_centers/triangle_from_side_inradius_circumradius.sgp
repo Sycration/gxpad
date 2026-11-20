@@ -1,0 +1,35 @@
+sgp 2
+
+given
+  line AB
+    d1: dist(A, B) = 14
+  line BC
+  line CA
+  point D
+  k1 = circle(D)
+    AB tan k1
+    BC tan k1
+    CA tan k1
+    r1: r(k1) = 4
+  point E
+  k2 = circle(E)
+    C on k2
+    A on k2
+    B on k2
+    r2: r(k2) = 8.125
+
+find
+  d2: dist(B, C)
+
+where
+  A (0.05163807222186919, -0.033829586408042234)
+  B (14.051601971214229, -0.0020360821866571605)
+  C (5.024373603957953, 11.97749429280733)
+  D (6.042538742012484, 3.979785886541797)
+  k1 r 4
+  E (7.042252292795676, 4.107056528798613)
+  k2 r 8.125
+  d1 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

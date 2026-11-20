@@ -1,5 +1,5 @@
 // sgweb's service worker: keeps every file of the app in the browser, so that it starts and runs without a
-// network. build.rs fills in the files and a version that changes with any of them; a changed version
+// network (the test constructions among the examples as they are opened). build.rs fills in the files and a version that changes with any of them; a changed version
 // installs beside the running one, and the page offers to reload into it.
 
 const VERSION = "__SGWEB_VERSION__";
@@ -33,7 +33,11 @@ self.addEventListener("fetch", (ev) => {
       const cache = await caches.open(CACHE);
       // every page is the app, whatever its query or fragment (a shared construction)
       const hit = req.mode === "navigate" ? await cache.match("./") : await cache.match(req);
-      return hit ?? fetch(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      // the test constructions are not in FILES (there are hundreds): each is kept once it is opened
+      if (res.ok && /\/examples\/[^/]+\/[^/]+\.sgp$/.test(new URL(req.url).pathname)) await cache.put(req, res.clone());
+      return res;
     })(),
   );
 });

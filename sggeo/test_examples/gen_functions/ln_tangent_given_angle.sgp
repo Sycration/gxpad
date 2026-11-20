@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  w = 35
+  g1 = curve(y = ln(x))
+
+construct
+  point A on g1
+  segment AB
+    AB tan g1
+    θ1: angle(xaxis, AB) = w*deg
+
+find
+  x_A: x(A)
+
+where
+  A (1.4281480067421148, 0.3563785047244502)
+  B (2.4281638540896155, 1.0565971393663405)
+  θ1 label (0.477158, 0.149401)
+  x_A label (0.3, 0.3)

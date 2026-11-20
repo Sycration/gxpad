@@ -1,0 +1,41 @@
+sgp 2
+
+given
+  point C
+  k1 = circle(C)
+    xaxis tan k1
+    yaxis tan k1
+  point D
+  k2 = circle(D)
+    xaxis tan k2
+    k1 tan k2
+  point E
+  k3 = circle(E)
+    yaxis tan k3
+    k2 tan k3
+    k3 tan k1
+
+construct
+  point A on xaxis
+    d1: dist(O, A) = 4
+  point B on yaxis
+    d2: dist(O, B) = 3
+  line AB
+    AB tan k2
+    AB tan k3
+
+find
+  r1: r(k1)
+
+where
+  C (0.507933962352463, 0.507933962352463)
+  k1 r 0.507933962352463
+  D (1.7440019398522528, 0.7519993533825825)
+  k2 r 0.7519993533825825
+  E (0.6648941887395788, 1.6702116225208423)
+  k3 r 0.6648941887395788
+  A (4, -2.3910617073357816e-25)
+  B (-3.3603901067419036e-25, 3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  r1 label (0.3, 0.3)

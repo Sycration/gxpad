@@ -1,0 +1,21 @@
+sgp 2
+
+given
+  point A
+    horiz O A
+  point B
+  w1 = arc(O, A, B)
+    r1: r(w1) = 3
+  segment OA
+  segment OB
+    θ1: ∠AOB = 100°
+
+find
+  d1: dist(A, B)
+
+where
+  A (3, 3.4114285788346645e-174)
+  B (-0.520944533000791, -2.9544232590366244)
+  r1 label (0.3, 0.3)
+  θ1 label (0.359394, -0.347614)
+  d1 label (0.3, 0.3)

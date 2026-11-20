@@ -1,0 +1,22 @@
+sgp 2
+
+given
+  L = 2
+  segment OA
+    d1: |OA| = L
+    θ1: angle(xaxis, OA) = 100°
+  segment OB
+    d2: |OB| = L
+    θ2: angle(xaxis, OB) = θ1/3
+
+find
+  d3: dist(A, B)
+
+where
+  A (-0.3472963553338606, 1.969615506024416)
+  B (1.670975622825873, 1.099017956141612)
+  d1 label (0.3, 0.3)
+  θ1 label (0.425325, 0.262866)
+  d2 label (0.3, 0.3)
+  θ2 label (0.496254, 0.0610916)
+  d3 label (0.3, 0.3)

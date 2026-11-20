@@ -4,8 +4,8 @@
 //! square subsystems (maximum matching + strongly connected components).
 //! Each block is solved symbolically by elimination: linear solving,
 //! pairwise elimination of shared quadratic forms, the quadratic formula,
-//! radical rationalization, harmonic (a·cos + b·sin) forms and inversion of
-//! elementary functions. Branches are chosen by comparing each candidate
+//! Cardano's and Ferrari's formulas, radical rationalization, harmonic
+//! (a·cos + b·sin) forms and inversion of elementary functions. Branches are chosen by comparing each candidate
 //! against the current numeric solution.
 
 use crate::alg::{MPoly, cheapest_main, factor_main, interreduce, resultant, strip_factor, subresultant_chain, subst_linear};
@@ -39,14 +39,21 @@ impl Env {
     fn eval(&self, e: &Expr) -> f64 {
         eval(e, &|s| self.get(s))
     }
-    fn eval_perturbed(&self, e: &Expr, k: u32) -> f64 {
-        eval(e, &|s| {
-            let v = self.get(s);
-            let h = ((s.wrapping_mul(2654435761).wrapping_add(k.wrapping_mul(40503))) % 1000) as f64 / 1000.0 - 0.5;
-            v + h * 0.05 * (1.0 + v.abs())
-        })
+    /// The value of `s` moved by up to 2.5% of itself (perturbation `k`):
+    /// relative, so that a construction at scale 1e-5 is moved as one at
+    /// scale 1 (an absolute move would leave its triangles).
+    fn perturbed(&self, s: u32, k: u32) -> f64 {
+        let v = self.get(s);
+        let h = ((s.wrapping_mul(2654435761).wrapping_add(k.wrapping_mul(40503))) % 1000) as f64 / 1000.0 - 0.5;
+        v + h * 0.05 * if v != 0.0 { v.abs() } else { 1.0 }
     }
-    /// Probabilistic test that an expression is identically zero.
+    fn eval_perturbed(&self, e: &Expr, k: u32) -> f64 {
+        eval(e, &|s| self.perturbed(s, k))
+    }
+    /// Probabilistic test that an expression is identically zero: zero here
+    /// and at two perturbed configurations, each time relative to the size
+    /// of its parts (so neither the rounding of large terms nor the
+    /// smallness of a small construction decides it).
     fn is_zero(&self, e: &Expr) -> bool {
         if e.is_zero() {
             return true;
@@ -55,12 +62,14 @@ impl Env {
             return n.is_zero();
         }
         let v0 = self.eval(e);
-        if !(v0.abs() < 1e-9) {
+        let m0 = magnitude_at(e, &|s| self.get(s));
+        if !(v0.abs() <= 1e-11 * m0) {
             return false;
         }
         for k in 1..3 {
-            let v = self.eval_perturbed(e, k);
-            if v.is_finite() && v.abs() > 1e-8 {
+            let get = |s| self.perturbed(s, k);
+            let v = eval(e, &get);
+            if v.is_finite() && v.abs() > 1e-10 * magnitude_at(e, &get) {
                 return false;
             }
         }
@@ -439,6 +448,10 @@ struct BlockSolver<'a> {
     keep: Option<u32>,
     /// Set once a block's result was too large for the normal form.
     normal_off: bool,
+    /// The block's variables that the target or later blocks use (None:
+    /// all of them); when that is the last variable of the elimination
+    /// alone, the others are not solved for.
+    needed: Option<Vec<u32>>,
 }
 
 fn has_inverse_trig(e: &Expr) -> bool {
@@ -484,6 +497,181 @@ fn sqrts_with(e: &Expr, v: u32, out: &mut Vec<Expr>) {
             sqrts_with(b, v, out);
         }
         _ => {}
+    }
+}
+
+/// The rates k (rational) of the exponentials exp(k v + b) in `e`; false
+/// when v also occurs elsewhere, or not in polynomial positions.
+fn exp_rates(e: &Expr, v: u32, out: &mut Vec<Rat>) -> bool {
+    if !contains(e, v) {
+        return true;
+    }
+    match e.node() {
+        Node::Fun(Fun::Exp, a) => match coeffs(a, v) {
+            Some(cs) if cs.len() == 2 && !contains(&cs[0], v) => match cs[1].as_rat() {
+                Some(r) if r.n != 0 => {
+                    out.push(r);
+                    true
+                }
+                _ => false,
+            },
+            _ => false,
+        },
+        Node::Pow(b, ex) if ex.as_int().is_some() => exp_rates(b, v, out),
+        Node::Add(ts) | Node::Mul(ts) => ts.iter().all(|t| exp_rates(t, v, out)),
+        _ => false,
+    }
+}
+
+/// The rates k (rational) of the sin, cos and tan of k v + b in `e`; false
+/// when v also occurs elsewhere, or not in polynomial positions.
+fn trig_rates(e: &Expr, v: u32, out: &mut Vec<Rat>) -> bool {
+    if !contains(e, v) {
+        return true;
+    }
+    match e.node() {
+        Node::Fun(Fun::Sin | Fun::Cos | Fun::Tan, a) => match coeffs(a, v) {
+            Some(cs) if cs.len() == 2 && !contains(&cs[0], v) => match cs[1].as_rat() {
+                Some(r) if r.n != 0 => {
+                    out.push(r);
+                    true
+                }
+                _ => false,
+            },
+            _ => false,
+        },
+        Node::Sym(_) => false,
+        Node::Fun(_, a) => trig_rates(a, v, out),
+        Node::Pow(b, ex) => trig_rates(b, v, out) && trig_rates(ex, v, out),
+        Node::Atan2(a, b) => trig_rates(a, v, out) && trig_rates(b, v, out),
+        Node::Add(ts) | Node::Mul(ts) => ts.iter().all(|t| trig_rates(t, v, out)),
+        Node::Num(_) | Node::Pi => true,
+    }
+}
+
+/// (cos mθ, sin mθ) as polynomials in C = cos θ, S = sin θ.
+fn cos_sin_multiple(m: i64, c: &Expr, s: &Expr) -> (Expr, Expr) {
+    let (mut cm, mut sm) = (one(), zero());
+    for _ in 0..m.unsigned_abs() {
+        let nc = expand(&(&cm * c - &sm * s));
+        let ns = expand(&(&sm * c + &cm * s));
+        cm = nc;
+        sm = ns;
+    }
+    if m < 0 { (cm, neg(sm)) } else { (cm, sm) }
+}
+
+/// `e` with sin, cos, tan of k v + b written in C = cos θ, S = sin θ for
+/// θ = κ v, κ = n/d (by the multiple-angle and addition formulas).
+fn sub_trig(e: &Expr, v: u32, c: u32, s: u32, n: i64, d: i64) -> Expr {
+    if !contains(e, v) {
+        return e.clone();
+    }
+    match e.node() {
+        Node::Fun(f, a) if !matches!(f, Fun::Sin | Fun::Cos | Fun::Tan) => fun(*f, sub_trig(a, v, c, s, n, d)),
+        Node::Fun(f, a) => {
+            let cs = coeffs(a, v).unwrap();
+            let r = cs[1].as_rat().unwrap();
+            let m = (r.n * d as i128 / (r.d * n as i128)) as i64;
+            let (cm, sm) = cos_sin_multiple(m, &sym(c), &sym(s));
+            let b = &cs[0];
+            let (co, si) = if b.is_zero() {
+                (cm, sm)
+            } else {
+                (&cm * cos(b.clone()) - &sm * sin(b.clone()), &sm * cos(b.clone()) + &cm * sin(b.clone()))
+            };
+            match f {
+                Fun::Sin => si,
+                Fun::Cos => co,
+                _ => div(si, co),
+            }
+        }
+        Node::Pow(b, ex) => pow(sub_trig(b, v, c, s, n, d), sub_trig(ex, v, c, s, n, d)),
+        Node::Atan2(a, b) => atan2(sub_trig(a, v, c, s, n, d), sub_trig(b, v, c, s, n, d)),
+        Node::Add(ts) => add(ts.iter().map(|t| sub_trig(t, v, c, s, n, d)).collect()),
+        Node::Mul(ts) => mul(ts.iter().map(|t| sub_trig(t, v, c, s, n, d)).collect()),
+        _ => e.clone(),
+    }
+}
+
+/// The terms (l, (−1)ˡ·C(h, l)) of (1 − x²)ʰ = Σ (−1)ˡ C(h, l) x²ˡ.
+fn binomials(h: u32) -> Vec<(usize, i64)> {
+    let mut out = Vec::new();
+    let mut b: i64 = 1;
+    for l in 0..=h as i64 {
+        out.push((l as usize, if l % 2 == 0 { b } else { -b }));
+        b = b * (h as i64 - l) / (l + 1);
+    }
+    out
+}
+
+/// The unit rate κ = n/d of which all `rates` are integer multiples, as (d, n).
+fn rate_unit(rates: &[Rat]) -> (i64, i64) {
+    let d = rates.iter().fold(1i64, |l, r| l / gcd(l as usize, r.d as usize) as i64 * r.d as i64);
+    let n = rates.iter().fold(0usize, |g, r| gcd(g, (r.n * d as i128 / r.d).unsigned_abs() as usize)) as i64;
+    (d, n)
+}
+
+/// `e` with each exp(k v + b) written as exp(b)·u^(k/κ), κ = n/d.
+fn sub_exp(e: &Expr, v: u32, u: u32, n: i64, d: i64) -> Expr {
+    if !contains(e, v) {
+        return e.clone();
+    }
+    match e.node() {
+        Node::Fun(Fun::Exp, a) => {
+            let cs = coeffs(a, v).unwrap();
+            let r = cs[1].as_rat().unwrap();
+            let m = (r.n * d as i128 / (r.d * n as i128)) as i64;
+            mul(vec![fun(Fun::Exp, cs[0].clone()), pow(sym(u), int(m))])
+        }
+        Node::Pow(b, ex) => pow(sub_exp(b, v, u, n, d), ex.clone()),
+        Node::Add(ts) => add(ts.iter().map(|t| sub_exp(t, v, u, n, d)).collect()),
+        Node::Mul(ts) => mul(ts.iter().map(|t| sub_exp(t, v, u, n, d)).collect()),
+        _ => e.clone(),
+    }
+}
+
+/// When v occurs in `e` only as v^(j/k) and in polynomial positions, the
+/// least common multiple L of the denominators k.
+fn root_power_lcm(e: &Expr, v: u32) -> Option<i64> {
+    fn walk(e: &Expr, v: u32, l: &mut i64) -> bool {
+        if !contains(e, v) {
+            return true;
+        }
+        match e.node() {
+            Node::Sym(_) => true,
+            Node::Pow(b, ex) if b.as_sym() == Some(v) => match ex.as_rat() {
+                Some(r) => {
+                    let d = r.d as i64;
+                    *l = *l / gcd(*l as usize, d as usize) as i64 * d;
+                    *l <= 12
+                }
+                None => false,
+            },
+            Node::Pow(b, ex) if ex.as_int().is_some() => walk(b, v, l),
+            Node::Add(ts) | Node::Mul(ts) => ts.iter().all(|t| walk(t, v, l)),
+            _ => false,
+        }
+    }
+    let mut l = 1;
+    walk(e, v, &mut l).then_some(l)
+}
+
+/// `e` with v = w^L (each v^(j/k) becoming w^(jL/k)).
+fn sub_root_power(e: &Expr, v: u32, w: u32, l: i64) -> Expr {
+    if !contains(e, v) {
+        return e.clone();
+    }
+    match e.node() {
+        Node::Sym(_) => pow(sym(w), int(l)),
+        Node::Pow(b, ex) if b.as_sym() == Some(v) => {
+            let r = ex.as_rat().unwrap();
+            pow(sym(w), int((r.n * l as i128 / r.d) as i64))
+        }
+        Node::Pow(b, ex) => pow(sub_root_power(b, v, w, l), ex.clone()),
+        Node::Add(ts) => add(ts.iter().map(|t| sub_root_power(t, v, w, l)).collect()),
+        Node::Mul(ts) => mul(ts.iter().map(|t| sub_root_power(t, v, w, l)).collect()),
+        _ => e.clone(),
     }
 }
 
@@ -621,14 +809,428 @@ impl<'a> BlockSolver<'a> {
     fn quad_roots(&self, c: &[Expr]) -> Vec<Expr> {
         let (c0, c1, c2) = (&c[0], &c[1], &c[2]);
         if c1.is_zero() || self.env.is_zero(c1) {
-            let r = best_form(&neg(div(c0.clone(), c2.clone())));
+            let r = coef_form(&neg(div(c0.clone(), c2.clone())));
             let s = sqrt(r);
             return vec![s.clone(), neg(s)];
         }
-        let disc = best_form(&(sq(c1.clone()) - int(4) * c0 * c2));
+        let disc = coef_form(&(sq(c1.clone()) - int(4) * c0 * c2));
         let sd = sqrt(disc);
         let den = int(2) * c2;
         vec![div(neg(c1.clone()) + &sd, den.clone()), div(neg(c1.clone()) - sd, den)]
+    }
+
+    /// Real d-th root of w (d odd), with the sign w has at the solution.
+    fn real_root(&self, w: Expr, d: i64) -> Expr {
+        if d == 1 {
+            w
+        } else if self.env.eval(&w) < 0.0 {
+            neg(pow(neg(w), rat(1, d)))
+        } else {
+            pow(w, rat(1, d))
+        }
+    }
+
+    /// Roots of c0 + c1 v + … + cn vⁿ (n ≤ 4, cn ≠ 0) by the formulas; only
+    /// real ones (at the solution) are meant, the others evaluate to NaN.
+    fn closed_roots(&self, c: &[Expr]) -> Vec<Expr> {
+        // a leading coefficient that vanishes here (but not identically, a
+        // variable left at 0) makes the formulas 0/0: the roots are then the
+        // reciprocals of those of the reversed polynomial, which stay finite
+        let n = c.len();
+        if n >= 3 {
+            let vs: Vec<f64> = c.iter().map(|x| self.env.eval(x).abs()).collect();
+            let scale = vs.iter().copied().filter(|v| v.is_finite()).fold(0.0, f64::max);
+            if vs[n - 1] <= 1e-9 * scale && vs[0] > 1e-9 * scale {
+                let rev: Vec<Expr> = c.iter().rev().cloned().collect();
+                return self.closed_roots_of(&rev).into_iter().map(|u| div(one(), u)).collect();
+            }
+        }
+        self.closed_roots_of(c)
+    }
+
+    fn closed_roots_of(&self, c: &[Expr]) -> Vec<Expr> {
+        match c.len() {
+            2 => vec![neg(div(c[0].clone(), c[1].clone()))],
+            3 => self.quad_roots(c),
+            4 => self.cubic_roots(c),
+            5 => self.quartic_roots(c),
+            _ => vec![],
+        }
+    }
+
+    /// Cardano: a v³ + b v² + c v + d = 0.
+    fn cubic_roots(&self, c: &[Expr]) -> Vec<Expr> {
+        let (d, c1, b, a) = (&c[0], &c[1], &c[2], &c[3]);
+        // v = t − b/(3a) gives t³ + p t + q = 0
+        let shift = coef_form(&div(b.clone(), int(3) * a));
+        let p = coef_form(&div(int(3) * a * c1 - sq(b.clone()), int(3) * sq(a.clone())));
+        let q = coef_form(&div(
+            int(2) * pow(b.clone(), int(3)) - int(9) * a * b * c1 + int(27) * sq(a.clone()) * d,
+            int(27) * pow(a.clone(), int(3)),
+        ));
+        let ts = if self.env.is_zero(&p) {
+            vec![neg(self.real_root(q, 3))]
+        } else {
+            let disc = coef_form(&(sq(div(q.clone(), int(2))) + pow(div(p.clone(), int(3)), int(3))));
+            if self.env.eval(&disc) < 0.0 {
+                // three real roots: t = 2√(−p/3) cos(φ/3 − 2πk/3), cos φ = (3q/2p)√(−3/p)
+                let r = int(2) * sqrt(coef_form(&neg(div(p.clone(), int(3)))));
+                let z = coef_form(&(div(int(3) * &q, int(2) * &p) * sqrt(neg(div(int(3), p.clone())))));
+                let third = mul(vec![rat(1, 3), fun(Fun::Acos, z)]);
+                (0..3)
+                    .map(|k| {
+                        let arg = if k == 0 { third.clone() } else { &third - mul(vec![rat(2 * k, 3), pi()]) };
+                        &r * cos(arg)
+                    })
+                    .collect()
+            } else {
+                // one real root: t = u − p/(3u), u³ = −q/2 ± √Δ, the sign keeping u away from 0
+                let h = neg(div(q.clone(), int(2)));
+                let s = sqrt(disc);
+                let w = if self.env.eval(&h) >= 0.0 { h + s } else { h - s };
+                let u = self.real_root(coef_form(&w), 3);
+                vec![&u - div(p, int(3) * &u)]
+            }
+        };
+        ts.into_iter().map(|t| t - &shift).collect()
+    }
+
+    /// Ferrari: a v⁴ + b v³ + c v² + d v + e = 0.
+    fn quartic_roots(&self, c: &[Expr]) -> Vec<Expr> {
+        let (e, d, c1, b, a) = (&c[0], &c[1], &c[2], &c[3], &c[4]);
+        // v = y − b/(4a) gives y⁴ + p y² + q y + r = 0
+        let shift = coef_form(&div(b.clone(), int(4) * a));
+        let p = coef_form(&div(int(8) * a * c1 - int(3) * sq(b.clone()), int(8) * sq(a.clone())));
+        let q = coef_form(&div(
+            pow(b.clone(), int(3)) - int(4) * a * b * c1 + int(8) * sq(a.clone()) * d,
+            int(8) * pow(a.clone(), int(3)),
+        ));
+        let r = coef_form(&div(
+            int(-3) * pow(b.clone(), int(4)) + int(256) * pow(a.clone(), int(3)) * e - int(64) * sq(a.clone()) * b * d
+                + int(16) * a * sq(b.clone()) * c1,
+            int(256) * pow(a.clone(), int(4)),
+        ));
+        let mut ys = Vec::new();
+        if self.env.is_zero(&q) {
+            for w in self.quad_roots(&[r, p, one()]) {
+                let s = sqrt(w);
+                ys.push(s.clone());
+                ys.push(neg(s));
+            }
+        } else {
+            // a positive root m of 8m³ + 8p m² + (2p² − 8r) m − q² splits the
+            // quartic into (y² ± √(2m) y + …): y = (±√(2m) ± √(−(2p + 2m ± 2q/√(2m))))/2
+            let res = [neg(sq(q.clone())), coef_form(&(int(2) * sq(p.clone()) - int(8) * &r)), int(8) * &p, int(8)];
+            // with q = 0 here (but not identically) m = 0 and 2q/√(2m) is 0/0;
+            // since q² = 2m((2m + p)² − 4r), √(2m) is q/T, T = √((2m + p)² − 4r),
+            // and 2q/√(2m) = 2T, which change smoothly as q passes 0
+            let (pv, qv, rv) = (self.env.eval(&p), self.env.eval(&q), self.env.eval(&r));
+            let small_q = qv.abs() <= 1e-9 * (pv.abs().sqrt() + rv.abs().sqrt().sqrt()).powi(3);
+            // (m and T are of the size of p)
+            let eps = 1e-12 * (pv.abs() + rv.abs().sqrt());
+            for m in self.cubic_roots(&res) {
+                let mv = self.env.eval(&m);
+                if !(mv.is_finite() && (mv > eps || small_q && mv > -eps)) {
+                    continue;
+                }
+                let (s, k) = if small_q {
+                    let t = sqrt(coef_form(&(sq(int(2) * m.clone() + &p) - int(4) * &r)));
+                    if !(self.env.eval(&t) > eps) {
+                        continue;
+                    }
+                    (div(q.clone(), t.clone()), int(2) * t)
+                } else {
+                    let s = sqrt(coef_form(&(int(2) * m.clone())));
+                    let k = div(int(2) * &q, s.clone());
+                    (s, k)
+                };
+                for (s1, k1) in [(s.clone(), k.clone()), (neg(s.clone()), neg(k))] {
+                    let w = sqrt(neg(int(2) * &p + int(2) * &m + k1));
+                    ys.push(mul(vec![rat(1, 2), &s1 + &w]));
+                    ys.push(mul(vec![rat(1, 2), s1 - w]));
+                }
+            }
+        }
+        ys.into_iter().map(|y| y - &shift).collect()
+    }
+
+    /// Real roots near `t` of c0 + c1 v + … + cn vⁿ (cn ≠ 0) in closed form:
+    /// by the formulas up to degree 4, and above that (when irreducible)
+    /// through a polynomial in v^g, also after a shift of v, a reciprocal
+    /// polynomial (in v + 1/v), a composition f(g(v)) of lower degrees, or a
+    /// Dickson polynomial (x⁵ − 5x³ + 5x = h, in cos θ/5).
+    fn poly_roots(&self, c: &[Expr], t: f64, depth: u32) -> Vec<Expr> {
+        let n = c.len().saturating_sub(1);
+        if n == 0 || depth > 8 || past_deadline() || !t.is_finite() {
+            return vec![];
+        }
+        // the formulas multiply the coefficients' sizes, and the
+        // transformations below expand powers of them: coefficients this
+        // large give nothing readable, only lost time
+        let size: usize = c.iter().map(|x| x.size()).sum();
+        if size > if n <= 4 { 6000 } else { 3000 } {
+            return vec![];
+        }
+        let near = |r: &Expr| {
+            let x = self.env.eval(r);
+            x.is_finite() && (x - t).abs() <= 1e-6 * (1.0 + t.abs())
+        };
+        let keep = |v: Vec<Expr>| -> Vec<Expr> { v.into_iter().filter(|r| near(r)).collect() };
+        // a polynomial in v^g
+        let g = (1..=n).filter(|&i| !self.env.is_zero(&c[i])).fold(0, gcd);
+        if g > 1 {
+            let red: Vec<Expr> = c.iter().step_by(g).cloned().collect();
+            let mut out = Vec::new();
+            for w in self.poly_roots(&red, t.powi(g as i32), depth + 1) {
+                if g % 2 == 0 {
+                    let r = pow(w, rat(1, g as i64));
+                    out.push(r.clone());
+                    out.push(neg(r));
+                } else {
+                    out.push(self.real_root(w, g as i64));
+                }
+            }
+            return keep(out);
+        }
+        // reciprocal: cᵢ = cₙ₋ᵢ, a polynomial in z = v + 1/v of half the degree
+        if n % 2 == 0 && n >= 4 && (0..n / 2).all(|i| self.env.is_zero(&(&c[i] - &c[n - i]))) {
+            let out = keep(self.reciprocal_roots(c, t, depth));
+            if !out.is_empty() {
+                return out;
+            }
+        }
+        if n <= 4 {
+            return keep(self.closed_roots(c));
+        }
+        // v = w − c₍ₙ₋₁₎/(n cₙ) removes the vⁿ⁻¹ term; maybe a polynomial in w^g then
+        if past_deadline() {
+            return vec![];
+        }
+        let a = self.monic(c);
+        let sh = best_form(&div(a[n - 1].clone(), int(n as i64)));
+        let shv = self.env.eval(&sh);
+        let b = if self.env.is_zero(&sh) { a.clone() } else { self.shifted(&a, &sh) };
+        if !self.env.is_zero(&sh) && shv.is_finite() {
+            let gb = (1..=n).filter(|&i| !self.env.is_zero(&b[i])).fold(0, gcd);
+            if gb > 1 {
+                let out = keep(self.poly_roots(&b, t + shv, depth + 1).into_iter().map(|w| w - &sh).collect());
+                if !out.is_empty() {
+                    return out;
+                }
+            }
+        }
+        // a composition f(g(v)), deg f · deg g = n
+        for s in (2..=n / 2).filter(|s| n % s == 0) {
+            if past_deadline() {
+                return vec![];
+            }
+            if let Some((f, gp)) = self.decompose(&a, s) {
+                let gt = self.env_eval_poly(&gp, t);
+                let mut out = Vec::new();
+                for u in self.poly_roots(&f, gt, depth + 1) {
+                    let mut h = gp.clone();
+                    h[0] = &h[0] - &u;
+                    out.extend(self.poly_roots(&h, t, depth + 1));
+                }
+                let out = keep(out);
+                if !out.is_empty() {
+                    return out;
+                }
+            }
+        }
+        // a Dickson polynomial in w (after the shift)
+        if shv.is_finite() {
+            let out = keep(self.dickson_roots(&b).into_iter().map(|w| w - &sh).collect());
+            if !out.is_empty() {
+                return out;
+            }
+        }
+        vec![]
+    }
+
+    /// The polynomial divided by its leading coefficient.
+    fn monic(&self, c: &[Expr]) -> Vec<Expr> {
+        let lead = c.last().unwrap().clone();
+        c.iter().map(|x| best_form(&div(x.clone(), lead.clone()))).collect()
+    }
+
+    /// Coefficients of p(w − s) from those of p(v).
+    fn shifted(&self, c: &[Expr], s: &Expr) -> Vec<Expr> {
+        let n = c.len() - 1;
+        (0..=n)
+            .map(|j| {
+                let mut terms = Vec::new();
+                let mut binom: i64 = 1;
+                for i in j..=n {
+                    if i > j {
+                        binom = binom * i as i64 / (i - j) as i64;
+                    }
+                    terms.push(mul(vec![int(binom), c[i].clone(), pow(neg(s.clone()), int((i - j) as i64))]));
+                }
+                best_form(&expand(&add(terms)))
+            })
+            .collect()
+    }
+
+    fn env_eval_poly(&self, c: &[Expr], t: f64) -> f64 {
+        c.iter().rev().fold(0.0, |acc, x| acc * t + self.env.eval(x))
+    }
+
+    /// Product of two polynomials (coefficient vectors).
+    fn pmul(a: &[Expr], b: &[Expr]) -> Vec<Expr> {
+        let mut out = vec![Vec::new(); a.len() + b.len() - 1];
+        for (i, x) in a.iter().enumerate() {
+            if x.is_zero() {
+                continue;
+            }
+            for (j, y) in b.iter().enumerate() {
+                if !y.is_zero() {
+                    out[i + j].push(x * y);
+                }
+            }
+        }
+        out.into_iter().map(|ts| best_form(&expand(&add(ts)))).collect()
+    }
+
+    /// Monic `a` (degree n) as f(g(v)) with g monic of degree `s`, g(0) = 0:
+    /// g from the top coefficients of a = g^(n/s) + lower terms, then f from
+    /// the g-adic digits of a, which must all be constants.
+    fn decompose(&self, a: &[Expr], s: usize) -> Option<(Vec<Expr>, Vec<Expr>)> {
+        let n = a.len() - 1;
+        let r = n / s;
+        let mut g = vec![zero(); s + 1];
+        g[s] = one();
+        let power = |g: &[Expr]| {
+            let mut p = vec![one()];
+            for _ in 0..r {
+                p = Self::pmul(&p, g);
+            }
+            p
+        };
+        for k in 1..s {
+            let e = power(&g)[n - k].clone();
+            g[s - k] = best_form(&div(&a[n - k] - e, int(r as i64)));
+            if past_deadline() {
+                return None;
+            }
+        }
+        // digits: a = f₀ + g·(f₁ + g·(f₂ + …))
+        let mut rest = a.to_vec();
+        let mut f = Vec::new();
+        while rest.len() > s {
+            // division by the monic g
+            let mut rem = rest.clone();
+            let mut quo = vec![zero(); rest.len() - s];
+            for i in (s..rest.len()).rev() {
+                let q = rem[i].clone();
+                quo[i - s] = q.clone();
+                if q.is_zero() {
+                    continue;
+                }
+                for j in 0..=s {
+                    rem[i - s + j] = best_form(&(&rem[i - s + j] - &q * &g[j]));
+                }
+            }
+            if (1..s).any(|i| !self.env.is_zero(&rem[i])) {
+                return None;
+            }
+            f.push(rem[0].clone());
+            rest = quo;
+            if past_deadline() {
+                return None;
+            }
+        }
+        if rest.len() != 1 {
+            return None;
+        }
+        f.push(rest[0].clone());
+        (f.len() == r + 1).then_some((f, g))
+    }
+
+    /// Roots near `t` of a reciprocal polynomial (cᵢ = cₙ₋ᵢ, n even): with
+    /// z = v + 1/v, v⁻ᵐ p(v) = cₘ + Σ cₘ₊ₖ Pₖ(z), Pₖ = vᵏ + v⁻ᵏ = z Pₖ₋₁ − Pₖ₋₂.
+    fn reciprocal_roots(&self, c: &[Expr], t: f64, depth: u32) -> Vec<Expr> {
+        let m = c.len() / 2;
+        let mut pk: Vec<Vec<Expr>> = vec![vec![int(2)], vec![zero(), one()]];
+        for k in 2..=m {
+            let mut nx = vec![zero(); k + 1];
+            for (i, x) in pk[k - 1].iter().enumerate() {
+                nx[i + 1] = &nx[i + 1] + x;
+            }
+            for (i, x) in pk[k - 2].iter().enumerate() {
+                nx[i] = &nx[i] - x;
+            }
+            pk.push(nx);
+        }
+        let mut q = vec![zero(); m + 1];
+        q[0] = c[m].clone();
+        for k in 1..=m {
+            for (i, x) in pk[k].iter().enumerate() {
+                q[i] = &q[i] + &c[m + k] * x;
+            }
+        }
+        let q: Vec<Expr> = q.iter().map(|x| best_form(&expand(x))).collect();
+        let mut out = Vec::new();
+        for z in self.poly_roots(&q, t + 1.0 / t, depth + 1) {
+            // v² − z v + 1 = 0
+            out.extend(self.quad_roots(&[one(), neg(z), one()]));
+        }
+        out
+    }
+
+    /// Roots of a monic b with no wⁿ⁻¹ term that is a Dickson
+    /// polynomial Dₙ(w, α) − h, Dₙ = Σ n/(n−i)·C(n−i, i)·(−α)ⁱ wⁿ⁻²ⁱ, which
+    /// takes u + α/u to uⁿ + (α/u)ⁿ.
+    fn dickson_roots(&self, b: &[Expr]) -> Vec<Expr> {
+        let n = b.len() - 1;
+        if n < 5 || self.env.is_zero(&b[n - 2]) {
+            return vec![];
+        }
+        let alpha = best_form(&div(neg(b[n - 2].clone()), int(n as i64)));
+        let mut d0 = zero();
+        for i in 0..=n / 2 {
+            // n/(n−i)·C(n−i, i)
+            let mut cnk: i64 = 1;
+            for j in 0..i {
+                cnk = cnk * (n - i - j) as i64 / (j + 1) as i64;
+            }
+            let coef = mul(vec![rat((n * cnk as usize) as i64, (n - i) as i64), pow(neg(alpha.clone()), int(i as i64))]);
+            let k = n - 2 * i;
+            if k == 0 {
+                d0 = coef;
+            } else if !self.env.is_zero(&(&b[k] - &coef)) {
+                return vec![];
+            }
+        }
+        if (1..n).filter(|k| (n - k) % 2 == 1).any(|k| !self.env.is_zero(&b[k])) {
+            return vec![];
+        }
+        let h = best_form(&(d0 - &b[0]));
+        let disc = best_form(&(sq(h.clone()) - int(4) * pow(alpha.clone(), int(n as i64))));
+        let mut out = Vec::new();
+        if self.env.eval(&disc) < 0.0 && self.env.eval(&alpha) > 0.0 {
+            // w = 2√α cos((acos(h/(2α^(n/2))) − 2πk)/n)
+            let z = best_form(&div(h, int(2) * pow(alpha.clone(), rat(n as i64, 2))));
+            let a = fun(Fun::Acos, z);
+            for k in 0..n as i64 {
+                let arg = mul(vec![rat(1, n as i64), if k == 0 { a.clone() } else { &a - mul(vec![int(2 * k), pi()]) }]);
+                out.push(int(2) * sqrt(alpha.clone()) * cos(arg));
+            }
+        } else {
+            for sd in [sqrt(disc.clone()), neg(sqrt(disc))] {
+                let w = mul(vec![rat(1, 2), &h + sd]);
+                let us = if n % 2 == 1 {
+                    vec![self.real_root(w, n as i64)]
+                } else {
+                    let r = pow(w, rat(1, n as i64));
+                    vec![r.clone(), neg(r)]
+                };
+                for u in us {
+                    out.push(&u + div(alpha.clone(), u.clone()));
+                }
+            }
+        }
+        out
     }
 
     /// Candidate solutions of eq = 0 for the single unknown v.
@@ -671,7 +1273,7 @@ impl<'a> BlockSolver<'a> {
             }
             match cs.len() {
                 2 => out.push(neg(div(cs[0].clone(), cs[1].clone()))),
-                3 => out.extend(self.quad_roots(&cs)),
+                3 => out.extend(self.closed_roots(&cs)),
                 n if n >= 4 && cs[1..n - 1].iter().all(|c| self.env.is_zero(c)) => {
                     // binomial c0 + c_d v^d = 0
                     let d = (n - 1) as i64;
@@ -695,7 +1297,13 @@ impl<'a> BlockSolver<'a> {
                 n if n >= 4 => {
                     // higher degree: solve the factor that holds the root
                     let poly = add(cs.iter().enumerate().map(|(i, c)| mul(vec![c.clone(), pow(sym(v), int(i as i64))])).collect());
-                    out.extend(self.factor_roots(&poly, v, depth));
+                    let fr = self.factor_roots(&poly, v, depth);
+                    if !fr.is_empty() {
+                        out.extend(fr);
+                    } else {
+                        // irreducible over the coefficients' field, but maybe solvable by radicals
+                        out.extend(self.poly_roots(&cs, self.env.get(v), depth));
+                    }
                 }
                 _ => {}
             }
@@ -729,6 +1337,93 @@ impl<'a> BlockSolver<'a> {
             });
             if !out.is_empty() {
                 return out;
+            }
+        }
+        // fractional powers of v only (v^(1/3) + v = c): a polynomial in w = v^(1/L)
+        if let Some(l) = root_power_lcm(eq, v).filter(|l| *l > 1) {
+            let t = self.env.get(v);
+            if t >= 0.0 || l % 2 == 1 {
+                let w = self.new_tmp();
+                let (num, _) = split_frac(&expand(&sub_root_power(eq, v, w, l)), &[w]);
+                if let Some(mut cs) = coeffs(&expand(&num), w) {
+                    while cs.len() > 1 && self.env.is_zero(&cs[0]) {
+                        cs.remove(0);
+                    }
+                    while cs.len() > 1 && self.env.is_zero(cs.last().unwrap()) {
+                        cs.pop();
+                    }
+                    let tw = t.signum() * t.abs().powf(1.0 / l as f64);
+                    let out: Vec<Expr> = self.poly_roots(&cs, tw, depth + 1).into_iter().map(|r| pow(r, int(l))).collect();
+                    if !out.is_empty() {
+                        return out;
+                    }
+                }
+            }
+        }
+        // v only in exponentials exp(k v + b) with rational k: a polynomial in u = exp(κ v)
+        let mut rates = Vec::new();
+        if exp_rates(eq, v, &mut rates) && !rates.is_empty() {
+            let (den, nums) = rate_unit(&rates);
+            let kappa = rat(nums, den);
+            let u = self.new_tmp();
+            let (num, _) = split_frac(&expand(&sub_exp(eq, v, u, nums, den)), &[u]);
+            if let Some(mut cs) = coeffs(&expand(&num), u) {
+                while cs.len() > 1 && self.env.is_zero(&cs[0]) {
+                    cs.remove(0);
+                }
+                while cs.len() > 1 && self.env.is_zero(cs.last().unwrap()) {
+                    cs.pop();
+                }
+                let tu = (nums as f64 / den as f64 * self.env.get(v)).exp();
+                let out: Vec<Expr> =
+                    self.poly_roots(&cs, tu, depth + 1).into_iter().map(|r| div(fun(Fun::Ln, r), kappa.clone())).collect();
+                if !out.is_empty() {
+                    return out;
+                }
+            }
+        }
+        // q₁ ln A₁ + q₂ ln A₂ + … = R with rational qᵢ and R free of v: Π Aᵢ^qᵢ = e^R
+        if let Node::Add(ts) = eq.node() {
+            let mut logs: Vec<(Rat, Expr)> = Vec::new();
+            let mut rest = Vec::new();
+            let mut ok = true;
+            for t in ts {
+                if !contains(t, v) {
+                    rest.push(t.clone());
+                    continue;
+                }
+                let (c, f) = t.split_coeff();
+                match (match c { Num::R(r) => Some(r), _ => None }, f.node()) {
+                    (Some(c), Node::Fun(Fun::Ln, a)) => logs.push((c, a.clone())),
+                    _ => ok = false,
+                }
+            }
+            if ok && logs.len() >= 2 {
+                // (with every qᵢ negative, the equation times −1: x(x + 1) = e^c rather than e^(−c)·x(x + 1) = 1)
+                if logs.iter().all(|(c, _)| c.n < 0) {
+                    logs.iter_mut().for_each(|(c, _)| *c = c.neg());
+                    rest = vec![neg(add(rest))];
+                }
+                let l = logs.iter().fold(1i64, |l, (c, _)| l / gcd(l as usize, c.d as usize) as i64 * c.d as i64);
+                let mut lhs = Vec::new();
+                let mut rhs = vec![fun(Fun::Exp, mul(vec![int(-l), add(rest)]))];
+                for (c, a) in &logs {
+                    let k = (c.n * l as i128 / c.d) as i64;
+                    if k > 0 {
+                        lhs.push(pow(a.clone(), int(k)));
+                    } else {
+                        rhs.push(pow(a.clone(), int(-k)));
+                    }
+                }
+                let ne = self.prep(&expand(&(mul(lhs) - mul(rhs))), &[v]);
+                let mut out = self.candidates(&ne, v, depth + 1);
+                out.retain(|c| {
+                    let r = self.env.eval(&subst(eq, &|x| if x == v { Some(c.clone()) } else { None }));
+                    r.is_finite() && r.abs() < 1e-6
+                });
+                if !out.is_empty() {
+                    return out;
+                }
             }
         }
         // harmonic form a cos v + b sin v + c
@@ -797,7 +1492,146 @@ impl<'a> BlockSolver<'a> {
                 }
             }
         }
-        self.isolate(eq, &zero(), v)
+        let iso = self.isolate(eq, &zero(), v);
+        if !iso.is_empty() {
+            return iso;
+        }
+        self.trig_multiple_roots(eq, v, depth)
+    }
+
+    /// v only in sin, cos and tan of k v + b with rational k (sin 2v = a sin v,
+    /// sin(v + a) = cos v, tan v = a sin v): with θ = κ v for the unit rate κ,
+    /// a polynomial P in C = cos θ and S = sin θ. A harmonic P is solved by
+    /// the harmonic forms; otherwise P = A(C) + S·B(C) modulo S² = 1 − C²
+    /// gives a polynomial in S (when P is even in C), or in C (when B = 0, or
+    /// A² − (1 − C²)B² after squaring), whose roots give θ by asin or acos.
+    fn trig_multiple_roots(&mut self, eq: &Expr, v: u32, depth: u32) -> Vec<Expr> {
+        let mut rates = Vec::new();
+        if depth > 4 || !trig_rates(eq, v, &mut rates) || rates.is_empty() {
+            return vec![];
+        }
+        let (den, nums) = rate_unit(&rates);
+        let (cv, sv) = (self.new_tmp(), self.new_tmp());
+        let e2 = sub_trig(eq, v, cv, sv, nums, den);
+        let (num, _) = split_frac(&expand(&e2), &[cv, sv]);
+        let Some(p) = poly(&expand(&num), &[cv, sv]) else { return vec![] };
+        let t = nums as f64 / den as f64 * self.env.get(v);
+        let mut thetas = Vec::new();
+        let harmonic = total_degree(&p) == 1 || (total_degree(&p) == 2 && p.keys().all(|m| (m[0] + m[1]) % 2 == 0));
+        if harmonic {
+            // the harmonic forms, in a fresh angle θ
+            let th = self.new_tmp();
+            let e3 = from_poly(&p, &[cv, sv]);
+            let e3 = subst(&e3, &|x| if x == cv { Some(cos(sym(th))) } else if x == sv { Some(sin(sym(th))) } else { None });
+            thetas = self.candidates_inner(&e3, th, depth + 1);
+            // (they are expressions of the coefficients only)
+            if thetas.iter().any(|x| contains(x, th)) {
+                thetas.clear();
+            }
+        }
+        if thetas.is_empty() {
+            let deg = p.keys().map(|m| m[0] + m[1]).max().unwrap_or(0) as usize;
+            if p.keys().all(|m| m[0] % 2 == 0) {
+                // even in C: C² = 1 − S²
+                let mut a = vec![zero(); deg + 1];
+                for (m, c) in &p {
+                    for (l, b) in binomials(m[0] / 2) {
+                        let i = m[1] as usize + 2 * l;
+                        a[i] = &a[i] + mul(vec![int(b), c.clone()]);
+                    }
+                }
+                for s in self.roots_at(&a, t.sin(), depth + 1) {
+                    let x = fun(Fun::Asin, s);
+                    thetas.push(x.clone());
+                    thetas.push(pi() - x);
+                }
+            } else {
+                // S² = 1 − C²: P = A(C) + S·B(C)
+                let mut a = vec![zero(); deg + 1];
+                let mut b = vec![zero(); deg + 1];
+                for (m, c) in &p {
+                    let tgt = if m[1] % 2 == 0 { &mut a } else { &mut b };
+                    for (l, bn) in binomials(m[1] / 2) {
+                        let i = m[0] as usize + 2 * l;
+                        tgt[i] = &tgt[i] + mul(vec![int(bn), c.clone()]);
+                    }
+                }
+                let a: Vec<Expr> = a.iter().map(|x| best_form(&expand(x))).collect();
+                let b: Vec<Expr> = b.iter().map(|x| best_form(&expand(x))).collect();
+                let q = if b.iter().all(|x| self.env.is_zero(x)) {
+                    a
+                } else {
+                    let a2 = Self::pmul(&a, &a);
+                    let b2 = Self::pmul(&Self::pmul(&b, &b), &[one(), zero(), int(-1)]);
+                    a2.iter().zip(&b2).map(|(x, y)| best_form(&(x - y))).collect()
+                };
+                for c in self.roots_at(&q, t.cos(), depth + 1) {
+                    let x = fun(Fun::Acos, c);
+                    thetas.push(x.clone());
+                    thetas.push(neg(x));
+                }
+            }
+        }
+        // v = (θ + 2πm)/κ: the θ branches within one period of v
+        let kappa = rat(nums, den);
+        let mut out = Vec::new();
+        for th in thetas {
+            for m in 0..nums {
+                let shifted = if m == 0 { th.clone() } else { &th + mul(vec![int(2 * m), pi()]) };
+                out.push(div(shifted, kappa.clone()));
+            }
+        }
+        out
+    }
+
+    /// Real roots near `t` of c0 + c1 w + … + cn wⁿ: the trivial ones, then
+    /// those of the factors (over the coefficients' field) that vanish at t,
+    /// then [`poly_roots`].
+    fn roots_at(&mut self, c: &[Expr], t: f64, depth: u32) -> Vec<Expr> {
+        let mut cs = c.to_vec();
+        let mut out = Vec::new();
+        let k = cs.iter().position(|x| !self.env.is_zero(x)).unwrap_or(cs.len());
+        if k == cs.len() {
+            return out;
+        }
+        if k > 0 {
+            out.push(zero());
+            cs.drain(..k);
+        }
+        while cs.len() > 1 && self.env.is_zero(cs.last().unwrap()) {
+            cs.pop();
+        }
+        if cs.len() < 2 || depth > 8 || past_deadline() {
+            return out;
+        }
+        if cs.len() >= 3 {
+            // factor in a fresh variable w with the value t
+            let w = self.new_tmp();
+            let pe = add(cs.iter().enumerate().map(|(i, x)| mul(vec![x.clone(), pow(sym(w), int(i as i64))])).collect());
+            let mut ctx = PolyCtx::new(&[w]);
+            if ctx.collect(&pe) {
+                if let Some(pm) = ctx.to_mpoly(&pe) {
+                    let mut vals = ctx.values(self.env);
+                    vals[0] = t;
+                    let total = pm.deg(0);
+                    let fs = factor_main(&pm, 0);
+                    let mut found = Vec::new();
+                    for f in fs {
+                        if f.uses(0) && f.deg(0) < total && f.vanishes(&vals) {
+                            if let Some(fc) = coeffs(&ctx.to_expr(&f), w) {
+                                found.extend(self.roots_at(&fc, t, depth + 1));
+                            }
+                        }
+                    }
+                    if !found.is_empty() {
+                        out.extend(found);
+                        return out;
+                    }
+                }
+            }
+        }
+        out.extend(self.poly_roots(&cs, t, depth));
+        out
     }
 
     fn isolate(&self, lhs: &Expr, rhs: &Expr, v: u32) -> Vec<Expr> {
@@ -1129,7 +1963,8 @@ impl<'a> BlockSolver<'a> {
         let mut eqs: Vec<Expr> = eqs.iter().map(|e| self.rationalize(e, vars).unwrap_or_else(|| e.clone())).collect();
         let mut vals = self.env.vals.clone();
         let mut new_vars: Vec<u32> = Vec::new();
-        let mut angles: Vec<(u32, u32, u32)> = Vec::new();
+        // (θ, cos κθ, sin κθ, κ = n/d)
+        let mut angles: Vec<(u32, u32, u32, i64, i64)> = Vec::new();
         for &v in vars {
             let vv = sym(v);
             if !eqs.iter().any(|e| periodic_in(e, v)) {
@@ -1137,19 +1972,44 @@ impl<'a> BlockSolver<'a> {
                 continue;
             }
             let (cs, sn) = (self.new_tmp(), self.new_tmp());
-            let swapped: Vec<Expr> = eqs.iter().map(|e| replace(&replace(e, &cos(vv.clone()), &sym(cs)), &sin(vv.clone()), &sym(sn))).collect();
+            let mut swapped: Vec<Expr> = eqs.iter().map(|e| replace(&replace(e, &cos(vv.clone()), &sym(cs)), &sin(vv.clone()), &sym(sn))).collect();
+            let (mut n, mut d) = (1, 1);
             if swapped.iter().any(|e| contains(e, v)) {
-                // θ also occurs some other way: leave it to the plain path
-                return self.solve_block_poly(&eqs, vars);
+                // θ also occurs in multiples, shifted, or in tan: by the
+                // multiple-angle and addition formulas in cos κθ, sin κθ
+                let mut rates = Vec::new();
+                if !(eqs.iter().all(|e| trig_rates(e, v, &mut rates)) && !rates.is_empty()) {
+                    // θ also occurs some other way: leave it to the plain path
+                    return self.solve_block_poly(&eqs, vars);
+                }
+                (d, n) = rate_unit(&rates);
+                let mut vs: Vec<u32> = vars.to_vec();
+                vs.extend(new_vars.iter().copied());
+                vs.extend([cs, sn]);
+                swapped = eqs
+                    .iter()
+                    .map(|e| {
+                        // atan2(y, x) = 0 (x > 0 at the solution) and atan(z) = 0 are y = 0, z = 0
+                        let e = match e.node() {
+                            Node::Atan2(y, _) => y.clone(),
+                            Node::Fun(Fun::Atan, z) => z.clone(),
+                            _ => e.clone(),
+                        };
+                        split_frac(&expand(&sub_trig(&e, v, cs, sn, n, d)), &vs).0
+                    })
+                    .collect();
+                if swapped.iter().any(|e| contains(e, v)) {
+                    return self.solve_block_poly(&eqs, vars);
+                }
             }
             eqs = swapped;
             eqs.push(sq(sym(cs)) + sq(sym(sn)) - one());
-            let t = self.env.get(v);
+            let t = self.env.get(v) * n as f64 / d as f64;
             vals.insert(cs, t.cos());
             vals.insert(sn, t.sin());
             new_vars.push(cs);
             new_vars.push(sn);
-            angles.push((v, cs, sn));
+            angles.push((v, cs, sn, n, d));
         }
         if angles.is_empty() {
             return self.solve_block_poly(&eqs, vars);
@@ -1158,7 +2018,7 @@ impl<'a> BlockSolver<'a> {
             eprintln!("  angles as cos/sin unknowns: {:?}", angles.iter().map(|a| a.0).collect::<Vec<_>>());
         }
         let env2 = Env { vals };
-        let mut sub = BlockSolver { env: &env2, tmp: self.tmp, budget: self.budget, deadline: self.deadline, keep: self.keep, normal_off: false };
+        let mut sub = BlockSolver { env: &env2, tmp: self.tmp, budget: self.budget, deadline: self.deadline, keep: self.keep, normal_off: false, needed: None };
         let r = sub.solve_block_poly(&eqs, &new_vars);
         self.tmp = sub.tmp;
         let r: HashMap<u32, Expr> = r?.into_iter().collect();
@@ -1168,13 +2028,16 @@ impl<'a> BlockSolver<'a> {
                 out.push((v, e.clone()));
             }
         }
-        for (v, cs, sn) in angles {
+        for (v, cs, sn, n, d) in angles {
             let mut th = atan2(r.get(&sn)?.clone(), r.get(&cs)?.clone());
-            // the branch of the current angle
-            let (t, x) = (self.env.get(v), self.env.eval(&th));
+            // the branch of the current angle (κθ is known up to 2π)
+            let (t, x) = (self.env.get(v) * n as f64 / d as f64, self.env.eval(&th));
             let k = ((t - x) / (2.0 * PI)).round();
             if k != 0.0 && k.is_finite() {
                 th = add(vec![th, mul(vec![int(2 * k as i64), pi()])]);
+            }
+            if (n, d) != (1, 1) {
+                th = div(th, rat(n, d));
             }
             out.push((v, deep_best(&th)));
         }
@@ -1229,7 +2092,7 @@ impl<'a> BlockSolver<'a> {
             back.push((t, kind));
         }
         let env2 = Env { vals };
-        let mut sub = BlockSolver { env: &env2, tmp: self.tmp, budget: self.budget, deadline: self.deadline, keep: self.keep, normal_off: false };
+        let mut sub = BlockSolver { env: &env2, tmp: self.tmp, budget: self.budget, deadline: self.deadline, keep: self.keep, normal_off: false, needed: None };
         let r = sub.solve_polys(&ctx, polys, vars, true);
         self.tmp = sub.tmp;
         let r = r?;
@@ -1469,7 +2332,7 @@ impl<'a> BlockSolver<'a> {
         let c = self.candidates(&fx, xs, 0);
         let Some(xe) = self.pick(c, xs, periodic_in(&fx, xs)) else { fail!("no root of the degree {} factor in v{x}", f.deg(x)) };
         let xe = deep_best(&resolve_abs(&xe, self.env));
-        if keep.is_some() {
+        if keep.is_some() || self.needed.as_ref().is_some_and(|n| n.iter().all(|v| *v == xs)) {
             return Some(vec![(xs, xe)]);
         }
         let mut solved: HashMap<u32, Expr> = HashMap::new();
@@ -1524,7 +2387,7 @@ impl<'a> BlockSolver<'a> {
         let env2 = Env { vals };
         let mut all = vars.to_vec();
         all.push(t);
-        let mut bs = BlockSolver { env: &env2, tmp: self.tmp, budget: 80, deadline: self.deadline, keep: Some(t), normal_off: false };
+        let mut bs = BlockSolver { env: &env2, tmp: self.tmp, budget: 80, deadline: self.deadline, keep: Some(t), normal_off: false, needed: None };
         let es: Vec<Expr> = eqs
             .iter()
             .chain(std::iter::once(&sub(sym(t), target.clone())))
@@ -1554,7 +2417,7 @@ impl<'a> BlockSolver<'a> {
         all.push(t);
         let mut eqs: Vec<Expr> = roots.iter().map(|(r, b)| sub(sq(sym(*r)), b.clone())).collect();
         eqs.push(sub(sym(t), body));
-        let mut bs = BlockSolver { env: &env2, tmp: self.tmp, budget: 80, deadline: self.deadline, keep: Some(t), normal_off: false };
+        let mut bs = BlockSolver { env: &env2, tmp: self.tmp, budget: 80, deadline: self.deadline, keep: Some(t), normal_off: false, needed: None };
         let es: Vec<Expr> = eqs.iter().map(|e| bs.prep(e, &all)).collect();
         let r = bs.solve_block_poly(&es, &all);
         self.tmp = bs.tmp;
@@ -1617,7 +2480,7 @@ impl<'a> BlockSolver<'a> {
     fn resolve_smaller_inner(&mut self, eqs: &[Expr], vars: &[u32], solved: &mut HashMap<u32, Expr>) {
         // results this small are not worth the time
         const SMALL: usize = 40;
-        let mut order: Vec<usize> = (0..vars.len()).filter(|&i| complexity(&solved[&vars[i]]) > SMALL).collect();
+        let mut order: Vec<usize> = (0..vars.len()).filter(|&i| solved.get(&vars[i]).is_some_and(|e| complexity(e) > SMALL)).collect();
         order.sort_by_key(|&i| complexity(&solved[&vars[i]]));
         for i in order {
             let ys = vars[i];
@@ -1705,6 +2568,10 @@ impl<'a> BlockSolver<'a> {
         }
         let dbg = std::env::var("SGGEO_DEBUG").is_ok();
         let mut moves: Vec<(usize, u32, Expr)> = Vec::new();
+        // (exact constants, which need not reproduce the numeric value closely)
+        let constant = self.find_constant_root(&eqs, &vars);
+        let n_constant = constant.len();
+        moves.extend(constant);
         moves.extend(self.find_linear(&eqs, &vars).into_iter().take(3));
         if eqs.len() >= 2 && combos < 4 {
             if let Some((i, ne)) = self.combine_pair(&eqs, &vars) {
@@ -1725,7 +2592,7 @@ impl<'a> BlockSolver<'a> {
                 eprintln!("       {}", crate::expr::bx::plain(&crate::expr::bx::to_bx(e, &|s| format!("s{s}"))));
             }
         }
-        for (i, v, sol) in moves.into_iter().take(4) {
+        for (k, (i, v, sol)) in moves.into_iter().take(4 + n_constant).enumerate() {
             if dbg {
                 eprintln!("     step eq{i} var s{v} = {}", crate::expr::bx::plain(&crate::expr::bx::to_bx(&sol, &|s| format!("s{s}"))));
             }
@@ -1745,7 +2612,7 @@ impl<'a> BlockSolver<'a> {
                 sol
             };
             // a step must reproduce the current solution (rejects degenerate branches)
-            if !(self.close(&sol, v) < 1e-6) {
+            if k >= n_constant && !(self.close(&sol, v) < 1e-6) {
                 continue;
             }
             let rest_vars: Vec<u32> = vars.iter().copied().filter(|x| *x != v).collect();
@@ -1764,6 +2631,42 @@ impl<'a> BlockSolver<'a> {
             }
         }
         None
+    }
+
+    /// An equation in one unknown and nothing else fixes it to a constant.
+    /// A simple value near the current one (a fraction with a small
+    /// denominator, or such a multiple of π) that satisfies it exactly is
+    /// taken as that constant. At a multiple root (the tangent at an
+    /// inflection: sin t = t·cos t at t = 0, a triple root) the numeric value
+    /// is only accurate to a power of the rounding error, so nearness is
+    /// loose; exactness is decided symbolically.
+    fn find_constant_root(&self, eqs: &[Expr], vars: &[u32]) -> Vec<(usize, u32, Expr)> {
+        let mut out: Vec<(usize, u32, Expr)> = Vec::new();
+        for (i, e) in eqs.iter().enumerate() {
+            let syms = sym_set(e);
+            let Some(&v) = vars.iter().find(|v| syms.contains(v)) else { continue };
+            if syms.len() != 1 || out.iter().any(|o| o.1 == v) {
+                continue;
+            }
+            let x = self.env.get(v);
+            if !x.is_finite() {
+                continue;
+            }
+            let mut cands: Vec<(f64, Expr)> = (1..=12).map(|d| ((x * d as f64).round() / d as f64, rat((x * d as f64).round() as i64, d))).collect();
+            let k = (x * 12.0 / PI).round();
+            cands.push((k * PI / 12.0, rat(k as i64, 12) * pi()));
+            for (cv, c) in cands {
+                if (cv - x).abs() > 1e-3 * (1.0 + x.abs()) {
+                    continue;
+                }
+                let z = deep_best(&subst(e, &|s| if s == v { Some(c.clone()) } else { None }));
+                if z.as_rat().is_some_and(|r| r.n == 0) {
+                    out.push((i, v, c));
+                    break;
+                }
+            }
+        }
+        out
     }
 
     fn find_linear(&self, eqs: &[Expr], vars: &[u32]) -> Vec<(usize, u32, Expr)> {
@@ -1886,7 +2789,7 @@ impl<'a> BlockSolver<'a> {
                 if cs.len() != 3 {
                     continue;
                 }
-                if let Some(s) = self.pick(self.quad_roots(&cs), v, false) {
+                if let Some(s) = self.pick(self.closed_roots(&cs), v, false) {
                     all.push((s.size(), i, v, s));
                 }
             }
@@ -1894,6 +2797,10 @@ impl<'a> BlockSolver<'a> {
         all.sort_by_key(|a| a.0);
         all.into_iter().take(3).map(|b| (b.1, b.2, b.3)).collect()
     }
+}
+
+fn gcd(a: usize, b: usize) -> usize {
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 pub fn simplify_result(e: &Expr) -> Expr {
@@ -2055,18 +2962,101 @@ fn divide_out(e: &Expr) -> Expr {
 /// denominator factored (see `divide_out`).
 fn factored_root(e: &Expr) -> Option<Expr> {
     let Node::Pow(b, x) = e.node() else { return None };
-    if x.as_rat().is_none_or(|q| q.d != 2) || !rational(b) || b.size() > 400 {
+    if x.as_rat().is_none_or(|q| q.d != 2) || b.size() > 400 {
         return None;
     }
-    let mut vars: Vec<u32> = sym_set(b).into_iter().collect();
-    vars.sort();
-    let (n, d) = split_frac(b, &vars);
-    let (n, d) = (expand(&n), expand(&d));
-    let (fnn, fd) = (factor_poly(&n), factor_poly(&d));
-    if fnn.is_none() && fd.is_none() {
-        return None;
+    // (with roots or functions in it, only a radicand over a denominator:
+    // factoring the others costs much and rarely shortens them)
+    let plain = rational(b);
+    with_atoms(b, |b| {
+        let mut vars: Vec<u32> = sym_set(b).into_iter().collect();
+        vars.sort();
+        let (n, d) = split_frac(b, &vars);
+        if !plain && d.is_one() {
+            return None;
+        }
+        let (n, d) = (expand(&n), expand(&d));
+        // (a large numerator with roots in it is slow to factor)
+        let fnn = if plain || n.size() <= 200 { factor_poly(&n).or_else(|| collected(&n, 2)) } else { None };
+        let fd = factor_poly(&d);
+        if fnn.is_none() && fd.is_none() && d.is_one() {
+            return None;
+        }
+        Some(pow(div(fnn.unwrap_or(n), fd.unwrap_or(d)), x.clone()))
+    })
+}
+
+/// A quantity of the root formulas (Cardano's and Ferrari's p, q, r and
+/// discriminants), as the smaller of `best_form` and the quotient with both
+/// sides factored over Q, or collected where they do not factor: the
+/// coefficients come expanded from elimination, and shared factors then
+/// cancel (Alhazen's quartic has the leading coefficient
+/// 4(x_P² + y_P²)(x_Q² + y_Q²), which divides much of the rest).
+fn coef_form(e: &Expr) -> Expr {
+    let b = best_form(e);
+    if past_deadline() || e.size() > 1500 {
+        return b;
     }
-    Some(pow(div(fnn.unwrap_or(n), fd.unwrap_or(d)), x.clone()))
+    let f = with_atoms(e, |a| {
+        let mut vars: Vec<u32> = sym_set(a).into_iter().collect();
+        vars.sort();
+        let (n, d) = split_frac(a, &vars);
+        let (n, d) = (expand(&n), expand(&d));
+        if n.size() + d.size() > 4000 {
+            return None;
+        }
+        let side = |x: &Expr| factor_poly(x).or_else(|| collected(x, 2)).filter(|f| complexity(f) < complexity(x)).unwrap_or_else(|| x.clone());
+        Some(div(side(&n), side(&d)))
+    });
+    match f {
+        Some(f) if clearly_shorter(&f, &b) => f,
+        _ => b,
+    }
+}
+
+/// Symbols standing for the parts of an expression that are not rational
+/// in its symbols (see `with_atoms`).
+const ATOM_BASE: u32 = 0xC000_0000;
+
+/// `f` applied to `e` with each maximal part that is not built from symbols
+/// and rational numbers by sums, products and integer powers (a root, a
+/// sine, π) replaced by a symbol, the parts substituted back after; x^(p/q)
+/// is (x^(1/q))^p, so √x and 1/√x share a symbol. A non-negative part (a
+/// root) gives a non-negative symbol. This lets the steps on rational
+/// functions (`factored_root`, `quotient_form`) see a radicand such as
+/// a² + (√H₁·√H₂ − b²)/c² as one.
+fn with_atoms(e: &Expr, f: impl FnOnce(&Expr) -> Option<Expr>) -> Option<Expr> {
+    fn walk(e: &Expr, atoms: &mut Vec<Expr>) -> Expr {
+        let mut atom = |a: Expr| {
+            let i = atoms.iter().position(|x| *x == a).unwrap_or_else(|| {
+                atoms.push(a);
+                atoms.len() - 1
+            });
+            sym(ATOM_BASE + i as u32)
+        };
+        match e.node() {
+            Node::Num(Num::R(_)) | Node::Sym(_) => e.clone(),
+            Node::Add(ts) => add(ts.iter().map(|t| walk(t, atoms)).collect()),
+            Node::Mul(ts) => mul(ts.iter().map(|t| walk(t, atoms)).collect()),
+            Node::Pow(b, x) if x.as_int().is_some() => pow(walk(b, atoms), x.clone()),
+            Node::Pow(b, x) => match x.as_rat() {
+                Some(q) if q.d > 1 => pow(atom(pow(b.clone(), num(Num::R(Rat::new(1, q.d).unwrap())))), int(q.n as i64)),
+                _ => atom(e.clone()),
+            },
+            _ => atom(e.clone()),
+        }
+    }
+    let mut atoms = Vec::new();
+    let a = walk(e, &mut atoms);
+    if atoms.is_empty() {
+        return f(&a);
+    }
+    let pos: Vec<u32> = (0..atoms.len()).filter(|&i| is_nonneg(&atoms[i])).map(|i| ATOM_BASE + i as u32).collect();
+    pos.iter().for_each(|&s| assume_nonneg(s, true));
+    let r = f(&a);
+    pos.iter().for_each(|&s| assume_nonneg(s, false));
+    let r = r?;
+    Some(subst(&r, &|s| s.checked_sub(ATOM_BASE).and_then(|i| atoms.get(i as usize)).cloned()))
 }
 
 /// Built from symbols and rational numbers by sums, products and integer powers.
@@ -2150,7 +3140,7 @@ fn divide_lead(n: &MPoly, d: &MPoly, v: usize) -> Option<(MPoly, MPoly)> {
 fn zero_abs(e: &Expr, env: &Env, out: &mut Vec<Expr>) {
     match e.node() {
         Node::Fun(Fun::Abs, a) => {
-            if env.eval(a).abs() <= 1e-12 && !out.contains(e) {
+            if env.eval(a).abs() <= 1e-12 * magnitude(a, env) && !out.contains(e) {
                 out.push(e.clone());
             }
             zero_abs(a, env, out);
@@ -2162,6 +3152,54 @@ fn zero_abs(e: &Expr, env: &Env, out: &mut Vec<Expr>) {
             zero_abs(b, env, out);
         }
         Node::Fun(_, a) => zero_abs(a, env, out),
+    }
+}
+
+/// The size of the parts of `e` at the current configuration (|a| + |b|
+/// for a sum), to tell a value that is zero from one that is only small
+/// because the construction is small; at least 1e-300.
+fn magnitude(e: &Expr, env: &Env) -> f64 {
+    magnitude_at(e, &|s| env.get(s)).max(1e-300)
+}
+
+/// [`magnitude`] with the symbols' values from `get` (0 when all parts are 0).
+fn magnitude_at(e: &Expr, get: &dyn Fn(u32) -> f64) -> f64 {
+    fn walk(e: &Expr, get: &dyn Fn(u32) -> f64) -> f64 {
+        match e.node() {
+            Node::Add(ts) => ts.iter().map(|t| walk(t, get)).sum(),
+            Node::Mul(ts) => ts.iter().map(|t| walk(t, get)).product(),
+            Node::Pow(b, x) if x.as_num().is_some() => walk(b, get).powf(eval(x, get)),
+            _ => eval(e, get).abs(),
+        }
+    }
+    let m = walk(e, get);
+    if m.is_finite() { m } else { f64::INFINITY }
+}
+
+/// The unit of the parameter steps: the size of the parameters `ps`, at
+/// most 1, so a step 1e-3·(unit + |x|) is relative in a small construction
+/// and as before in an ordinary one.
+fn param_unit(base: &[f64], ps: &[u32]) -> f64 {
+    let m = ps.iter().map(|&p| base[p as usize].abs()).filter(|x| x.is_finite()).fold(0.0, f64::max);
+    if m > 0.0 { m.min(1.0) } else { 1.0 }
+}
+
+/// Square roots in `e` whose radicand is 0 in the current configuration.
+fn zero_sqrt(e: &Expr, env: &Env, out: &mut Vec<Expr>) {
+    match e.node() {
+        Node::Pow(a, x) => {
+            if x.as_rat().is_some_and(|r| r.n == 1 && r.d == 2) && env.eval(a).abs() <= 1e-12 * magnitude(a, env) && !out.contains(e) {
+                out.push(e.clone());
+            }
+            zero_sqrt(a, env, out);
+        }
+        Node::Num(_) | Node::Pi | Node::Sym(_) => {}
+        Node::Add(ts) | Node::Mul(ts) => ts.iter().for_each(|t| zero_sqrt(t, env, out)),
+        Node::Atan2(a, b) => {
+            zero_sqrt(a, env, out);
+            zero_sqrt(b, env, out);
+        }
+        Node::Fun(_, a) => zero_sqrt(a, env, out),
     }
 }
 
@@ -2203,6 +3241,8 @@ fn settle_zero_abs(e: Expr, env: &Env, actual: f64) -> Expr {
 fn settle_branch(e: Expr, env: &Env, rows: &[Expr], unknowns: &[u32], target: &Expr, named: &HashSet<u32>) -> Expr {
     let mut abs_nodes = Vec::new();
     zero_abs(&e, env, &mut abs_nodes);
+    // so does √r with r = 0 (a double root): ±√r
+    zero_sqrt(&e, env, &mut abs_nodes);
     abs_nodes.truncate(3);
     if abs_nodes.is_empty() || rows.is_empty() {
         return e;
@@ -2218,8 +3258,11 @@ fn settle_branch(e: Expr, env: &Env, rows: &[Expr], unknowns: &[u32], target: &E
     for mask in 0..(1u32 << abs_nodes.len()) {
         let mut x = e.clone();
         for (i, node) in abs_nodes.iter().enumerate() {
-            let Node::Fun(_, a) = node.node() else { continue };
-            let r = if mask & (1 << i) == 0 { a.clone() } else { neg(a.clone()) };
+            let a = match node.node() {
+                Node::Fun(_, a) => a.clone(),
+                _ => node.clone(),
+            };
+            let r = if mask & (1 << i) == 0 { a } else { neg(a) };
             x = replace(&x, node, &r);
         }
         cands.push(simplify_result(&x));
@@ -2235,9 +3278,10 @@ fn settle_branch(e: Expr, env: &Env, rows: &[Expr], unknowns: &[u32], target: &E
     let sys = crate::solver::Sys::build(&owned, unknowns.iter().map(|u| *u as usize).collect());
     let mut ok = vec![true; cands.len()];
     let mut trials = 0;
+    let unit = param_unit(&base, &params);
     for &p in &params {
         let x0 = base[p as usize];
-        let d = 1e-3 * (1.0 + x0.abs());
+        let d = 1e-3 * (unit + x0.abs());
         for sign in [1.0, -1.0] {
             if past_deadline() {
                 return e;
@@ -2275,16 +3319,22 @@ fn settle_branch(e: Expr, env: &Env, rows: &[Expr], unknowns: &[u32], target: &E
 }
 
 /// Whether formula `f` keeps giving the target when the parameters it uses
-/// (up to 4) move slightly and the construction is solved again numerically.
-/// A formula can match at the current configuration only by coincidence
-/// (two branches meeting at 60°, say). None when no perturbed configuration
-/// could be solved.
+/// (up to 4) move slightly, one at a time, and when all parameters of the
+/// construction move together, and the construction is solved again
+/// numerically. A formula can match at the current configuration only by
+/// coincidence (two branches meeting at 60°, say), or miss a parameter the
+/// target does not depend on there (a contact point that stays put while P
+/// slides along the tangent). None when no perturbed configuration could be
+/// solved.
 fn agrees_when_perturbed(f: &Expr, env: &Env, rows: &[Expr], unknowns: &[u32], target: &Expr, named: &HashSet<u32>) -> Option<bool> {
     // (in symbol order: a set's own order differs from run to run)
     let mut params: Vec<u32> = sym_set(f).into_iter().filter(|s| named.contains(s) && !unknowns.contains(s)).collect();
     params.sort();
     params.truncate(4);
-    if params.is_empty() || rows.is_empty() {
+    let mut all: Vec<u32> = rows.iter().chain([target, f]).flat_map(sym_set).filter(|s| named.contains(s) && !unknowns.contains(s)).collect();
+    all.sort();
+    all.dedup();
+    if all.is_empty() || rows.is_empty() {
         return None;
     }
     let n = env.vals.keys().filter(|k| **k < TMP_BASE).max().copied().unwrap_or(0) as usize + 1;
@@ -2294,35 +3344,52 @@ fn agrees_when_perturbed(f: &Expr, env: &Env, rows: &[Expr], unknowns: &[u32], t
             base[*k as usize] = *v;
         }
     }
+    let unit = param_unit(&base, &all);
+    let step = |p: u32| 1e-3 * (unit + base[p as usize].abs());
+    let mut moves: Vec<Vec<(u32, f64)>> = Vec::new();
+    for &p in &params {
+        for sign in [1.0, -1.0] {
+            moves.push(vec![(p, sign * step(p))]);
+        }
+    }
+    // all together, with fixed pseudo-random weights
+    for k in 1..=2u32 {
+        moves.push(
+            all.iter()
+                .map(|&p| {
+                    let h = (p.wrapping_mul(2654435761).wrapping_add(k.wrapping_mul(40503)) % 1000) as f64 / 500.0 - 1.0;
+                    (p, if h.abs() < 0.2 { 0.2f64.copysign(h) } else { h } * step(p))
+                })
+                .collect(),
+        );
+    }
     let owned: Vec<(Expr, Owner)> = rows.iter().map(|e| (e.clone(), Owner::Ent(0))).collect();
     let sys = crate::solver::Sys::build(&owned, unknowns.iter().map(|u| *u as usize).collect());
     let mut trials = 0;
-    for &p in &params {
-        let x0 = base[p as usize];
-        let d = 1e-3 * (1.0 + x0.abs());
-        for sign in [1.0, -1.0] {
-            let mut v = base.clone();
-            let mut solved = true;
-            for k in 1..=4 {
-                v[p as usize] = x0 + sign * d * k as f64 / 4.0;
-                if !sys.solve(&mut v, &[], [0.0; 2]) {
-                    solved = false;
-                    break;
-                }
+    for mv in moves {
+        let mut v = base.clone();
+        let mut solved = true;
+        for k in 1..=4 {
+            for &(p, d) in &mv {
+                v[p as usize] = base[p as usize] + d * k as f64 / 4.0;
             }
-            if !solved {
-                continue;
+            if !sys.solve(&mut v, &[], [0.0; 2]) {
+                solved = false;
+                break;
             }
-            let get = |s: u32| v.get(s as usize).copied().unwrap_or(f64::NAN);
-            let t = eval(target, &get);
-            if !t.is_finite() {
-                continue;
-            }
-            trials += 1;
-            let fv = eval(f, &get);
-            if !(fv.is_finite() && (fv - t).abs() <= 1e-7 * (1.0 + t.abs())) {
-                return Some(false);
-            }
+        }
+        if !solved {
+            continue;
+        }
+        let get = |s: u32| v.get(s as usize).copied().unwrap_or(f64::NAN);
+        let t = eval(target, &get);
+        if !t.is_finite() {
+            continue;
+        }
+        trials += 1;
+        let fv = eval(f, &get);
+        if !(fv.is_finite() && (fv - t).abs() <= 1e-7 * (1.0 + t.abs())) {
+            return Some(false);
         }
     }
     (trials > 0).then_some(true)
@@ -2336,7 +3403,10 @@ fn same_function(a: &Expr, b: &Expr, env: &Env) -> bool {
         if !x.is_finite() || !y.is_finite() {
             continue;
         }
-        if (x - y).abs() > 1e-7 * (1.0 + x.abs().max(y.abs())) {
+        // (relative to the values, so the same at every scale, and above
+        // the rounding of the parts where both are near 0)
+        let get = |s| env.perturbed(s, k);
+        if (x - y).abs() > 1e-7 * x.abs().max(y.abs()) + 1e-12 * magnitude_at(a, &get).max(magnitude_at(b, &get)) {
             return false;
         }
         n += 1;
@@ -2364,10 +3434,206 @@ fn factor_sums(e: &Expr) -> Expr {
         return r;
     }
     // a product only a little smaller reads worse than the sum
-    match factor_poly(&r) {
-        Some(f) if 10 * complexity(&f) <= 7 * complexity(&r) => f,
+    if let Some(f) = factor_poly(&r).filter(|f| 10 * complexity(f) <= 7 * complexity(&r)) {
+        return f;
+    }
+    match with_atoms(&r, |a| collected(a, 2)) {
+        Some(c) if clearly_shorter(&c, &r) => c,
         _ => r,
     }
+}
+
+/// `e` with sums written through other sums of it, P = c·S + R with R
+/// factored or collected, where that is clearly shorter. S is a sum that
+/// is a denominator or occurs more than once: a law of cosines
+/// L² = d1² + 25 − 10·d1·cos θ in a denominator makes the
+/// 10·d1·cos θ + d2² + 2·d2·d3 + d3² − d1² − 25 under a root the
+/// (d2 + d3)² − L² it is.
+fn resubstituted(e: &Expr) -> Expr {
+    if past_deadline() || e.size() > 3000 {
+        return e.clone();
+    }
+    // (sums of three or more terms anywhere, with their counts, and those in denominators)
+    fn sums(e: &Expr, all: &mut Vec<(Expr, usize)>, dens: &mut Vec<Expr>) {
+        let big = |x: &Expr| matches!(x.node(), Node::Add(ts) if ts.len() >= 3);
+        match e.node() {
+            Node::Add(ts) => {
+                match all.iter_mut().find(|(x, _)| x == e) {
+                    Some(c) => c.1 += 1,
+                    None if big(e) => all.push((e.clone(), 1)),
+                    None => {}
+                }
+                ts.iter().for_each(|t| sums(t, all, dens));
+            }
+            Node::Mul(ts) => ts.iter().for_each(|t| sums(t, all, dens)),
+            Node::Pow(b, x) => {
+                if x.as_num().is_some_and(|n| n.is_neg()) {
+                    // (a product in a denominator: its sums)
+                    let fs = match b.node() { Node::Mul(fs) => fs.clone(), _ => vec![b.clone()] };
+                    for f in fs {
+                        let (fb, _) = base_exp(&f);
+                        if big(&fb) && !dens.contains(&fb) {
+                            dens.push(fb);
+                        }
+                    }
+                }
+                sums(b, all, dens);
+            }
+            Node::Fun(_, a) => sums(a, all, dens),
+            Node::Atan2(a, b) => {
+                sums(a, all, dens);
+                sums(b, all, dens);
+            }
+            _ => {}
+        }
+    }
+    let (mut all, mut dens) = (Vec::new(), Vec::new());
+    sums(e, &mut all, &mut dens);
+    let mut cands = dens;
+    for (x, n) in &all {
+        if *n >= 2 && !cands.contains(x) {
+            cands.push(x.clone());
+        }
+    }
+    if cands.is_empty() {
+        return e.clone();
+    }
+    // one atom for each symbol and each part that is not a polynomial, the
+    // same everywhere (cos θ in and outside a root)
+    let mut ctx = PolyCtx::new(&[]);
+    for (x, _) in &all {
+        ctx.collect(x);
+    }
+    let polys: Vec<(Expr, MPoly)> = cands.iter().filter_map(|c| ctx.to_mpoly(c).map(|p| (c.clone(), p))).filter(|(_, p)| p.terms() <= 40).collect();
+    fn walk(e: &Expr, ctx: &PolyCtx, polys: &[(Expr, MPoly)]) -> Expr {
+        if past_deadline() {
+            return e.clone();
+        }
+        let r = match e.node() {
+            Node::Add(ts) => add(ts.iter().map(|t| walk(t, ctx, polys)).collect()),
+            Node::Mul(ts) => mul(ts.iter().map(|t| walk(t, ctx, polys)).collect()),
+            Node::Pow(b, x) => pow(walk(b, ctx, polys), x.clone()),
+            Node::Fun(f, a) => fun(*f, walk(a, ctx, polys)),
+            Node::Atan2(a, b) => atan2(walk(a, ctx, polys), walk(b, ctx, polys)),
+            _ => return e.clone(),
+        };
+        let Node::Add(ts) = r.node() else { return r };
+        if ts.len() < 3 {
+            return r;
+        }
+        let Some(p) = ctx.to_mpoly(&r).filter(|p| p.terms() <= 60) else { return r };
+        let mut best = r.clone();
+        for (se, sp) in polys {
+            if *se == r || sp.terms() > p.terms() {
+                continue;
+            }
+            // c from a term both have; S must take away more than it adds
+            let mut tried: Vec<BigQ> = Vec::new();
+            for (m, cs) in &sp.t {
+                let Some(cp) = p.t.get(m) else { continue };
+                let c = cp / cs;
+                if tried.contains(&c) {
+                    continue;
+                }
+                tried.push(c.clone());
+                let rest = p.sub(&sp.scale(&c));
+                if rest.terms() + 1 >= p.terms() {
+                    continue;
+                }
+                let re = ctx.to_expr(&rest);
+                let rb = [factor_poly(&re), collected(&re, 2)].into_iter().flatten().fold(re.clone(), |b, x| if complexity(&x) < complexity(&b) { x } else { b });
+                let cand = add(vec![mul(vec![ctx.to_expr(&MPoly::constant(p.n, c)), se.clone()]), rb]);
+                if clearly_shorter(&cand, &best) {
+                    best = cand;
+                }
+            }
+        }
+        best
+    }
+    let r = walk(e, &ctx, &polys);
+    // (each rewriting was clearly shorter on its own)
+    let text = |e: &Expr| crate::expr::bx::plain(&crate::expr::bx::to_bx(e, &|s| format!("s{s}"))).len();
+    if complexity(&r) < complexity(e) && text(&r) < text(e) { r } else { e.clone() }
+}
+
+/// `a` a tenth less complex than `b` and shorter as written: a leading minus
+/// and a product of two sums can count as fewer nodes and read longer
+/// ((a + b)(a − b) for a² − b²).
+fn clearly_shorter(a: &Expr, b: &Expr) -> bool {
+    let text = |e: &Expr| crate::expr::bx::plain(&crate::expr::bx::to_bx(e, &|s| format!("s{s}"))).len();
+    10 * complexity(a) <= 9 * complexity(b) && text(a) < text(b)
+}
+
+/// The polynomial `r` (in symbols only) collected in the powers of one of
+/// its variables, each coefficient factored, or collected again down to
+/// `depth` levels: the smallest such form, when smaller than `r`. A sum that
+/// is no product as a whole often is one in parts: d1²d3² + d2²d3² − d3⁴ +
+/// d1²d4² − d2²d4² is d3²(d1² + d2² − d3²) + (d1 − d2)(d1 + d2)d4².
+fn collected(r: &Expr, depth: u32) -> Option<Expr> {
+    if depth == 0 || past_deadline() {
+        return None;
+    }
+    // (the same sums recur, in the coefficients and from the steps that
+    // factor their results; a result cut short by the deadline is not kept)
+    let key = (r.clone(), depth);
+    if let Some(c) = COLLECTED.with(|m| m.borrow().get(&key).cloned()) {
+        return c;
+    }
+    let c = collected_uncached(r, depth);
+    if !past_deadline() {
+        COLLECTED.with(|m| m.borrow_mut().insert(key, c.clone()));
+    }
+    c
+}
+
+thread_local! {
+    /// Results of `collected` in the current derivation.
+    static COLLECTED: std::cell::RefCell<std::collections::BTreeMap<(Expr, u32), Option<Expr>>> = const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
+}
+
+fn collected_uncached(r: &Expr, depth: u32) -> Option<Expr> {
+    let Node::Add(ts) = r.node() else { return None };
+    if ts.len() < 3 || ts.len() > 60 {
+        return None;
+    }
+    let mut vars: Vec<u32> = sym_set(r).into_iter().collect();
+    vars.sort();
+    let mut ctx = PolyCtx::new(&vars);
+    if !ctx.collect(r) || !ctx.atoms.is_empty() {
+        return None;
+    }
+    // (collecting an expanded polynomial much larger than the sum as written
+    // rarely gives anything shorter, and factoring its coefficients is slow)
+    let p = ctx.to_mpoly(r)?;
+    if p.terms() > 40 {
+        return None;
+    }
+    let mut best: Option<(usize, Expr)> = None;
+    for v in (0..p.n).filter(|&v| p.uses(v)) {
+        if past_deadline() {
+            break;
+        }
+        let mut parts = Vec::new();
+        for (k, c) in p.coeffs(v).iter().enumerate() {
+            if c.is_zero() {
+                continue;
+            }
+            let c = ctx.to_expr(c);
+            let mut cb = c.clone();
+            for alt in [factor_poly(&c), collected(&c, depth - 1)].into_iter().flatten() {
+                if complexity(&alt) < complexity(&cb) {
+                    cb = alt;
+                }
+            }
+            parts.push(mul(vec![cb, pow(ctx.to_expr(&MPoly::var(p.n, v)), int(k as i64))]));
+        }
+        let e = add(parts);
+        let c = complexity(&e);
+        if best.as_ref().is_none_or(|(b, _)| c < *b) {
+            best = Some((c, e));
+        }
+    }
+    best.filter(|(c, _)| *c < complexity(r)).map(|(_, e)| e)
 }
 
 /// The polynomial `r` (in symbols only) as a product of its factors over Q,
@@ -2461,11 +3727,15 @@ fn constant_value(e: &Expr, env: &Env) -> Option<f64> {
     }
     let mut n = 0;
     for k in 1..=8 {
-        let v = env.eval_perturbed(e, k);
+        let get = |s| env.perturbed(s, k);
+        let v = eval(e, &get);
         if !v.is_finite() {
             continue;
         }
-        if (v - v0).abs() > 1e-9 * (1.0 + v0.abs().max(v.abs())) {
+        // (relative: a part of a large construction can be 1e-20 and vary;
+        // an identity's terms cancel to rounding of their own size, but the
+        // terms of a large formula can be many times its value)
+        if (v - v0).abs() > 1e-9 * v0.abs().max(v.abs()) + 1e-13 * magnitude_at(e, &get) {
             return None;
         }
         n += 1;
@@ -2519,9 +3789,11 @@ fn resolve_abs(e: &Expr, env: &Env) -> Expr {
         Node::Fun(Fun::Abs, a) => {
             let a2 = resolve_abs(a, env);
             let v = env.eval(&a2);
-            if v > 1e-9 {
+            // (relative to the size of its parts: a small construction has small values)
+            let eps = 1e-9 * magnitude(&a2, env).min(1.0);
+            if v > eps {
                 a2
-            } else if v < -1e-9 {
+            } else if v < -eps {
                 neg(a2)
             } else {
                 fun(Fun::Abs, a2)
@@ -2681,6 +3953,55 @@ fn priorities(doc: &Doc) -> HashMap<u32, u8> {
         }
     }
     m
+}
+
+/// [`rank_select`] where the rows are independent nearby. At a double root
+/// (the foci of an ellipse with a = b: u·v = 0, u² − v² = a² − b² at u = v
+/// = 0) the gradients vanish and the rows look dependent, though for other
+/// values of the parameters they determine the unknowns; there the known
+/// parameters are moved a little, the unknowns re-solved, and the rank taken
+/// at that configuration.
+fn generic_rank_select(eqs: &[Expr], rows: &[usize], cols: &[u32], env: &Env) -> (Vec<usize>, Vec<usize>) {
+    let here = rank_select(eqs, rows, cols, env);
+    if here.1.len() == rows.len() {
+        return here;
+    }
+    let n = env.vals.keys().filter(|k| **k < TMP_BASE).max().copied().unwrap_or(0) as usize + 1;
+    let mut base = vec![0.0; n];
+    for (k, v) in &env.vals {
+        if (*k as usize) < n {
+            base[*k as usize] = *v;
+        }
+    }
+    let unknown: HashSet<u32> = cols.iter().copied().collect();
+    let known: Vec<u32> = rows.iter().flat_map(|&r| sym_set(&eqs[r])).filter(|s| !unknown.contains(s) && (*s as usize) < n).collect::<HashSet<_>>().into_iter().collect();
+    let owned: Vec<(Expr, Owner)> = rows.iter().map(|&r| (eqs[r].clone(), Owner::Ent(0))).collect();
+    let sys = crate::solver::Sys::build(&owned, cols.iter().map(|u| *u as usize).collect());
+    // (the unknowns are moved too: at the double root itself Newton has no
+    // gradient to follow)
+    let mut v = base.clone();
+    let size = cols.iter().map(|&c| base[c as usize].abs()).fold(1.0, f64::max);
+    for &c in cols {
+        v[c as usize] += 1e-3 * size * ((c as f64 + 1.0) * 78.233).sin();
+    }
+    let steps = 4;
+    for k in 1..=steps {
+        for &s in &known {
+            let x0 = base[s as usize];
+            v[s as usize] = x0 + 1e-3 * (1.0 + x0.abs()) * ((s as f64 + 1.0) * 12.9898).sin() * k as f64 / steps as f64;
+        }
+        if !sys.solve(&mut v, &[], [0.0; 2]) {
+            return here;
+        }
+    }
+    let mut vals = env.vals.clone();
+    for (i, x) in v.iter().enumerate() {
+        if let Some(y) = vals.get_mut(&(i as u32)) {
+            *y = *x;
+        }
+    }
+    let near = rank_select(eqs, rows, cols, &Env { vals });
+    if near.1.len() > here.1.len() { near } else { here }
 }
 
 /// Gaussian elimination with partial pivoting over columns in order.
@@ -3033,6 +4354,30 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
     if let Some((_, m)) = errs.first() {
         return Err(m.clone());
     }
+    // a distance that is 0 here (driven by an expression that vanishes)
+    // makes its end points coincide; as |AB|² = 0 it is a double root whose
+    // gradient vanishes, and the rank analysis would leave B undetermined
+    let eqns: Vec<(Expr, Owner)> = eqns
+        .into_iter()
+        .flat_map(|(e, o)| {
+            let zero_dist = match o {
+                Owner::Dim(i) => doc.dims[i].as_ref().and_then(|d| match d.kind {
+                    DimKind::Distance(..) | DimKind::Length(_) => {
+                        let (a, b) = doc.dim_points(&d.kind)?;
+                        let size = [&a.0, &a.1, &b.0, &b.1].iter().map(|x| doc.eval_now(x).abs()).fold(1.0, f64::max);
+                        let v = doc.dim_value_expr(i, 0).ok()?;
+                        (doc.eval_now(&v).abs() <= 1e-12 * size).then(|| vsub(&b, &a))
+                    }
+                    _ => None,
+                }),
+                _ => None,
+            };
+            match zero_dist {
+                Some(d) => vec![(d.0, o), (d.1, o)],
+                None => vec![(e, o)],
+            }
+        })
+        .collect();
     let unknown_set: HashSet<u32> = doc.unknowns().into_iter().map(|p| p as u32).collect();
     let named: HashSet<u32> = doc
         .vars
@@ -3357,7 +4702,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
         v
     };
     // numeric rank analysis picks which unknowns stay free and which equations are independent
-    let (piv_cols, piv_rows) = rank_select(&eqs, &all_ce, &all_unk, &env);
+    let (piv_cols, piv_rows) = generic_rank_select(&eqs, &all_ce, &all_unk, &env);
     let mut free: Vec<u32> = all_unk.iter().enumerate().filter(|(j, _)| !piv_cols.contains(j)).map(|(_, u)| *u).collect();
     let unk: Vec<u32> = piv_cols.iter().map(|&j| all_unk[j]).collect();
     // free unknowns the target does not depend on are moved to simple values
@@ -3437,8 +4782,9 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
         eprintln!("target: {}", crate::expr::bx::plain(&crate::expr::bx::to_bx(&target_c, &|s| format!("s{s}"))));
     }
     crate::nf::reset_degenerate();
+    COLLECTED.with(|m| m.borrow_mut().clear());
     let blocks_start = work_now();
-    let mut solver = BlockSolver { env: &env, tmp: TMP_BASE, budget: 0, deadline, keep: None, normal_off: false };
+    let mut solver = BlockSolver { env: &env, tmp: TMP_BASE, budget: 0, deadline, keep: None, normal_off: false, needed: None };
     // the equations of the needed blocks, for solving for the target directly
     let mut target_vars: Vec<u32> = Vec::new();
     let mut target_eqs: Vec<Expr> = Vec::new();
@@ -3462,6 +4808,14 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
             }
             let vars: Vec<u32> = b.iter().map(|&n| unk[em[matched[n]].unwrap()]).collect();
             let beqs: Vec<Expr> = b.iter().map(|&n| subst_map(&eqs[ce[matched[n]]], &sol)).collect();
+            // the variables of this block that the target or another needed block uses
+            let used: HashSet<u32> = blocks
+                .iter()
+                .filter(|o| !std::ptr::eq(*o, b) && o.iter().any(|n| need.contains(n)))
+                .flat_map(|o| o.iter().flat_map(|&n| sym_set(&eqs[ce[matched[n]]])))
+                .chain(sym_set(&target_c))
+                .collect();
+            solver.needed = Some(vars.iter().copied().filter(|v| used.contains(v)).collect());
             let dbg = std::env::var("SGGEO_DEBUG").is_ok();
             if dbg {
                 eprintln!("block vars={:?}", vars);
@@ -3471,6 +4825,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
             }
             let tb = web_time::Instant::now();
             let solved = if past_deadline() { None } else { solver.solve_block(beqs, vars.clone()) };
+            solver.needed = None;
             if dbg {
                 eprintln!("   block took {:?}", tb.elapsed());
                 for (v, e) in solved.iter().flatten() {
@@ -3524,7 +4879,7 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
                     let mut vals = env.vals.clone();
                     vals.insert(t, if cos { actual.cos() } else { actual });
                     let env2 = Env { vals };
-                    let mut bs = BlockSolver { env: &env2, tmp: solver.tmp, budget: 80, deadline: s, keep: None, normal_off: false };
+                    let mut bs = BlockSolver { env: &env2, tmp: solver.tmp, budget: 80, deadline: s, keep: None, normal_off: false, needed: None };
                     let c = bs.candidates(&p, t, 0);
                     let x = bs.pick(c, t, false)?;
                     if cos { fun(Fun::Acos, x) } else { x }
@@ -3761,14 +5116,16 @@ fn derive_inner(doc: &Doc, target: &Expr, strategy: u8, deadline: web_time::Inst
         set_deadline(Some(work_now() + scaled(100)));
         divided(result)
     };
-    // factored sums only help a formula small enough to read
-    let result = if result.size() < 1500 {
-        // a short slice of its own: the simplification may have used up its time
+    // factored sums, in a short slice of its own (the simplification may
+    // have used up its time); a large formula gains as much as a small one
+    // (Ferrari's from elimination: 4(x_P² + y_P²)(x_Q² + y_Q²) for its
+    // expanded leading coefficient, in many places)
+    let result = {
         set_deadline(Some(work_now() + scaled(200)));
         let f = factor_sums(&result);
-        if complexity(&f) < complexity(&result) { f } else { result }
-    } else {
-        result
+        let f = if complexity(&f) < complexity(&result) { f } else { result };
+        set_deadline(Some(work_now() + scaled(100)));
+        resubstituted(&f)
     };
     stage("simplification");
     let result = settle_zero_abs(result, &env, actual);
@@ -3887,3 +5244,60 @@ mod factor_sums_tests {
     }
 }
 
+
+#[cfg(test)]
+mod simplify_tools {
+    use super::*;
+    use std::cell::RefCell;
+
+    /// Debugging helper: `SGGEO_SIMPLIFY_FILE=<file>` simplifies each line
+    /// `name = formula` (or a bare formula) with `simplify_result` and prints
+    /// the complexity before and after.
+    #[test]
+    fn simplify_file() {
+        let Ok(path) = std::env::var("SGGEO_SIMPLIFY_FILE") else { return };
+        for line in std::fs::read_to_string(path).unwrap().lines() {
+            let src = line.split_once(" = ").map_or(line, |(_, f)| f).trim();
+            if src.is_empty() {
+                continue;
+            }
+            let names: RefCell<Vec<String>> = RefCell::new(Vec::new());
+            let res = |n: &str| {
+                let mut v = names.borrow_mut();
+                let i = v.iter().position(|x| x == n).unwrap_or_else(|| {
+                    v.push(n.to_string());
+                    v.len() - 1
+                });
+                Some(sym(i as u32))
+            };
+            let e = match crate::expr::parse::parse(src, &res) {
+                Ok(e) => e,
+                Err(m) => {
+                    println!("parse error {m}: {src}");
+                    continue;
+                }
+            };
+            let t0 = std::time::Instant::now();
+            set_deadline(Some(work_now() + std::time::Duration::from_secs(2)));
+            let s = if std::env::var("SGGEO_SIMPLIFY_FACTOR").is_ok() {
+                factor_sums(&e)
+            } else if std::env::var("SGGEO_SIMPLIFY_RESUB").is_ok() {
+                resubstituted(&e)
+            } else {
+                simplify_result(&e)
+            };
+            let names = names.borrow();
+            let show = |e: &Expr| crate::expr::bx::to_plain(e, &|s| names[s as usize].clone());
+            println!("{} -> {} ({:?}): {}", complexity(&e), complexity(&s), t0.elapsed(), show(&s));
+            if std::env::var("SGGEO_SIMPLIFY_CSE").is_ok() {
+                let (main, defs) = crate::expr::cse(&s, 0x7000_0000, 6);
+                let nm = |x: u32| if x >= 0x7000_0000 { format!("u{}", x - 0x7000_0000 + 1) } else { names[x as usize].clone() };
+                let total = crate::expr::bx::to_plain(&main, &nm).len() + defs.iter().map(|(_, d)| crate::expr::bx::to_plain(d, &nm).len()).sum::<usize>();
+                println!("  shown: {total} chars, main {}", crate::expr::bx::to_plain(&main, &nm));
+                for (k, d) in &defs {
+                    println!("  {} = {}", nm(*k), crate::expr::bx::to_plain(d, &nm));
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  c = 3
+  g1 = curve(y = exp(x) + exp(-x))
+
+construct
+  point A on g1
+    y_A: y(A) = c
+
+find
+  x_A: x(A)
+
+where
+  A (0.9624236501192069, 3)
+  y_A label (0.3, 0.3)
+  x_A label (0.3, 0.3)

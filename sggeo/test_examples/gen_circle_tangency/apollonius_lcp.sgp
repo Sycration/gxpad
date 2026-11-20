@@ -1,0 +1,32 @@
+sgp 2
+
+given
+  point A
+    x_A: x(A) = 1
+    y_A: y(A) = 3
+  point B
+    x_B: x(B) = 5
+    y_B: y(B) = 2
+  k1 = circle(B)
+    r1: r(k1) = 1
+  point C
+  k2 = circle(C)
+    xaxis tan k2
+    A on k2
+    k2 tan k1
+
+find
+  r2: r(k2)
+
+where
+  A (1, 3)
+  B (5, 2)
+  k1 r 1
+  C (2.25, 1.7604166666666665)
+  k2 r 1.7604166666666665
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)

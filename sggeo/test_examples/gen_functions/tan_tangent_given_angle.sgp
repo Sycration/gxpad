@@ -1,0 +1,20 @@
+sgp 2
+
+given
+  w = 70
+  g1 = curve(y = tan(x))
+
+construct
+  point A on g1
+  segment AB
+    AB tan g1
+    θ1: angle(xaxis, AB) = w*deg
+
+find
+  x_A: x(A)
+
+where
+  A (0.9231644869817038, 1.3219218658659906)
+  B (1.4231657736538237, 2.6956641106958967)
+  θ1 label (0.409346, 0.287117)
+  x_A label (0.3, 0.3)

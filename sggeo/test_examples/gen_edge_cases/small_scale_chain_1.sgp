@@ -1,0 +1,42 @@
+sgp 2
+
+given
+  segment OA
+    θ1: angle(xaxis, OA) = 30°
+    d1: |OA| = 5
+  segment OB
+    d2: |OB| = 3
+  segment AB
+    d3: |AB| = 5
+  segment BC
+    d4: |BC| = 4
+  segment AC
+    d5: |AC| = 4
+  k1 = circle(O)
+    r1: r(k1) = 1.5
+
+construct
+  D = tangent(C, k1)
+  segment CD
+
+find
+  d6: dist(O, C)
+  y_C: y(C)
+  y_D: y(D)
+
+where
+  A (4.330127018922194, 2.4999999999999996)
+  B (-0.6514859387194235, 2.928406746278746)
+  C (2.106860467402499, 5.825219668066115)
+  k1 r 1.5
+  D (-1.2450556916625277, 0.8365622060903448)
+  θ1 label (0.482766, 0.130141)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  d3 label (0.3, 0.3)
+  d4 label (0.3, 0.3)
+  d5 label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  d6 label (0.3, 0.3)
+  y_C label (0.3, 0.3)
+  y_D label (0.3, 0.3)

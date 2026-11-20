@@ -1,0 +1,26 @@
+sgp 2
+
+construct
+  point A on xaxis
+  line AB
+    vert A B
+  point C on yaxis
+  segment OB
+    d1: |OB| = 3
+  segment AC
+    d2: |AC| = 2
+  D = meet(OB, AC)
+    y_D: y(D) = 1
+
+find
+  x_A: x(A)
+
+where
+  A (1.2311857237786688, -4.067564042545842e-31)
+  B (1.2311857237786688, 2.7357232523710424)
+  C (-5.423418723394456e-31, 1.576128710976231)
+  D (0.45004030386173166, 1)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)
+  y_D label (0.3, 0.3)
+  x_A label (0.3, 0.3)

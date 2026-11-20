@@ -1,0 +1,27 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 5
+  line BC
+    horiz B C
+    y_B: y(B) = 6
+    x_B: x(B) = -6
+
+construct
+  point A on k1
+    d1: dist(A, BC) = 10.5
+
+find
+  x_A: x(A)
+
+where
+  k1 r 5
+  B (-6, 6)
+  C (4.333760226334399, 6)
+  A (2.1794494717703383, -4.499999999999999)
+  r1 label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)

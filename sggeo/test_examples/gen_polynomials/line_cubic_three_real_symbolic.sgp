@@ -1,0 +1,25 @@
+sgp 2
+
+given
+  line AB
+    x_A: x(A) = 0
+    y_A: y(A) = -1
+    x_B: x(B) = 1
+    y_B: y(B) = 2
+  g1 = curve(y = x^3)
+
+construct
+  C = meet(AB, g1)
+
+find
+  x_C: x(C)
+
+where
+  A (-1.2938158758247024e-171, -1)
+  B (1, 2)
+  C (1.5320888862379562, 3.596266658713869)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  x_B label (0.3, 0.3)
+  y_B label (0.3, 0.3)
+  x_C label (0.3, 0.3)

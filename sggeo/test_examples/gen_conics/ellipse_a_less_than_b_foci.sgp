@@ -1,0 +1,28 @@
+sgp 2
+
+given
+  e1 = ellipse(O)
+    a1: a(e1) = 3
+    b1: b(e1) = 5
+  point B
+
+construct
+  A = focus(e1)
+    O == mid(A, B)
+  point C on e1
+    x_C: x(C) = 1
+
+find
+  d1: dist(C, A)
+  d2: dist(C, B)
+
+where
+  e1 a 3 b 5 angle 0° [fixed angle]
+  B (0, -4)
+  A (0, 4)
+  C (1, 4.714045207910317)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  x_C label (0.3, 0.3)
+  d1 label (0.3, 0.3)
+  d2 label (0.3, 0.3)

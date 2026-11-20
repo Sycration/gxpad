@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 0.003
+  point A
+    x_A: x(A) = 0.005
+    y_A: y(A) = 0.004
+
+construct
+  B = tangent(A, k1)
+  segment AB
+
+find
+  y_B: y(B)
+
+where
+  k1 r 0.003
+  A (0.005, 0.004)
+  B (0.00275322563399777, -0.0011915320424972123)
+  r1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  y_B label (0.3, 0.3)

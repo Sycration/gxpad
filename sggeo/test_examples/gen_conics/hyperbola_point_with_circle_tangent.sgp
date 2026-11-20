@@ -1,0 +1,24 @@
+sgp 2
+
+given
+  h1 = hyperbola(O)
+    a1: a(h1) = 3
+    b1: b(h1) = 4
+  point A
+    x_A: x(A) = 0
+  k1 = circle(A)
+    k1 tan h1 near (-4.386342439892262, 4.2666666666666675)
+    r1: r(k1) = 5
+
+find
+  y_A: y(A)
+
+where
+  h1 a 3 b 4 angle 0° [fixed angle]
+  A (-1.268896891983012e-21, 6.666666666666668)
+  k1 r 5
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  y_A label (0.3, 0.3)

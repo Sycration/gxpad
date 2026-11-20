@@ -1,0 +1,17 @@
+sgp 2
+
+given
+  a = -2
+  b = 1
+  segment OA
+    d1: |OA| = 5
+    θ1: angle(xaxis, OA) = atan2(b, a)
+
+find
+  x_A: x(A)
+
+where
+  A (-4.472135954999579, 2.2360679774997907)
+  d1 label (0.3, 0.3)
+  θ1 label (0.133467, 0.481857)
+  x_A label (0.3, 0.3)

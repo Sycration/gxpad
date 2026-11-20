@@ -1,0 +1,42 @@
+sgp 2
+
+given
+  line AB
+  line BC
+  line CA
+  point D
+  k1 = circle(D)
+    AB tan k1
+    BC tan k1
+    CA tan k1
+    r1: r(k1) = 12
+  point E
+  k2 = circle(E)
+    AB tan k2
+    BC tan k2
+    CA tan k2
+    r2: r(k2) = 14
+  point F
+  k3 = circle(F)
+    AB tan k3
+    BC tan k3
+    CA tan k3
+    r3: r(k3) = 10.5
+
+find
+  d1: dist(A, B)
+
+where
+  A (0.3691699859866988, -0.05953750612460079)
+  B (14.369085276229436, -0.1082393133558358)
+  C (5.410884138700163, 11.922996382929446)
+  D (8.32737717421292, -12.08729450189337)
+  k1 r 12
+  E (21.41774472858204, 13.867325073271283)
+  k2 r 14
+  F (-6.594261303711246, 10.46474986517307)
+  k3 r 10.5
+  r1 label (0.3, 0.3)
+  r2 label (0.3, 0.3)
+  r3 label (0.3, 0.3)
+  d1 label (0.3, 0.3)

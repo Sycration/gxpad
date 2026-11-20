@@ -1,0 +1,29 @@
+sgp 2
+
+given
+  e1 = ellipse(O)
+    a1: a(e1) = 5
+    b1: b(e1) = 3
+  point A
+    x_A: x(A) = 5
+    y_A: y(A) = 0
+  k1 = circle(A)
+    r1: r(k1) = 4
+
+construct
+  B = meet(e1, k1)
+
+find
+  x_B: x(B)
+
+where
+  e1 a 5 b 3 angle 0° [fixed angle]
+  A (5, 7.295385651483917e-26)
+  k1 r 4
+  B (2.0757625779106816, 2.7292554844228887)
+  a1 label (0.3, 0.3)
+  b1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
+  y_A label (0.3, 0.3)
+  r1 label (0.3, 0.3)
+  x_B label (0.3, 0.3)

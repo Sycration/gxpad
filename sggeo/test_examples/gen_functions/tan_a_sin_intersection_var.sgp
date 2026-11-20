@@ -1,0 +1,16 @@
+sgp 2
+
+given
+  a = 2.5
+  g1 = curve(y = tan(x))
+  g2 = curve(y = a*sin(x))
+
+construct
+  A = meet(g1, g2)
+
+find
+  x_A: x(A)
+
+where
+  A (1.1592794807274085, 2.29128784747792)
+  x_A label (0.3, 0.3)

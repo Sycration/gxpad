@@ -129,16 +129,19 @@ fn exact(v: f64) -> String {
 }
 
 /// Angle `rad` in degrees, as the shortest decimal that converts back to
-/// exactly `rad`.
+/// exactly `rad`. When no decimal does (degrees and radians round
+/// differently), the shortest one for the angle that 17 digits read back
+/// as, so that a file saves as it reads.
 fn degrees(rad: f64) -> String {
-    let deg = rad.to_degrees();
-    for n in 1..=17 {
-        let s = sig(deg, n);
-        if s.parse::<f64>().is_ok_and(|v| v.to_radians() == rad) {
-            return s;
-        }
+    let shortest = |rad: f64| {
+        let deg = rad.to_degrees();
+        (1..=17).map(|n| sig(deg, n)).find(|s| s.parse::<f64>().is_ok_and(|v| v.to_radians() == rad))
+    };
+    if let Some(s) = shortest(rad) {
+        return s;
     }
-    sig(deg, 17)
+    let s17 = sig(rad.to_degrees(), 17);
+    s17.parse::<f64>().ok().and_then(|v| shortest(v.to_radians())).unwrap_or(s17)
 }
 
 #[cfg(test)]
@@ -153,6 +156,10 @@ mod tests {
         assert_eq!(sig(1234567.89, 3), "1234568");
         assert_eq!(degrees(30f64.to_radians()), "30");
         assert_eq!(degrees(0.9272952180016124).parse::<f64>().unwrap().to_radians(), 0.9272952180016124);
+        // no decimal gives exactly this angle back; the one written must at
+        // least write the same way once read
+        let once = degrees(25.771133672187421f64.to_radians());
+        assert_eq!(degrees(once.parse::<f64>().unwrap().to_radians()), once);
         assert_eq!(exact(4.925937527486427), "4.925937527486427");
         assert_eq!(exact(9.755345e-26), "9.755345e-26");
         assert_eq!(exact(-2.5), "-2.5");

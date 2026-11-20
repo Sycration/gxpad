@@ -1,0 +1,18 @@
+sgp 2
+
+given
+  k1 = circle(O)
+    r1: r(k1) = 2
+  g1 = curve(y = x^3)
+
+construct
+  A = meet(k1, g1)
+
+find
+  x_A: x(A)
+
+where
+  k1 r 2
+  A (1.174221742316821, 1.6190130635268045)
+  r1 label (0.3, 0.3)
+  x_A label (0.3, 0.3)
